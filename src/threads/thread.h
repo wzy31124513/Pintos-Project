@@ -88,6 +88,14 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+
+    int priority0; /*original priority.*/
+    struct lock* wait;
+    struct list locks;
+    struct list_elem lock_elem;    
+	int nice;
+	int recent_cpu;
+	struct list_elem sleepelem;    
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -100,13 +108,14 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    int ticks;
   };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-
+int load_avg;
 void thread_init (void);
 void thread_start (void);
 
@@ -137,5 +146,6 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
+bool cmp(const struct list_elem *a, const struct list_elem *b,void* c UNUSED);
+bool ticks_more(const struct list_elem *a, const struct list_elem *b,void* c UNUSED);
 #endif /* threads/thread.h */

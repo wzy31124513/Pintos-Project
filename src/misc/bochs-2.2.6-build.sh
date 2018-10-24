@@ -1,5 +1,8 @@
 #! /bin/sh -e
 
+SRCDIR=/home/pintos/Downloads
+PINTOSDIR=/home/pintos/pintos
+DSTDIR=/home/pintos
 if test -z "$SRCDIR" || test -z "$PINTOSDIR" || test -z "$DSTDIR"; then
     echo "usage: env SRCDIR=<srcdir> PINTOSDIR=<srcdir> DSTDIR=<dstdir> sh $0"
     echo "  where <srcdir> contains bochs-2.2.6.tar.gz"
@@ -26,7 +29,7 @@ cat $PINTOSDIR/src/misc/bochs-2.2.6-namespace.patch | patch -p1
 if test "`uname -s`" = "SunOS"; then
     cat $PINTOSDIR/src/misc/bochs-2.2.6-solaris-link.patch | patch -p1
 fi
-CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR --enable-cpu-level=6"
+CFGOPTS=" --with-term --with-nogui --prefix=$DSTDIR --enable-cpu-level=6"
 mkdir plain &&
         cd plain && 
         ../configure $CFGOPTS --enable-gdb-stub && 
