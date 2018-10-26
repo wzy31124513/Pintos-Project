@@ -92,10 +92,9 @@ struct thread
     int priority0; /*original priority.*/
     struct lock* wait;
     struct list locks;
-    struct list_elem lock_elem;    
+    struct list_elem lock_elem;
 	int nice;
 	int recent_cpu;
-	struct list_elem sleepelem;    
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -105,10 +104,10 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
+    int ticks;
+    int rtn; //return value.
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    int ticks;
   };
 
 /* If false (default), use round-robin scheduler.
