@@ -55,15 +55,13 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  char* p;
-  char* name=strtok_r(file_name," ",&p);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (name, &if_.eip, &if_.esp);
+  success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -200,7 +198,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp,char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -307,7 +305,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp,file_name))
     goto done;
 
   /* Start address. */
@@ -432,7 +430,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp)
+setup_stack (void **esp,char* file_name)
 {
   uint8_t *kpage;
   bool success = false;
@@ -442,10 +440,41 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE-12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
+    char* p;
+    char* name=strtok_r(file_name," ",&p);
+    int argc=1;
+    char* argv[128];
+    argv[0]=name;
+    char* temp=strtok_r(NULL," ",&p);
+    while (temp!=NULL) {
+        argv[argc]=temp;
+        argc++;
+        temp=strtok_r(NULL," ",&p);
+    }
+    for (int i = argc-1; i > 0; i--) {
+        *esp-=strlen(argv[i])+1;
+        strlcpy(*esp, argv[i], strlen(argv[i])+1);
+    }
+    while(*esp%4!=0){
+        *esp--;
+        uint8_t o=0;
+        memcpy(*esp,&o,sizeof(o));
+    }
+    int null=0;
+    *esp-=sizeof(null);
+    memcpy(*esp,&null,sizeof(null));
+    for (int i = argc-1; i >= 0; i--) {
+        *esp-=sizeof(argv[i]);
+        memcpy（*esp,&argv[i],sizeof(argv[i])）;
+    }
+    *esp-=sizeof(argv);
+    memcpy(*esp,&((int)*esp+sizeof(argv)),sizeof(argv));
+    *esp-=sizeof(int);
+    memcpy(*esp,&argc,sizeof(argc));
   return success;
 }
 
