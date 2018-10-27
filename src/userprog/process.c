@@ -32,7 +32,7 @@ process_execute (const char *file_name)
   tid_t tid;
   char* name;
   char* p;
-  name=strtok_r(file_name," ",&p);
+  name=strtok_r((char*)file_name," ",&p);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -459,22 +459,22 @@ setup_stack (void **esp,char* file_name)
         *esp-=strlen(argv[i])+1;
         strlcpy(*esp, argv[i], strlen(argv[i])+1);
     }
-    while(*esp%4!=0){
+    while((int)*esp%4!=0){
         *esp--;
         uint8_t o=0;
-        memcpy(*esp,&o,sizeof(o));
+        *esp=&o;
     }
     int null=0;
-    *esp-=sizeof(null);
-    memcpy(*esp,&null,sizeof(null));
+    *esp-=sizeof(int);
+    *esp=&null;
     for (int i = argc-1; i >= 0; i--) {
         *esp-=sizeof(argv[i]);
-        memcpy（*esp,&argv[i],sizeof(argv[i])）;
+        *esp=&argv[i];
     }
-    *esp-=sizeof(argv);
-    memcpy(*esp,&((int)*esp+sizeof(argv)),sizeof(argv));
     *esp-=sizeof(int);
-    memcpy(*esp,&argc,sizeof(argc));
+    *esp=&((int)*esp+sizeof(int))
+    *esp-=sizeof(int);
+    *esp=&argc;
   return success;
 }
 
