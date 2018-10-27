@@ -471,8 +471,9 @@ setup_stack (void **esp,char* file_name)
         *esp-=sizeof(argv[i]);
         *esp=&argv[i];
     }
+    int a=*esp;
     *esp-=sizeof(int);
-    *esp=&((int)*esp+sizeof(int));
+    *esp=&a;
     *esp-=sizeof(int);
     *esp=&argc;
   return success;
