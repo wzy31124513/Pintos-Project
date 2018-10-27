@@ -440,10 +440,11 @@ setup_stack (void **esp,char* file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE-12;
       else
         palloc_free_page (kpage);
     }
+    return success;
     char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
