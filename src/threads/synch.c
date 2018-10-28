@@ -218,7 +218,6 @@ lock_acquire (struct lock *lock)
   }
   
   sema_down (&lock->semaphore);
-  thread_yield1(thread_current());
   lock->holder = thread_current ();
   intr_set_level(old_level);
 }
@@ -293,7 +292,6 @@ lock_release (struct lock *lock)
   sema_up (&lock->semaphore);
   
  
-  thread_yield1(thread_current());
   intr_set_level(old_level);
    
 }
