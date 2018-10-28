@@ -661,8 +661,7 @@ void thread_yield1 (struct thread* cur){
     
       old_level = intr_disable ();
       if (cur != idle_thread) {
-        list_push_back (&ready_list, &cur->elem);
-        list_sort(&ready_list,cmp,NULL);
+         list_insert_ordered (&ready_list, &cur->elem,cmp, NULL);
       }
       cur->status = THREAD_READY;
       schedule ();
