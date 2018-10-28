@@ -440,11 +440,10 @@ setup_stack (void **esp,char* file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE-12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
-    return success;
     char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
@@ -452,31 +451,31 @@ setup_stack (void **esp,char* file_name)
     argv[0]=name;
     char* temp=strtok_r(NULL," ",&p);
     while (temp!=NULL) {
+        *esp-=strlen(temp)+1;
+        strlcpy(*esp, temp, strlen(temp)+1);
         argv[argc]=temp;
         argc++;
         temp=strtok_r(NULL," ",&p);
     }
-    for (int i = argc-1; i > 0; i--) {
-        *esp-=strlen(argv[i])+1;
-        strlcpy(*esp, argv[i], strlen(argv[i])+1);
-    }
     while((int)*esp%4!=0){
         *esp--;
         uint8_t o=0;
-        *esp=&o;
+        **esp=o;
     }
     int null=0;
     *esp-=sizeof(int);
-    *esp=&null;
+    **esp=null;
     for (int i = argc-1; i >= 0; i--) {
-        *esp-=sizeof(argv[i]);
-        *esp=&argv[i];
+        *esp-=sizeof(int);
+        memcpy(*esp,&argv[i],sizeof(int));
     }
     int a=*esp;
     *esp-=sizeof(int);
-    *esp=&a;
+    **esp=a;
     *esp-=sizeof(int);
-    *esp=&argc;
+    **esp=argc;
+    *esp-=sizeof(int);
+    **esp=null;
   return success;
 }
 
