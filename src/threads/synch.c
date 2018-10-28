@@ -289,7 +289,7 @@ lock_release (struct lock *lock)
   }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  thread_yield();
+  //thread_yield();
  
   intr_set_level(old_level);
    
