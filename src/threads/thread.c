@@ -249,10 +249,9 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-  if (thread_started)
-  {
-    thread_current ()->status = THREAD_BLOCKED;
-  }
+
+  thread_current ()->status = THREAD_BLOCKED;
+
   schedule ();
 }
 
