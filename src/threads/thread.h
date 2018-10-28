@@ -100,6 +100,7 @@ struct thread
 
     /* Owned by thread.c. */
     int rtn; /*return value*/
+    
     unsigned magic;                     /* Detects stack overflow. */
   };
 
