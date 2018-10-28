@@ -460,22 +460,22 @@ setup_stack (void **esp,char* file_name)
     while((int)*esp%4!=0){
         *esp--;
         uint8_t o=0;
-        **esp=o;
+        memcpy(*esp,&o,sizeof(uint8_t));
     }
     int null=0;
     *esp-=sizeof(int);
-    **esp=null;
+    memcpy(*esp,&null,sizeof(int));
     for (int i = argc-1; i >= 0; i--) {
         *esp-=sizeof(int);
         memcpy(*esp,&argv[i],sizeof(int));
     }
     int a=*esp;
     *esp-=sizeof(int);
-    **esp=a;
+    memcpy(*esp,&a,sizeof(int));
     *esp-=sizeof(int);
-    **esp=argc;
+    memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
-    **esp=null;
+    memcpy(*esp,&null,sizeof(int));
   return success;
 }
 
