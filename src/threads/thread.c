@@ -380,6 +380,7 @@ thread_set_priority (int new_priority)
 	  thread_current()->priority=new_priority;
      }
   }
+  thread_yield1(thread_current());
   intr_set_level (old_level);
 
 }
