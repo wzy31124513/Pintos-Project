@@ -1,0 +1,221 @@
+			+--------------------+
+			| CS 140             |
+			| PROJECT 1: THREADS |
+			| DESIGN DOCUMENT    |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Ziyang Wang <wangzy4@shanghaitech.edu.cn>
+Kefei Wu <wukf@shanghaitech.edu.cn>
+
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+struct thread{
+	int ticks; /*record ticks to sleep, -1 in each tick, default 0.*/
+}
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+	
+	timer_sleep():set ticks to thread_current() and block the thread if ticks>0.
+	
+	timer_interrupt():timer_interrupt() is called in every tick,timer_interrupt() calls thread_tick() in "thread.c". Therefore, in thread_tick() function, for every thread, subtract each thread's ticks by 1 and check if ticks=0, if so, unblock the thread.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+	Make another list to store thread that sleeps which sorted by their ticks. If ticks<0 just break the loop.
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+	use enum intr_level old_level=intr_disable() to disabled thread interrupt.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+	Set the interrupt disabled when call timer_sleep, then timer_interrupt can't happened.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+	Because this design use less data structures and functions. Another is to use a function to decrease thread's ticks, and use thread_for_each() to call the function.
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+  struct thread:
+    struct lock* wait; /*the lock that thread are waiting.*/
+    struct list locks; /* list of locks that thread accquired.*/
+    struct list_elem lock_elem; /*list elem of list locks*/
+    int priority0; /*original priority of the thread*/
+	In thread.h：
+		bool cmp(const struct list_elem *a, const struct list_elem *b,void* c UNUSED); /*compare the priority of threads*/
+	In synch.h:
+		bool condcmp(struct list_elem *a, struct list_elem *b, void* c __attribute__ ((unused))); /*compare the priority of threads when cond_signal() is called*/
+	
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+
+	Thread 1     31	    	32		33		31			31			31		31		31
+				lock a  	lock a	lock a	release a							finished
+    -------------------------------------------------------------------------------------
+	Thread 2     x			32		33		33			32			32		32		x
+							lock a  locka   lock a      release a		finished
+							lock b  lockb   lock b      release b 
+    -------------------------------------------------------------------------------------
+	Thread 3     x			x		33		33			33			33		x		x
+									lockb	lockb		lockb		finished
+
+	-------------------------------------------------------------------------------------
+ Thread_running  1			1		1		2			3			3		2		1
+							
+
+
+
+
+	
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+	Sort the waiter_list by priority and  when sema_up(), and push thread with the highest priority into ready_list.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+	Disable interruption, check if the lock already has a holder. If the lock has no holder, set lock->holder() to thread_current(). If the lock has a holder, look for the holder's priority and priority of all holders of lock holder's locks, if the max priority of them is less than current thread's priority, change the priority of them. Enable interruption.
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+	Disable interruption. Check if lock list is empty, if so, change the priority to the original priority and set lock->holder to NULL. If not, remove the lock holders that have same lock with the released one in the lock list, and find the maximum priority, compare it to the original priority, set priority to the larger one, set lock->holder to NULL. sema_up() and disable interruption. 
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+	
+	Disable interruption. Lock can't be used because the set of thread priority is ahead of all operation on locks, so that there's some operations that cannot acquire locks may use thread_set_priority().
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+	Another design is to set the lock list and priority in struct locks, which is easier to remove list members when release the lock. I didn't choose that design because I don't want to change more files and data structures, which is more conplicated and not necessary.
+
+			  ADVANCED SCHEDULER
+			  ==================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+	"fixed-point.h"
+        int load_avg; /*load_avg*/
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0     0	0	0	63  61  59     A
+ 4     4 	0	0	62  61  59     A
+ 8	   8	0	0	61	61	59	   B
+12	   8	4   0   61  60  59     A
+16	   12	4	0	60  60  59	   B
+20	   12   8	0	60	59	59	   A
+24	   16	8	0	59	59	59	   C
+28	   16	8	4	59	59	58	   B
+32	   16	12	4	59	58	58	   A
+36	   20	12	4	58	58	58	   C
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+
+	When there're more than 2 threads that have same priority, the thread to run will be uncertain. Because every time after thread_yield(), thread_current() will be put back to the ready_list, if there're other threads have same priority, the least recent one will be run next.
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+	Inside the interrupt context will affect performance more, because everytime calculating recent_cpu, updating priority and calculating load_avg will happened in interrupt section.Only operation about nice happen outside interrupt context, which doesn't cost a lot.
+
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+	Advantage: Use new data structures as less as possible, and not have any extra custom function.
+    Disadvantage: Sometimes there're a too much loops and sorts which takes a lot of times. 
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+	It takes a lot of time to understand the whole structure of all files and figure out how to finish this project.
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+	Yes.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+	It's much better to tell us which functions that we might want to modify.
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+	No.
+
+>> Any other comments?
