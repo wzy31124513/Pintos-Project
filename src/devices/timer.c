@@ -7,7 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
- 
+  
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -23,7 +23,7 @@ static int64_t ticks;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
-static struct list sleep_list;
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -44,7 +44,7 @@ void
 timer_calibrate (void) 
 {
   unsigned high_bit, test_bit;
-  
+
   ASSERT (intr_get_level () == INTR_ON);
   printf ("Calibrating timer...  ");
 
@@ -89,16 +89,11 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  if(ticks<=0){
-      return;
-  }
   int64_t start = timer_ticks ();
+
   ASSERT (intr_get_level () == INTR_ON);
-  enum intr_level old_level=intr_disable();
-  thread_current()->ticks=ticks;
-  thread_block();
-  
-  intr_set_level(old_level);
+  while (timer_elapsed (start) < ticks) 
+    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
