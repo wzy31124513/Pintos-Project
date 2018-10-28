@@ -113,6 +113,7 @@ sema_up (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   struct thread* temp=NULL;
+  struct thread* cur=thread_current();
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)){ 
    
@@ -124,7 +125,7 @@ sema_up (struct semaphore *sema)
   sema->value++;
   if (temp!=NULL && temp->priority>thread_current()->priority)
   {
-    thread_yield1(thread_current());
+    thread_yield1(cur);
   }
 
   intr_set_level (old_level);
