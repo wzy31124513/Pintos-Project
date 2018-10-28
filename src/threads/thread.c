@@ -238,7 +238,7 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
   if (t->priority>thread_current()->priority)
   {
-    thread_yield1(thread_current());
+    thread_yield();
   }
   return tid;
 }
@@ -386,7 +386,7 @@ thread_set_priority (int new_priority)
      }
     if (thread_current()->status==THREAD_RUNNING && thread_current()->priority < list_entry(list_begin(&ready_list),struct thread,elem)->priority)
     {
-      thread_yield1(thread_current());
+      thread_yield();
     }
   }
   intr_set_level (old_level);
