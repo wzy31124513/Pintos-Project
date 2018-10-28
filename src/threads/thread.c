@@ -60,7 +60,6 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
-bool thread_started=0;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -114,7 +113,6 @@ thread_start (void)
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
-  thread_started=1;
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
@@ -236,7 +234,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  thread_yield();
+  thread_yield1(thread_current());
   return tid;
 }
 
@@ -344,17 +342,15 @@ thread_yield (void)
   enum intr_level old_level;
 
   ASSERT (!intr_context ());
-  if (thread_started)
-  {
-    old_level = intr_disable ();
-    if (cur != idle_thread) {
-      list_push_back (&ready_list, &cur->elem);
-      list_sort(&ready_list,cmp,NULL);
-    }
-    cur->status = THREAD_READY;
-    schedule ();
-    intr_set_level (old_level);
+
+  old_level = intr_disable ();
+  if (cur != idle_thread) {
+    list_push_back (&ready_list, &cur->elem);
+    list_sort(&ready_list,cmp,NULL);
   }
+  cur->status = THREAD_READY;
+  schedule ();
+  intr_set_level (old_level);
 }
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
@@ -385,7 +381,6 @@ thread_set_priority (int new_priority)
 	  thread_current()->priority=new_priority;
      }
   }
-  thread_yield();
   intr_set_level (old_level);
 
 }
@@ -403,7 +398,6 @@ thread_set_nice (int nice UNUSED)
 {
   thread_current()->nice=nice;
   thread_current()->priority=PRI_MAX-ftinearest(divxn(thread_current()->recent_cpu,4))-2*nice;
-  thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -647,4 +641,19 @@ bool cmp(const struct list_elem *a, const struct list_elem *b,void* c UNUSED){
 	    return 1;
     }
 	return 0;
+}
+void thread_yield1(struct thread* cur){
+
+  enum intr_level old_level;
+
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  if (cur != idle_thread) {
+    list_push_back (&ready_list, &cur->elem);
+    list_sort(&ready_list,cmp,NULL);
+  }
+  cur->status = THREAD_READY;
+  schedule ();
+  intr_set_level (old_level);
 }
