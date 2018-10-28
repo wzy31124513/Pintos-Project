@@ -444,7 +444,60 @@ setup_stack (void **esp,char* file_name)
       else
         palloc_free_page (kpage);
     }
-    char* p;
+      char *token, *save_ptr;
+  int argc = 0,i;
+
+  char * copy = malloc(strlen(file_name)+1);
+  strlcpy (copy, file_name, strlen(file_name)+1);
+
+
+  for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr))
+    argc++;
+
+
+  int *argv = calloc(argc,sizeof(int));
+
+  for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr),i++)
+    {
+      *esp -= strlen(token) + 1;
+      memcpy(*esp,token,strlen(token) + 1);
+
+      argv[i]=*esp;
+    }
+
+  while((int)*esp%4!=0)
+  {
+    *esp-=sizeof(char);
+    char x = 0;
+    memcpy(*esp,&x,sizeof(char));
+  }
+
+  int zero = 0;
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  for(i=argc-1;i>=0;i--)
+  {
+    *esp-=sizeof(int);
+    memcpy(*esp,&argv[i],sizeof(int));
+  }
+
+  int pt = *esp;
+  *esp-=sizeof(int);
+  memcpy(*esp,&pt,sizeof(int));
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&argc,sizeof(int));
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  free(copy);
+  free(argv);
+    /*char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
     char* argv[128];
@@ -475,7 +528,7 @@ setup_stack (void **esp,char* file_name)
     *esp-=sizeof(int);
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
+    memcpy(*esp,&null,sizeof(int));*/
   return success;
 }
 
