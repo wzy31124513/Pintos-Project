@@ -652,3 +652,20 @@ bool cmp(const struct list_elem *a, const struct list_elem *b,void* c UNUSED){
     }
 	return 0;
 }
+
+void thread_yield1 (struct thread* cur){
+  if (thread_started){
+      enum intr_level old_level;
+    
+      ASSERT (!intr_context ());
+    
+      old_level = intr_disable ();
+      if (cur != idle_thread) {
+        list_push_back (&ready_list, &cur->elem);
+        list_sort(&ready_list,cmp,NULL);
+      }
+      cur->status = THREAD_READY;
+      schedule ();
+      intr_set_level (old_level);
+  }
+}
