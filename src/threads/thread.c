@@ -60,6 +60,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+bool thread_started=0;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -93,7 +94,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -107,6 +108,7 @@ void
 thread_start (void)
 {
   /* Create the idle thread. */
+  thread_started=1;
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
@@ -249,9 +251,9 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
+  if(thread_started){
   thread_current ()->status = THREAD_BLOCKED;
-
+  }
   schedule ();
 }
 
@@ -643,17 +645,19 @@ bool cmp(const struct list_elem *a, const struct list_elem *b,void* c UNUSED){
 	return 0;
 }
 void thread_yield1(struct thread* cur){
+  if (thread_started)
+  {
+      enum intr_level old_level;
 
-  enum intr_level old_level;
+      ASSERT (!intr_context ());
 
-  ASSERT (!intr_context ());
-
-  old_level = intr_disable ();
-  if (cur != idle_thread) {
-    list_push_back (&ready_list, &cur->elem);
-    list_sort(&ready_list,cmp,NULL);
+      old_level = intr_disable ();
+      if (cur != idle_thread) {
+         list_push_back (&ready_list, &cur->elem);
+         list_sort(&ready_list,cmp,NULL);
+      }
+      cur->status = THREAD_READY;
+      schedule ();
+      intr_set_level (old_level);
   }
-  cur->status = THREAD_READY;
-  schedule ();
-  intr_set_level (old_level);
 }
