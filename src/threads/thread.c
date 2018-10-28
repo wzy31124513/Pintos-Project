@@ -60,7 +60,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
-
+bool thread_started=0;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -114,7 +114,7 @@ thread_start (void)
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
-
+  thread_started=1;
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
@@ -251,8 +251,10 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
-  thread_current ()->status = THREAD_BLOCKED;
+  if (thread_started)
+  {
+    thread_current ()->status = THREAD_BLOCKED;
+  }
   schedule ();
 }
 
@@ -342,15 +344,17 @@ thread_yield (void)
   enum intr_level old_level;
 
   ASSERT (!intr_context ());
-
-  old_level = intr_disable ();
-  if (cur != idle_thread) {
-    list_push_back (&ready_list, &cur->elem);
- 	list_sort(&ready_list,cmp,NULL);
+  if (thread_started)
+  {
+    old_level = intr_disable ();
+    if (cur != idle_thread) {
+      list_push_back (&ready_list, &cur->elem);
+      list_sort(&ready_list,cmp,NULL);
+    }
+    cur->status = THREAD_READY;
+    schedule ();
+    intr_set_level (old_level);
   }
-  cur->status = THREAD_READY;
-  schedule ();
-  intr_set_level (old_level);
 }
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
