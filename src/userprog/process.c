@@ -72,7 +72,7 @@ start_process (void *file_name_)
     }else{
       thread_current()->parent->child_load=-1;
     }
-    cond_signal(&thread_current()->parent->wait_cond,thread_current()->parent->wait_for_child);
+    cond_signal(&thread_current()->parent->wait_cond,&thread_current()->parent->wait_for_child);
     lock_release(&thread_current()->parent->wait_for_child);
   }
   /* If load failed, quit. */
