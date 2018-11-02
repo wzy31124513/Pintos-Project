@@ -96,11 +96,15 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    int exitcode; /*return status*/
+    struct thread* parent;
+    int child_load;
+    struct lock wait_for_child;
+    struct condition wait_cond;
 #endif
 
     /* Owned by thread.c. */
-    int rtn; /*return value*/
-    
+
     unsigned magic;                     /* Detects stack overflow. */
   };
 

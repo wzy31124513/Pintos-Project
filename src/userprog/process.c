@@ -63,6 +63,18 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load ((char*)file_name, &if_.eip, &if_.esp);
 
+  if (thread_current()->parent)
+  { 
+    lock_acquire(thread_current()->parent->wait_for_child);
+    if (success)
+    {
+      thread_current()->parent->child_load=1;
+    }else{
+      thread_current()->parent->child_load=-1;
+    }
+    cond_signal(thread_current()->parent->wait_cond,thread_current()->parent->wait_for_child);
+    lock_release(thread_current()->parent->wait_for_child);
+  }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success)
@@ -90,6 +102,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
+  while(true);
   return -1;
 }
 
@@ -112,7 +125,7 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      printf ("%s: exit(%d)\n",cur->name, cur->rtn);
+      printf ("%s: exit(%d)\n",cur->name, cur->exitcode);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -441,26 +454,31 @@ setup_stack (void **esp,char* file_name)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
-      else
+      else{
         palloc_free_page (kpage);
+        return success;
+      }
     }
     char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
     char* argv[128];
-    argv[0]=name;
+    *esp-=strlen(name)+1;
+    strlcpy(*esp,name,strlen(name)+1);
+    argv[0]=*esp;
     char* temp=strtok_r(NULL," ",&p);
     while (temp!=NULL) {
         *esp-=strlen(temp)+1;
         strlcpy(*esp, temp, strlen(temp)+1);
-        argv[argc]=temp;
+        argv[argc]=*esp;
         argc++;
         temp=strtok_r(NULL," ",&p);
     }
+    argv[argc]=0;
     while((int)*esp%4!=0){
         *esp--;
         uint8_t o=0;
-        memcpy(*esp,&o,sizeof(uint8_t));
+        memcpy(*esp,&o,1);
     }
     int null=0;
     *esp-=sizeof(int);
@@ -476,7 +494,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    
+
   return success;
 }
 
