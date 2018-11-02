@@ -111,7 +111,7 @@ struct thread
 
   struct child_proc
   {
-    tid_t tid;
+    tid_t id;
     int ret;
     struct list_elem elem;
   };

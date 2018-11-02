@@ -45,7 +45,7 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  struct child_proc* child=calloc(1,struct,child_proc);
+  struct child_proc* child=calloc(1,struct child_proc);
   child->id=tid;
   list_push_back(&thread_current()->children,&child->elem);
   return tid;
@@ -107,12 +107,13 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
-  struct child_proc* child=NULL;
+  struct child_proc* child;
+  struct thread* t=NULL;
   for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
     if (list_entry(e,struct child_proc,elem)->id==child_tid)
     {
-      child=get_thread(child_tid);
+      child=list_entry(e,struct child_proc,elem);
     }
   }
   if (child==NULL)
@@ -150,12 +151,12 @@ process_exit (void)
       pagedir_destroy (pd);
     }
   struct list_elem* e;
-  struct thread* t;
+  struct child_proc* child;
   for (e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e=list_next(e))
   {
-    t=list_entry(e,struct child_proc,elem);
+    child=list_entry(e,struct child_proc,elem);
     list_remove(e);
-    free(t);
+    free(child);
   }
 }
 
