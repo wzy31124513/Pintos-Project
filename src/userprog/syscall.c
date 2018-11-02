@@ -8,6 +8,7 @@
 #include "devices/shutdown.h"
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 #include "threads/malloc.h"
 
 
@@ -34,13 +35,13 @@ int filesize (int fd);
 int read (int fd, void *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
-void tell (int fd);
+unsigned tell (int fd);
 void close (int fd);
 
 
 
 bool is_valid_vaddr(const void* esp){
-	if(esp!=NULL && is_user_vaddr(esp) && pagedir_get_page(thread_current(),esp)!=NULL){
+	if(esp!=NULL && is_user_vaddr(esp) && pagedir_get_page(thread_current()->pagedir,esp)!=NULL){
 		return 1;
 	}
 	return 0;
@@ -134,21 +135,20 @@ int read (int fd, void *buffer, unsigned size){
 	{
 		for (unsigned i = 0; i < size; i++)
 		{
-			buffer[i]=input_getc();
+			(char)buffer[i]=input_getc();
 		}
 		return size;
 
-	}else{
-		lock_acquire (&file_lock); 
-		struct fds* fds=getfile(fd);
-		if (fds==NULL)
-		{
-			return -1;
-		}else{
-			return file_read(fn->f,buffer,size);
-		}
-		lock_release (&file_lock);
 	}
+	lock_acquire (&file_lock); 
+	struct fds* fds=getfile(fd);
+	if (fds==NULL)
+	{
+		return -1;
+	}else{
+		return file_read(fds->f,buffer,size);
+	}
+	lock_release (&file_lock);
 }
 
 int write (int fd, const void *buffer, unsigned size){
@@ -275,7 +275,7 @@ struct fds* getfile(int fd){
 	for(e=list_begin(&file_list);e!=list_end(&file_list);e=list_next(e)){
 		if (list_entry(e,struct fds, elem)->fd==fd)
 		{
-			return list_entry(e,struct fds, elem)->fd;
+			return (struct fds*)list_entry(e,struct fds, elem)->fd;
 		}
 	}
 	return NULL;
