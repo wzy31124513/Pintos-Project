@@ -151,12 +151,12 @@ process_exit (void)
       pagedir_destroy (pd);
     }
   struct list_elem* e;
-  struct thread* t;
+  struct child_proc* child;
   for (e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e=list_next(e))
   {
-    t=list_entry(e,struct child_proc,elem);
+    child=list_entry(e,struct child_proc,elem);
     list_remove(e);
-    free(t);
+    free(child);
   }
 }
 
