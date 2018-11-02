@@ -600,9 +600,9 @@ struct thread* get_thread(tid_t tid){
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_tail(&all_list); e=list_next(e))
   {
-    if (thread_current()->tid==tid)
+    if (list_entry(e,struct thread,allelem)->tid==tid)
     {
-      return t;
+      return list_entry(e,struct thread,allelem);
     }
   }
   return NULL;
