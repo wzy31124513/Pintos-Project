@@ -226,13 +226,13 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 	if (*esp==SYS_HALT)
 	{
-		f->eax=halt();
+		halt();
 	}else if (*esp==SYS_HALT)
 	{
 		f->eax=wait(*(esp+1));
 	}else if (*esp==SYS_EXIT)
 	{
-		f->eax=exit(*(esp+1));
+		exit(*(esp+1));
 	}else if (*esp==SYS_EXEC)
 	{
 		f->eax=exec((char*)*(esp+1));
@@ -256,13 +256,13 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax=write(*(esp+1),(void*)*(esp+2),*(esp+3));
 	}else if (*esp==SYS_SEEK)
 	{
-		f->eax=seek(*(esp+1),*(esp+2));
+		seek(*(esp+1),*(esp+2));
 	}else if (*esp==SYS_TELL)
 	{
 		f->eax=tell(*(esp+1));
 	}else if (*esp==SYS_CLOSE)
 	{
-		f->eax=close(*(esp+1));
+		close(*(esp+1));
 	}
 }
 
