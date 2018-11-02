@@ -199,6 +199,7 @@ void close (int fd){
 void
 syscall_init (void) 
 {
+  fd_num=1;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
