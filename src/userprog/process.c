@@ -102,8 +102,23 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-  while(true);
-  return -1;
+  struct list_elem* e;
+  struct thread* child=NULL;
+  for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
+  {
+    if (list_entry(e,struct child_proc,elem)->id==child_tid)
+    {
+      child=get_thread(child_tid);
+    }
+  }
+  if (child==NULL)
+  {
+    return -1;
+  }
+  lock_acquire(&thread_current()->wait_for_child);
+  while(get_thread(child_tid)!=NULL);
+  lock_release(&thread_current()->wait_for_child);
+  return child->ret;
 }
 
 /* Free the current process's resources. */

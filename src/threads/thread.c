@@ -476,6 +476,7 @@ init_thread (struct thread *t, const char *name, int priority)
   lock_init(&t->wait_for_child);
   cond_init(&t->wait_cond);
   t->child_load=0;
+  list_init(&t->children);
   #endif
   list_push_back (&all_list, &t->allelem);
 }
@@ -593,3 +594,16 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+struct thread* get_thread(tid_t tid){
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_tail(&all_list); e=list_next(e))
+  {
+    if (thread_current()->tid==tid)
+    {
+      return t
+    }
+  }
+  return NULL;
+}
