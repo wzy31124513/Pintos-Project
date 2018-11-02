@@ -17,6 +17,22 @@ struct fds
 };
 
 struct fds* getfile(int fd);
+bool is_valid_vaddr(const void* esp);
+void halt (void);
+void exit (int status);
+void exec (const char *cmd_line);
+void wait (int pid);
+void create (const char *file, unsigned initial_size);
+void remove (const char *file);
+void open (const char *file);
+void filesize (int fd);
+void read (int fd, void *buffer, unsigned size);
+void write (int fd, const void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+void tell (int fd);
+void close (int fd);
+
+
 
 bool is_valid_vaddr(const void* esp){
 	if(esp!=NULL && is_user_vaddr(esp) && pagedir_get_page(thread_current(),esp)!=NULL){
@@ -33,7 +49,7 @@ void exit (int status){
 	thread_current()->exitcode=status;
 	if (status!=-1)
 	{
-		f->eax=0;
+		return 0;
 	}
 	thread_exit();
 }
@@ -41,40 +57,40 @@ void exit (int status){
 void exec (const char *cmd_line){
 	thread_current()->child_load=0;
 	int ret=process_execute(cmd_line);
-	lock_acquire(thread_current()->wait_for_child);
+	lock_acquire(&thread_current()->wait_for_child);
 	while(thread_current()->child_load==0){
-		cond_wait(thread_current()->wait_cond, thread_current()->wait_for_child);
+		cond_wait(&thread_current()->wait_cond, &thread_current()->wait_for_child);
 	}
 	if (thread_current()->child_load==-1)
 	{
 		ret=-1;
 	}
-	lock_release(thread_current()->wait_for_child);
-	f->eax=ret;
+	lock_release(&thread_current()->wait_for_child);
+	return ret;
 }
 
-void wait (pid_t pid){
-	f->eax=process_wait(pid);
+void wait (int pid){
+	return process_wait(pid);
 }
 void create (const char *file, unsigned initial_size){
 	if (!is_valid_vaddr(file))
 	{
-		f->eax=false;
+		return false;
 		exit(-1);
 	}else{
 		lock_acquire(&file_lock);
-		f->eax=filesys_create(file,initial_size);
+		return filesys_create(file,initial_size);
 		lock_release(&file_lock);
 	}
 }
 void remove (const char *file){
 	if (!is_valid_vaddr(file))
 	{
-		f->eax=false;
+		return false;
 		exit(-1);
 	}else{
 		lock_acquire(&file_lock);
-		f->eax=filesys_remove(file);
+		return filesys_remove(file);
 		lock_release(&file_lock);
 	}
 }
@@ -82,7 +98,7 @@ void open (const char *file){
 	struct fds* fd;
 	if (!is_valid_vaddr(file))
 	{
-		f->eax=-1;
+		return -1;
 		exit(-1);
 	}
 	fd=calloc(1,sizeof(struct fds));
@@ -97,7 +113,7 @@ void open (const char *file){
 		list_push_back(&file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
-	f->eax=fd->fd;
+	return fd->fd;
 }
 
 void filesize (int fd){
@@ -105,9 +121,9 @@ void filesize (int fd){
 	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
 	{
-		f->eax=file_length(fds->f);
+		return file_length(fds->f);
 	}else{
-		f->eax=-1;
+		return -1;
 	}
 	lock_release (&file_lock);
 }
@@ -119,16 +135,16 @@ void read (int fd, void *buffer, unsigned size){
 		{
 			buffer[i]=input_getc();
 		}
-		f->eax=size;
+		return size;
 
 	}else{
 		lock_acquire (&file_lock); 
 		struct fds* fds=getfile(fd);
 		if (fds==NULL)
 		{
-			f->eax=-1;
+			return -1;
 		}else{
-			f->eax=file_read(fn->f,buffer,size);
+			return file_read(fn->f,buffer,size);
 		}
 		lock_release (&file_lock);
 	}
@@ -139,14 +155,14 @@ void write (int fd, const void *buffer, unsigned size){
 	if (fd==1)
 	{
 		putbuf(buffer,size);
-		f->eax=size;
+		return size;
 	}else{
 		struct fds* fds=getfile(fd);
 		if (fds==NULL)
 		{
-			f->eax=0;
+			return 0;
 		}else{
-			f->eax=file_write(fds->f,buffer,size);
+			return file_write(fds->f,buffer,size);
 		}
 	}
 	lock_release (&file_lock);
@@ -164,9 +180,9 @@ void tell (int fd){
 	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
 	{
-		f->eax=file_tell(fds->f);
+		return file_tell(fds->f);
 	}else{
-		f->eax=1;
+		return 1;
 	}
 	lock_release(&file_lock);
 }
@@ -184,7 +200,7 @@ void close (int fd){
 				file_close(list_entry(e,struct fds,elem)->f);
 				list_remove(e);
 				free(list_entry(e,struct fds,elem)->f)
-				f->eax=0;
+				return 0;
 				lock_release(&file_lock);
 				return;
 			}
@@ -214,43 +230,43 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 	if (*esp==SYS_HALT)
 	{
-		halt();
+		f->eax=halt();
 	}else if (*esp==SYS_HALT)
 	{
-		wait(*(esp+1));
+		f->eax=wait(*(esp+1));
 	}else if (*esp==SYS_EXIT)
 	{
-		exit(*(esp+1));
+		f->eax=exit(*(esp+1));
 	}else if (*esp==SYS_EXEC)
 	{
-		exec((char*)*(esp+1));
+		f->eax=exec((char*)*(esp+1));
 	}else if (*esp==SYS_WAIT)
 	{
-		wait(*(esp+1));
+		f->eax=wait(*(esp+1));
 	}else if (*esp==SYS_CREATE)
 	{
-		create((char*)*(esp+1),*(esp+2));
+		f->eax=create((char*)*(esp+1),*(esp+2));
 	}else if (*esp==SYS_REMOVE)
 	{
-		remove((char*)*(esp+1));
+		f->eax=remove((char*)*(esp+1));
 	}else if (*esp==SYS_FILESIZE)
 	{
-		filesize(*(esp+1));
+		f->eax=filesize(*(esp+1));
 	}else if (*esp==SYS_READ)
 	{
-		read(*(esp+1),(void*)*(esp+2),*(esp+3));
+		f->eax=read(*(esp+1),(void*)*(esp+2),*(esp+3));
 	}else if (*esp==SYS_WRITE)
 	{
-		write(*(esp+1),(void*)*(esp+2),*(esp+3));
+		f->eax=write(*(esp+1),(void*)*(esp+2),*(esp+3));
 	}else if (*esp==SYS_SEEK)
 	{
-		seek(*(esp+1),*(esp+2));
+		f->eax=seek(*(esp+1),*(esp+2));
 	}else if (*esp==SYS_TELL)
 	{
-		tell(*(esp+1));
+		f->eax=tell(*(esp+1));
 	}else if (*esp==SYS_CLOSE)
 	{
-		close(*(esp+1));
+		f->eax=close(*(esp+1));
 	}
 }
 
