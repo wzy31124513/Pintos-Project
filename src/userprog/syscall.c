@@ -6,6 +6,11 @@
 #include "threads/vaddr.h"
 #include "userprog/process.h"
 #include "devices/shutdown.h"
+#include "userprog/pagedir.h"
+#include "filesys/filesys.h"
+#include "threads/malloc.h"
+
+
 static void syscall_handler (struct intr_frame *);
 
 struct fds
@@ -127,7 +132,7 @@ int filesize (int fd){
 int read (int fd, void *buffer, unsigned size){
 	if (fd==0)
 	{
-		for (int i = 0; i < size; i++)
+		for (unsigned i = 0; i < size; i++)
 		{
 			buffer[i]=input_getc();
 		}
@@ -166,7 +171,7 @@ int write (int fd, const void *buffer, unsigned size){
 
 void seek (int fd, unsigned position){
 	lock_acquire (&file_lock); 
-	struct *fds fds=getfile(fd);
+	struct fds* fds=getfile(fd);
 	file_seek(fds->f,position);
 	lock_release (&file_lock);
 }
@@ -185,7 +190,7 @@ unsigned tell (int fd){
 
 void close (int fd){
 	lock_acquire(&file_lock);
-	struct fds* fds-getfile(fd);
+	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
 	{
 		struct list_elem* e;
@@ -195,8 +200,7 @@ void close (int fd){
 			{
 				file_close(list_entry(e,struct fds,elem)->f);
 				list_remove(e);
-				free(list_entry(e,struct fds,elem)->f)
-				return 0;
+				free(list_entry(e,struct fds,elem)->f);
 				lock_release(&file_lock);
 				return;
 			}
