@@ -72,8 +72,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-struct lock file_lock;
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -186,7 +184,9 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  #ifdef USERPROG
   t->parent=thread_current();
+  #endif
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -471,11 +471,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->child_load=0;
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
   lock_init(&t->wait_for_child);
   cond_init(&t->wait_cond);
+  t->child_load=0;
   #endif
   list_push_back (&all_list, &t->allelem);
 }
