@@ -47,14 +47,10 @@ void halt (void){
 
 void exit (int status){
 	thread_current()->exitcode=status;
-	if (status!=-1)
-	{
-		return 0;
-	}
 	thread_exit();
 }
 
-void exec (const char *cmd_line){
+int exec (const char *cmd_line){
 	thread_current()->child_load=0;
 	int ret=process_execute(cmd_line);
 	lock_acquire(&thread_current()->wait_for_child);
@@ -69,10 +65,10 @@ void exec (const char *cmd_line){
 	return ret;
 }
 
-void wait (int pid){
+int wait (int pid){
 	return process_wait(pid);
 }
-void create (const char *file, unsigned initial_size){
+bool create (const char *file, unsigned initial_size){
 	if (!is_valid_vaddr(file))
 	{
 		return false;
@@ -83,7 +79,7 @@ void create (const char *file, unsigned initial_size){
 		lock_release(&file_lock);
 	}
 }
-void remove (const char *file){
+bool remove (const char *file){
 	if (!is_valid_vaddr(file))
 	{
 		return false;
@@ -94,7 +90,7 @@ void remove (const char *file){
 		lock_release(&file_lock);
 	}
 }
-void open (const char *file){
+int open (const char *file){
 	struct fds* fd;
 	if (!is_valid_vaddr(file))
 	{
@@ -116,7 +112,7 @@ void open (const char *file){
 	return fd->fd;
 }
 
-void filesize (int fd){
+int filesize (int fd){
 	lock_acquire (&file_lock); 
 	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
@@ -128,7 +124,7 @@ void filesize (int fd){
 	lock_release (&file_lock);
 }
 
-void read (int fd, void *buffer, unsigned size){
+int read (int fd, void *buffer, unsigned size){
 	if (fd==0)
 	{
 		for (int i = 0; i < size; i++)
@@ -150,7 +146,7 @@ void read (int fd, void *buffer, unsigned size){
 	}
 }
 
-void write (int fd, const void *buffer, unsigned size){
+int write (int fd, const void *buffer, unsigned size){
 	lock_acquire (&file_lock); 
 	if (fd==1)
 	{
@@ -175,7 +171,7 @@ void seek (int fd, unsigned position){
 	lock_release (&file_lock);
 }
 
-void tell (int fd){
+unsigned tell (int fd){
 	lock_acquire(&file_lock);
 	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
