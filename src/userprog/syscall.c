@@ -53,6 +53,19 @@ void halt (void){
 
 void exit (int status){
 	thread_current()->exitcode=status;
+	if (thread_current()->parent!=NULL)
+	{
+		struct list_elem* e;
+		for (e=list_begin(&thread_current()->parent->children);e!=e=list_tail(&thread_current()->parent->children); e=list_next(e))
+		{
+			if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
+			{
+				lock_acquire(&thread_current()->parent->wait_for_child);
+				list_entry(e,struct child_proc,elem)->ret=status;
+				lock_release(&thread_current()->parent->wait_for_child);
+			}
+		}
+	}
 	thread_exit();
 }
 
