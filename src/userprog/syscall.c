@@ -32,7 +32,7 @@ bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
 int filesize (int fd);
-int read (int fd, void *buffer, unsigned size);
+int read (int fd, char *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
@@ -135,7 +135,7 @@ int read (int fd, void *buffer, unsigned size){
 	{
 		for (unsigned i = 0; i < size; i++)
 		{
-			(char)buffer[i]=input_getc();
+			buffer[i]=input_getc();
 		}
 		return size;
 
