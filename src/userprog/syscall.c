@@ -130,7 +130,7 @@ int filesize (int fd){
 	lock_release (&file_lock);
 }
 
-int read (int fd, void *buffer, unsigned size){
+int read (int fd, char *buffer, unsigned size){
 	if (fd==0)
 	{
 		for (unsigned i = 0; i < size; i++)
