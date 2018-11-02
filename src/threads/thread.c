@@ -93,7 +93,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  lock_init (&file_lock)
+  lock_init (&file_lock);
   list_init (&ready_list);
   list_init (&all_list);
   /* Set up a thread structure for the running thread. */
@@ -474,7 +474,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->child_load=0;
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
-  list_init (&file_list);
   lock_init(&t->wait_for_child);
   cond_init(&t->wait_cond);
   #endif
