@@ -65,15 +65,15 @@ start_process (void *file_name_)
 
   if (thread_current()->parent)
   { 
-    lock_acquire(thread_current()->parent->wait_for_child);
+    lock_acquire(&thread_current()->parent->wait_for_child);
     if (success)
     {
       thread_current()->parent->child_load=1;
     }else{
       thread_current()->parent->child_load=-1;
     }
-    cond_signal(thread_current()->parent->wait_cond,thread_current()->parent->wait_for_child);
-    lock_release(thread_current()->parent->wait_for_child);
+    cond_signal(&thread_current()->parent->wait_cond,thread_current()->parent->wait_for_child);
+    lock_release(&thread_current()->parent->wait_for_child);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -476,7 +476,7 @@ setup_stack (void **esp,char* file_name)
     }
     argv[argc]=0;
     while((int)*esp%4!=0){
-        *esp--;
+        *esp=*esp-1;
         uint8_t o=0;
         memcpy(*esp,&o,1);
     }
@@ -487,7 +487,7 @@ setup_stack (void **esp,char* file_name)
         *esp-=sizeof(int);
         memcpy(*esp,&argv[i],sizeof(int));
     }
-    int a=*esp;
+    int a=(int)*esp;
     *esp-=sizeof(int);
     memcpy(*esp,&a,sizeof(int));
     *esp-=sizeof(int);
