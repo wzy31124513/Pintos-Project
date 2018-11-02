@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -44,6 +45,9 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+  struct child_proc* child=calloc(1,struct,child_proc);
+  child->id=tid;
+  list_push_back(&thread_current()->children,&child->elem);
   return tid;
 }
 
@@ -103,7 +107,7 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
-  struct thread* child=NULL;
+  struct child_proc* child=NULL;
   for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
     if (list_entry(e,struct child_proc,elem)->id==child_tid)
@@ -145,6 +149,14 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  struct list_elem* e;
+  struct thread* t;
+  for (e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e=list_next(e))
+  {
+    t=list_entry(e,struct child_proc,elem);
+    list_remove(e);
+    free(t);
+  }
 }
 
 /* Sets up the CPU for running user code in the current
