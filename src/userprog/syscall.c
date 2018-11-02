@@ -10,7 +10,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/malloc.h"
-
+#include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -56,7 +56,7 @@ void exit (int status){
 	if (thread_current()->parent!=NULL)
 	{
 		struct list_elem* e;
-		for (e=list_begin(&thread_current()->parent->children);e!=e=list_tail(&thread_current()->parent->children); e=list_next(e))
+		for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 		{
 			if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
 			{
