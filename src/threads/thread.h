@@ -101,11 +101,19 @@ struct thread
     int child_load;
     struct lock wait_for_child;
     struct condition wait_cond;
+    struct list children;
 #endif
 
     /* Owned by thread.c. */
 
     unsigned magic;                     /* Detects stack overflow. */
+  };
+
+  struct child_proc
+  {
+    tid_t tid;
+    int ret;
+    struct list_elem elem;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -144,4 +152,5 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 struct lock file_lock;
+struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */
