@@ -476,6 +476,7 @@ init_thread (struct thread *t, const char *name, int priority)
   #ifdef USERPROG
   list_init (&file_list);
   lock_init(&t->wait_for_child);
+  cond_init(&t->wait_cond);
   #endif
   list_push_back (&all_list, &t->allelem);
 }
