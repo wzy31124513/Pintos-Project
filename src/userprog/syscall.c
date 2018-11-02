@@ -16,7 +16,7 @@ struct fds
     struct thread* t;
 };
 
-
+struct fds* getfile(int fd);
 
 bool is_valid_vaddr(const void* esp){
 	if(esp!=NULL && is_user_vaddr(esp) && pagedir_get_page(thread_current(),esp)!=NULL){
