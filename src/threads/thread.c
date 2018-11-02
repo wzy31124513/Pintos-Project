@@ -602,7 +602,7 @@ struct thread* get_thread(tid_t tid){
   {
     if (thread_current()->tid==tid)
     {
-      return t
+      return t;
     }
   }
   return NULL;
