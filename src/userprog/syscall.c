@@ -57,13 +57,16 @@ void exit (int status){
 	if (thread_current()->parent!=NULL)
 	{
 		struct list_elem* e;
-		for (e=list_next(list_begin(&thread_current()->parent->children));e!=list_tail(&thread_current()->parent->children); e=list_next(e))
+		if (!list_empty(&thread_current()->parent->children))
 		{
-			if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
+			for (e=list_next(list_begin(&thread_current()->parent->children));e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 			{
-				lock_acquire(&thread_current()->parent->wait_for_child);
-				list_entry(e,struct child_proc,elem)->ret=status;
-				lock_release(&thread_current()->parent->wait_for_child);
+				if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
+				{
+					lock_acquire(&thread_current()->parent->wait_for_child);
+					list_entry(e,struct child_proc,elem)->ret=status;
+					lock_release(&thread_current()->parent->wait_for_child);
+				}
 			}
 		}
 	}
@@ -213,15 +216,18 @@ void close (int fd){
 	if (fds!=NULL)
 	{
 		struct list_elem* e;
-		for (e=list_next(list_begin(&file_list));e!=list_tail(&file_list);e=list_next(e))
+		if (!list_empty(&file_list))
 		{
-			if (list_entry(e,struct fds,elem)->fd==fd)
+			for (e=list_next(list_begin(&file_list));e!=list_tail(&file_list);e=list_next(e))
 			{
-				file_close(list_entry(e,struct fds,elem)->f);
-				list_remove(e);
-				free(list_entry(e,struct fds,elem)->f);
-				lock_release(&file_lock);
-				return;
+				if (list_entry(e,struct fds,elem)->fd==fd)
+				{
+					file_close(list_entry(e,struct fds,elem)->f);
+					list_remove(e);
+					free(list_entry(e,struct fds,elem)->f);
+					lock_release(&file_lock);
+					return;
+				}
 			}
 		}
 	}
@@ -293,11 +299,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 struct fds* getfile(int fd){
 	struct list_elem *e;
 	struct fds* fds;
-	for(e=list_next(list_begin(&file_list));e!=list_end(&file_list);e=list_next(e)){
-		fds=list_entry(e,struct fds, elem);
-		if (fds->fd==fd)
-		{
-			return fds;
+	if (!list_empty(&file_list))
+	{	
+		for(e=list_next(list_begin(&file_list));e!=list_end(&file_list);e=list_next(e)){
+			fds=list_entry(e,struct fds, elem);
+			if (fds->fd==fd)
+			{
+				return fds;
+			}
 		}
 	}
 	return NULL;
