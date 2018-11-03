@@ -31,19 +31,41 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+
+  /*
   char* name;
   char* p;
-  name=strtok_r((char*)file_name," ",&p);
+  name=strtok_r((char*)file_name," ",&p);*/
 
+  char *f_name;
+
+  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  char *save_ptr;
+  f_name = malloc(strlen(file_name)+1);
+  strlcpy (f_name, file_name, strlen(file_name)+1);
+  f_name = strtok_r (f_name," ",&save_ptr);
+  /* Create a new thread to execute FILE_NAME. */
+  //printf("%d\n", thread_current()->tid);
+  tid = thread_create (f_name, PRI_DEFAULT, start_process, fn_copy);
+
+  /* Make a copy of FILE_NAME.
+     Otherwise there's a race between the caller and load(). */
+ /* fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);*/
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+  //tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+
+
+
   struct child_proc* child=calloc(1,sizeof(struct child_proc));
   child->id=tid;
   list_push_back(&thread_current()->children,&child->elem);
@@ -486,7 +508,7 @@ setup_stack (void **esp,char* file_name)
         palloc_free_page (kpage);
       }
     }
-/*    
+   
     char* p;
     char* name;
     int argc=0;
@@ -529,62 +551,7 @@ setup_stack (void **esp,char* file_name)
 
     free(fn_copy);
     free(argv);
-*/
-  char *token, *save_ptr;
-  int argc = 0,i;
-
-  char * copy = malloc(strlen(file_name)+1);
-  strlcpy (copy, file_name, strlen(file_name)+1);
-
-
-  for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
-    token = strtok_r (NULL, " ", &save_ptr))
-    argc++;
-
-
-  int *argv = calloc(argc,sizeof(int));
-
-  for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
-    token = strtok_r (NULL, " ", &save_ptr),i++)
-    {
-      *esp -= strlen(token) + 1;
-      memcpy(*esp,token,strlen(token) + 1);
-
-      argv[i]=*esp;
-    }
-
-  while((int)*esp%4!=0)
-  {
-    *esp-=sizeof(char);
-    char x = 0;
-    memcpy(*esp,&x,sizeof(char));
-  }
-
-  int zero = 0;
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&zero,sizeof(int));
-
-  for(i=argc-1;i>=0;i--)
-  {
-    *esp-=sizeof(int);
-    memcpy(*esp,&argv[i],sizeof(int));
-  }
-
-  int pt = *esp;
-  *esp-=sizeof(int);
-  memcpy(*esp,&pt,sizeof(int));
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&argc,sizeof(int));
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&zero,sizeof(int));
-
-  free(copy);
-  free(argv);
-    
-  return success;
+*
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
