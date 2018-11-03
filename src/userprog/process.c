@@ -34,7 +34,7 @@ process_execute (const char *file_name)
   char* name=calloc(1,strlen(file_name)+1);
   strlcpy (name, file_name, strlen(file_name)+1);
   char* p;
-  name=strtok_r((char*)file_name," ",&p);
+  name=strtok_r(name," ",&p);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
