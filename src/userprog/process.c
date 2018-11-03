@@ -123,7 +123,7 @@ process_wait (tid_t child_tid UNUSED)
   while(get_thread(child_tid)!=NULL);
   lock_release(&thread_current()->wait_for_child);
   return child->ret;*/
-  while(1);
+  //while(1);
   return -1;
 }
 
