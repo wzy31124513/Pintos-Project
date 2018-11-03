@@ -147,7 +147,11 @@ int read (int fd, char *buffer, unsigned size){
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size; ++i)
 	{
-		if (!is_user_vaddr(check) || (int)check< 0x08048000)
+		if (!is_user_vaddr(check) || check==NULL)
+		{
+			exit(-1);
+		}
+		if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
 		{
 			exit(-1);
 		}
@@ -184,7 +188,11 @@ int write (int fd, const void *buffer, unsigned size){
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size; ++i)
 	{
-		if (!is_user_vaddr(check) || (int)check< 0x08048000)
+		if (!is_user_vaddr(check) || check==NULL)
+		{
+			exit(-1);
+		}
+		if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
 		{
 			exit(-1);
 		}
@@ -264,9 +272,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 	int *esp=f->esp;
 	is_valid_vaddr(esp);
-	is_valid_vaddr(esp+1);
-	is_valid_vaddr(esp+2);
-	is_valid_vaddr(esp+3);
+
 	if (*esp==SYS_HALT)
 	{
 		halt();
