@@ -108,7 +108,7 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
   struct child_proc* child=NULL;
-  for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
+  for (e = list_next(list_begin(&thread_current()->children)); e != list_tail(&thread_current()->children); e=list_next(e))
   {
     if (list_entry(e,struct child_proc,elem)->id==child_tid)
     {
@@ -152,7 +152,7 @@ process_exit (void)
     }
   struct list_elem* e;
   struct child_proc* child;
-  for (e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e=list_next(e))
+  for (e = list_next(list_begin(&thread_current()->children)); e != list_end(&thread_current()->children); e=list_next(e))
   {
     child=list_entry(e,struct child_proc,elem);
     list_remove(e);
