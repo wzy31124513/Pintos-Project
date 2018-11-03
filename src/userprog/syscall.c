@@ -170,7 +170,6 @@ int read (int fd, char *buffer, unsigned size){
 }
 
 int write (int fd, const void *buffer, unsigned size){
-	lock_acquire(&file_lock);
 	int ret;
 	if (fd==0)
 	{
@@ -186,10 +185,11 @@ int write (int fd, const void *buffer, unsigned size){
 		{
 			ret= -1;
 		}else{
+			lock_acquire(&file_lock);
 			ret= file_write(fds->f,buffer,size);
+			lock_release(&file_lock);
 		}
 	}
-	lock_release(&file_lock);
 	return ret;
 }
 
