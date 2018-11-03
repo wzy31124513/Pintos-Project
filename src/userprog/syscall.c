@@ -53,7 +53,7 @@ void halt (void){
 
 void exit (int status){
 	thread_current()->exitcode=status;
-	/*
+	
 	if (thread_current()->parent!=NULL)
 	{
 		struct list_elem* e;
@@ -67,7 +67,7 @@ void exit (int status){
 			}
 		}
 	}
-	*/
+	
 	thread_exit();
 }
 
