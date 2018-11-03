@@ -261,7 +261,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-
+  char* p;
+  char* name=calloc(1,strlen(file_name)+1);
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
@@ -269,8 +270,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  char* p;
-  char* name=calloc(1,strlen(file_name)+1);
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
   file = filesys_open (name);
