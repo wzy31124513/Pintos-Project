@@ -72,7 +72,9 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-
+  char* name=calloc(1,strlen(file_name)+1);
+  strlcpy(name,file_name,strlen(file_name))
+  name=strtok_r(name," ",&p);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -95,6 +97,7 @@ start_process (void *file_name_)
   char* name=strtok_r(file_name," ",&p);
   thread_current()->self=filesys_open(file_name);
   file_deny_write(thread_current()->self);
+  free(name);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
