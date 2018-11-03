@@ -488,7 +488,7 @@ setup_stack (void **esp,char* file_name)
         return success;
       }
     }
-    /*
+    
     char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
@@ -524,87 +524,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    */
-
-    uint8_t *argstr_head;
-        char *cmd_name = thread_current ()->name;
-        int strlength, total_length;
-        int argc;
-
-        /*push the arguments string into stack*/
-        strlength = strlen(file_name) + 1;
-        *esp -= strlength;
-        memcpy(*esp, file_name, strlength);
-        total_length += strlength;
-
-        /*push command name into stack*/
-        strlength = strlen(cmd_name) + 1;
-        *esp -= strlength;
-        argstr_head = *esp;
-        memcpy(*esp, cmd_name, strlength);
-        total_length += strlength;
-
-        /*set alignment, get the starting address, modify *esp */
-        *esp -= 4 - total_length % 4;
-
-        /* push argv[argc] null into the stack */
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) NULL;
-
-        /* scan throught the file name with arguments string downward,
-         * using the cur_addr and total_length above to define boundary.
-         * omitting the beginning space or '\0', but for every encounter
-         * after, push the last non-space-and-'\0' address, which is current
-         * address minus 1, as one of argv to the stack, and set the space to
-         * '\0', multiple adjancent spaces and '0' is treated as one.
-         */
-        int i = total_length - 1;
-        /*omitting the starting space and '\0' */
-        while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
-          {
-            if (*(argstr_head + i) == ' ')
-              {
-                *(argstr_head + i) = '\0';
-              }
-            i--;
-          }
-
-        /*scan through args string, push args address into stack*/
-        char *mark;
-        for (mark = (char *)(argstr_head + i); i > 0;
-             i--, mark = (char*)(argstr_head+i))
-          {
-            /*detect args, if found, push it's address to stack*/
-            if ( (*mark == '\0' || *mark == ' ') &&
-                 (*(mark+1) != '\0' && *(mark+1) != ' '))
-              {
-                *esp -= 4;
-                * (uint32_t *) *esp = (uint32_t) mark + 1;
-                argc++;
-              }
-            /*set space to '\0', so that each arg string will terminate*/
-            if (*mark == ' ')
-              *mark = '\0';
-          }
-
-        /*push one more arg, which is the command name, into stack*/
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) argstr_head;
-        argc++;
-
-        /*push argv*/
-        * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
-        *esp -= 4;
-
-        /*push argc*/
-        *esp -= 4;
-        * (int *) *esp = argc;
-
-        /*push return address*/
-        *esp -= 4;
-        * (uint32_t *) *esp = 0x0;
     
-
 
   return success;
 }
