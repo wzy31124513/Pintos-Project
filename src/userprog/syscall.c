@@ -250,7 +250,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_WAIT)
 	{
 		is_valid_vaddr(esp+1);
-		f->eax=wait((void*)*(esp+1));
+		f->eax=wait((int)*(esp+1));
 	}else if (*esp==SYS_CREATE)
 	{
 		is_valid_vaddr(esp+5);
@@ -264,12 +264,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_OPEN){
 		is_valid_vaddr(esp+1);
 		is_valid_vaddr((void*)*(esp+1));
-		f->eax=open(*(esp+1));
+		f->eax=open((char *)*(esp+1));
 	}
 	else if (*esp==SYS_FILESIZE)
 	{
 		is_valid_vaddr(esp+1);
-		f->eax=filesize((void*)*(esp+1));
+		f->eax=filesize((int)*(esp+1));
 	}else if (*esp==SYS_READ)
 	{
 		is_valid_vaddr(esp+7);
@@ -298,7 +298,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 struct fds* getfile(int fd){
 	struct list_elem *e;
 	struct fds* fds;
-	for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e)){
+	for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
 	{	
 		fds=list_entry(e,struct fds, elem);
 		if (fds->fd==fd)
