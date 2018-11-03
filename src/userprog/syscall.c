@@ -168,7 +168,11 @@ int read (int fd, char *buffer, unsigned size){
 
 int write (int fd, const void *buffer, unsigned size){
 	lock_acquire (&file_lock); 
-	if (fd==1)
+	if (fd==0)
+	{
+		return -1;
+	}
+	else if (fd==1)
 	{
 		putbuf(buffer,size);
 		return size;
