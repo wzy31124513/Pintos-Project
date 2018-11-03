@@ -31,9 +31,10 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char* name;
+  char* name=calloc(1,strlen(file_name));
+  strlcpy(name,file_name,strlen(file_name)+1);
   char* p;
-  name=strtok_r((char*)file_name," ",&p);
+  name=strtok_r(name," ",&p);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
