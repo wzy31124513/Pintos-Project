@@ -105,8 +105,8 @@ struct thread
     int fd_num;
     struct list file_list;
     int wait;
-
-
+    
+    bool child_load;
     /* Owned by thread.c. */
 
     unsigned magic;                     /* Detects stack overflow. */
