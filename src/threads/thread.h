@@ -102,6 +102,8 @@ struct thread
     struct lock wait_for_child;
     struct condition wait_cond;
     struct list children;
+    int fd_num;
+    struct list file_list;
 #endif
 
     /* Owned by thread.c. */

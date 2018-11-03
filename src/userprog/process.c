@@ -108,25 +108,21 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
   struct child_proc* child=NULL;
-  if(!list_empty(&thread_current()->children))
+  for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
-    for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
+    if (list_entry(e,struct child_proc,elem)->id==child_tid)
     {
-      if (list_entry(e,struct child_proc,elem)->id==child_tid)
-      {
-        child=list_entry(e,struct child_proc,elem);
-      }
+      child=list_entry(e,struct child_proc,elem);
     }
   }
   if (child==NULL)
   {
     return -1;
   }
-  //lock_acquire(&thread_current()->wait_for_child);
+  lock_acquire(&thread_current()->wait_for_child);
   while(get_thread(child_tid)!=NULL);
-  //lock_release(&thread_current()->wait_for_child);
+  lock_release(&thread_current()->wait_for_child);
   return child->ret;
-  return -1;
 }
 
 /* Free the current process's resources. */
@@ -493,7 +489,7 @@ setup_stack (void **esp,char* file_name)
         return success;
       }
     }
-    /*
+    
     char* p;
     char* name=strtok_r(file_name," ",&p);
     int argc=1;
@@ -529,61 +525,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    */
-
-    char *token, *save_ptr;
-  int argc = 0,i;
-
-  char * copy = malloc(strlen(file_name)+1);
-  strlcpy (copy, file_name, strlen(file_name)+1);
-
-
-  for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
-    token = strtok_r (NULL, " ", &save_ptr))
-    argc++;
-
-
-  int *argv = calloc(argc,sizeof(int));
-
-  for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
-    token = strtok_r (NULL, " ", &save_ptr),i++)
-    {
-      *esp -= strlen(token) + 1;
-      memcpy(*esp,token,strlen(token) + 1);
-
-      argv[i]=*esp;
-    }
-
-  while((int)*esp%4!=0)
-  {
-    *esp-=sizeof(char);
-    char x = 0;
-    memcpy(*esp,&x,sizeof(char));
-  }
-
-  int zero = 0;
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&zero,sizeof(int));
-
-  for(i=argc-1;i>=0;i--)
-  {
-    *esp-=sizeof(int);
-    memcpy(*esp,&argv[i],sizeof(int));
-  }
-
-  int pt = *esp;
-  *esp-=sizeof(int);
-  memcpy(*esp,&pt,sizeof(int));
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&argc,sizeof(int));
-
-  *esp-=sizeof(int);
-  memcpy(*esp,&zero,sizeof(int));
-
-  free(copy);
-  free(argv);
+    
 
   return success;
 }
