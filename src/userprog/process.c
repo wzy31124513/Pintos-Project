@@ -145,6 +145,16 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  lock_acquire(&file_lock);
+  file_close(thread_current()->self);
+  struct list_elem* e;
+  for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
+  {
+    file_close(list_entry(e,struct fds,elem)->f);
+    list_remove(e);
+    free(list_entry(e,struct child_proc,elem));
+  } 
+  lock_release(&file_lock);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -163,18 +173,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-
-  file_close(thread_current()->self);
-
-  lock_acquire(&file_lock);
-  struct list_elem* e;
-  for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
-  {
-    file_close(list_entry(e,struct fds,elem)->f);
-    list_remove(e);
-    free(list_entry(e,struct child_proc,elem));
-  } 
-  lock_release(&file_lock);
 
 }
 
