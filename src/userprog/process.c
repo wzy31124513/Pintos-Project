@@ -278,6 +278,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int i;
   char* p;
   char* name=calloc(1,strlen(file_name)+1);
+  lock_acquire(&file_lock);
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
@@ -378,9 +379,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   thread_current()->self = file;
  done:
   /* We arrive here whether the load is successful or not. */
-
-  file_close (file);
   free(name);
+  lock_release(&file_lock);
   return success;
 }
 
@@ -408,7 +408,6 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
   /* The segment must not be empty. */
   if (phdr->p_memsz == 0)
     return false;
-
   /* The virtual memory region must both start and end within the
      user address space range. */
   if (!is_user_vaddr ((void *) phdr->p_vaddr))
