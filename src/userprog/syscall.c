@@ -310,14 +310,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax=filesize((int)*(esp+1));
 	}else if (*esp==SYS_READ)
 	{
-		is_valid_vaddr(esp+7);
-		is_valid_vaddr((void*)*(esp+6));
-		f->eax=read(*(esp+5),(void*)*(esp+6),*(esp+7));
+		is_valid_vaddr(esp+3);
+		is_valid_vaddr((void*)*(esp+2));
+		f->eax=read(*(esp+1),(void*)*(esp+2),*(esp+3));
 	}else if (*esp==SYS_WRITE)
 	{
-		is_valid_vaddr(esp+7);
-		is_valid_vaddr((void*)*(esp+6));
-		f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
+		is_valid_vaddr(esp+3);
+		is_valid_vaddr((void*)*(esp+2));
+		f->eax=write(*(esp+1),(void*)*(esp+2),*(esp+3));
 	}else if (*esp==SYS_SEEK)
 	{
 		is_valid_vaddr(esp+5);
