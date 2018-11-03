@@ -9,5 +9,5 @@ struct fds
     struct file *f;
     struct list_elem elem;
 };
-
+void exit (int status);
 #endif /* userprog/syscall.h */
