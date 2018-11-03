@@ -170,25 +170,27 @@ int read (int fd, char *buffer, unsigned size){
 }
 
 int write (int fd, const void *buffer, unsigned size){
-	lock_acquire (&file_lock); 
+	lock_acquire(&file_lock);
+	int ret;
 	if (fd==0)
 	{
-		return -1;
+		ret= -1;
 	}
 	else if (fd==1)
 	{
 		putbuf(buffer,size);
-		return size;
+		ret= size;
 	}else{
 		struct fds* fds=getfile(fd);
 		if (fds==NULL)
 		{
-			return 0;
+			ret= 0;
 		}else{
-			return file_write(fds->f,buffer,size);
+			ret= file_write(fds->f,buffer,size);
 		}
 	}
-	lock_release (&file_lock);
+	lock_release(&file_lock);
+	return ret;
 }
 
 void seek (int fd, unsigned position){
