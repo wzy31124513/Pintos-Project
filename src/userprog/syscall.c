@@ -241,6 +241,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
 	int *esp=f->esp;
+	is_valid_vaddr(esp);
 	if (*esp==SYS_HALT)
 	{
 		halt();
