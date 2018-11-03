@@ -165,7 +165,7 @@ process_exit (void)
     }
 
   file_close(thread_current()->self);
-/*
+
   lock_acquire(&file_lock);
   struct list_elem* e;
   for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
@@ -175,7 +175,7 @@ process_exit (void)
     free(list_entry(e,struct child_proc,elem));
   } 
   lock_release(&file_lock);
-*/
+
 }
 
 /* Sets up the CPU for running user code in the current
