@@ -98,12 +98,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     int exitcode; /*return status*/
     struct thread* parent;
-    int child_load;
-    struct lock wait_for_child;
-    struct condition wait_cond;
+    struct semaphore wait_for_child;
     struct list children;
     int fd_num;
     struct list file_list;
+    int wait;
 #endif
 
     /* Owned by thread.c. */
@@ -115,6 +114,7 @@ struct thread
   {
     tid_t id;
     int ret;
+    bool waited;
     struct list_elem elem;
   };
 

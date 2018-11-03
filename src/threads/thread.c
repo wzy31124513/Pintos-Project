@@ -474,7 +474,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
   lock_init(&t->wait_for_child);
-  cond_init(&t->wait_cond);
   t->child_load=0;
   list_init(&t->children);
   list_init(&t->file_list);

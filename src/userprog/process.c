@@ -67,22 +67,15 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load ((char*)file_name, &if_.eip, &if_.esp);
 
-  if (thread_current()->parent)
-  { 
-    lock_acquire(&thread_current()->parent->wait_for_child);
-    if (success)
-    {
-      thread_current()->parent->child_load=1;
-    }else{
-      thread_current()->parent->child_load=-1;
-    }
-    cond_signal(&thread_current()->parent->wait_cond,&thread_current()->parent->wait_for_child);
-    lock_release(&thread_current()->parent->wait_for_child);
-  }
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success)
+  if (!success){
+    sema_up(&thread_current()->parent->wait_for_child);
     thread_exit ();
+  }else{
+    sema_up(&thread_current()->parent->wait_for_child);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -107,21 +100,26 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
+  struct list_elem* e1;
   struct child_proc* child=NULL;
   for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
     if (list_entry(e,struct child_proc,elem)->id==child_tid)
     {
       child=list_entry(e,struct child_proc,elem);
+      e1=e;
     }
   }
   if (child==NULL)
   {
     return -1;
   }
-  lock_acquire(&thread_current()->wait_for_child);
-  while(get_thread(child_tid)!=NULL);
-  lock_release(&thread_current()->wait_for_child);
+  thread_current()->wait=child_tid;
+  if (child->waited)
+  {
+    sema_down(&thread_current()->wait_for_child);
+  }
+  list_remove(e1);
   return child->ret;
 }
 
