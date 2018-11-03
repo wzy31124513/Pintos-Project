@@ -603,9 +603,6 @@ setup_stack (void **esp,char* file_name)
         /*push return address*/
         *esp -= 4;
         * (uint32_t *) *esp = 0x0;
-      } 
-      else
-        vm_free_frame (kpage);
     
 
 
