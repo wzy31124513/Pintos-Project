@@ -60,18 +60,17 @@ void halt (void){
 void exit (int status){
 	thread_current()->exitcode=status;
 	
-	if (thread_current()->parent!=NULL)
+
+	struct list_elem* e;
+	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 	{
-		struct list_elem* e;
-		for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
+		if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
 		{
-			if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
-			{
-				list_entry(e,struct child_proc,elem)->ret=status;
-				list_entry(e,struct child_proc,elem)->waited=false;
-			}
+			list_entry(e,struct child_proc,elem)->ret=status;
+			list_entry(e,struct child_proc,elem)->waited=false;
 		}
 	}
+	
 	if (thread_current()->parent->wait==thread_current()->tid)
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
