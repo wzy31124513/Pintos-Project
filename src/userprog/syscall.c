@@ -15,13 +15,6 @@
 
 static void syscall_handler (struct intr_frame *);
 
-struct fds
-{
-    int fd;
-    struct file *f;
-    struct list_elem elem;
-};
-
 struct fds* getfile(int fd);
 void* is_valid_vaddr(const void* esp);
 void halt (void);
