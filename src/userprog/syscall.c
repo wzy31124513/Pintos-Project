@@ -41,7 +41,7 @@ void close (int fd);
 
 
 void* is_valid_vaddr(const void* esp){
-	if(esp==NULL && !is_user_vaddr(esp)){
+	if(esp==NULL || !is_user_vaddr(esp)){
 		exit(-1);
 		return 0;
 	}
