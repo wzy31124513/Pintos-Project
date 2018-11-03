@@ -287,10 +287,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 struct fds* getfile(int fd){
 	struct list_elem *e;
+	struct fds* fds;
 	for(e=list_begin(&file_list);e!=list_end(&file_list);e=list_next(e)){
-		if (list_entry(e,struct fds, elem)->fd==fd)
+		fds=list_entry(e,struct fds, elem);
+		if (fds->fd==fd)
 		{
-			return (struct fds*)list_entry(e,struct fds, elem)->fd;
+			return fds;
 		}
 	}
 	return NULL;
