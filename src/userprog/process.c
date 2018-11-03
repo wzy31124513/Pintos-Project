@@ -92,12 +92,11 @@ start_process (void *file_name_)
     thread_exit ();
   }else{
     thread_current()->parent->child_load=true;
+    thread_current()->self=filesys_open(name);
+    file_deny_write(thread_current()->self);
+    free(name);
     sema_up(&thread_current()->parent->wait_for_child);
   }
-
-  thread_current()->self=filesys_open(name);
-  file_deny_write(thread_current()->self);
-  free(name);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
