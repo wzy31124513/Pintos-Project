@@ -219,9 +219,9 @@ void close (int fd){
 	{
 		if (list_entry(e,struct fds,elem)->fd==fd)
 		{
+			list_remove(e);
 			file_close(list_entry(e,struct fds,elem)->f);
 			free(list_entry(e,struct fds,elem));
-			list_remove(e);
 			break;
 		}
 	}
