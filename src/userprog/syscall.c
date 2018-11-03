@@ -144,6 +144,7 @@ int filesize (int fd){
 
 int read (int fd, char *buffer, unsigned size){
 
+	lock_acquire (&file_lock); 
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size; ++i)
 	{
@@ -165,10 +166,10 @@ int read (int fd, char *buffer, unsigned size){
 		{
 			buffer[i]=input_getc();
 		}
+		lock_release (&file_lock);
 		return size;
 
 	}
-	lock_acquire (&file_lock); 
 	int ret;
 	struct fds* fds=getfile(fd);
 	//is_valid_vaddr(fds->f);
@@ -186,7 +187,7 @@ int write (int fd, const void *buffer, unsigned size){
 	int ret;
 
 	char* check=(char*)buffer;
-	for (unsigned i = 0; i < size; ++i)
+	for (unsigned i = 0; i < size+1; ++i)
 	{
 		if (!is_user_vaddr(check) || check==NULL)
 		{
