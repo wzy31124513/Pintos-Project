@@ -44,7 +44,7 @@ void* is_valid_vaddr(const void* esp){
 		exit(-1);
 		return 0;
 	}
-	return pagedir_get_page(thread_current()->pagedir,esp)
+	return pagedir_get_page(thread_current()->pagedir,esp);
 }
 
 void halt (void){
@@ -106,7 +106,7 @@ bool remove (const char *file){
 	lock_acquire(&file_lock);
 	ret = filesys_remove(file);
 	lock_release(&file_lock);
-	return ret
+	return ret;
 }
 
 int open (const char *file){
@@ -119,7 +119,7 @@ int open (const char *file){
 	}else{
 		thread_current()->fd_num=thread_current()->fd_num+1;
 		fd->fd=thread_current()->fd_num;
-		list_push_back(&thread_current()->file_list,fd->elem);
+		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
 	return fd->fd;
@@ -136,7 +136,7 @@ int filesize (int fd){
 		ret = -1;
 	}
 	lock_release (&file_lock);
-	return ret
+	return ret;
 }
 
 int read (int fd, char *buffer, unsigned size){
@@ -207,7 +207,6 @@ unsigned tell (int fd){
 
 void close (int fd){
 	lock_acquire(&file_lock);
-	struct fds* fds=getfile(fd);
 	struct list_elem* e;
 	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
 	{
@@ -246,40 +245,40 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_EXEC)
 	{
 		is_valid_vaddr(esp+1);
-		is_valid_vaddr(*(esp+1));
+		is_valid_vaddr((void*)*(esp+1));
 		f->eax=exec((char*)*(esp+1));
 	}else if (*esp==SYS_WAIT)
 	{
 		is_valid_vaddr(esp+1);
-		f->eax=wait(*(esp+1));
+		f->eax=wait((void*)*(esp+1));
 	}else if (*esp==SYS_CREATE)
 	{
 		is_valid_vaddr(esp+5);
-		is_valid_vaddr(*(esp+4));
+		is_valid_vaddr((void*)*(esp+4));
 		f->eax=create((char*)*(esp+4),*(esp+5));
 	}else if (*esp==SYS_REMOVE)
 	{
 		is_valid_vaddr(esp+1);
-		is_valid_vaddr(*(esp+1));
+		is_valid_vaddr((void*)*(esp+1));
 		f->eax=remove((char*)*(esp+1));
 	}else if (*esp==SYS_OPEN){
 		is_valid_vaddr(esp+1);
-		is_valid_vaddr(*(esp+1));
+		is_valid_vaddr((void*)*(esp+1));
 		f->eax=open(*(esp+1));
 	}
 	else if (*esp==SYS_FILESIZE)
 	{
 		is_valid_vaddr(esp+1);
-		f->eax=filesize(*(esp+1));
+		f->eax=filesize((void*)*(esp+1));
 	}else if (*esp==SYS_READ)
 	{
 		is_valid_vaddr(esp+7);
-		is_valid_vaddr(*(esp+6));
+		is_valid_vaddr((void*)*(esp+6));
 		f->eax=read(*(esp+5),(void*)*(esp+6),*(esp+7));
 	}else if (*esp==SYS_WRITE)
 	{
 		is_valid_vaddr(esp+7);
-		is_valid_vaddr(*(esp+6));
+		is_valid_vaddr((void*)*(esp+6));
 		f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
 	}else if (*esp==SYS_SEEK)
 	{
@@ -299,7 +298,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 struct fds* getfile(int fd){
 	struct list_elem *e;
 	struct fds* fds;
-	for(e=list_next(list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list;e=list_next(e)){
+	for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e)){
 	{	
 		fds=list_entry(e,struct fds, elem);
 		if (fds->fd==fd)
