@@ -106,7 +106,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-  /*struct list_elem* e;
+  struct list_elem* e;
   struct child_proc* child=NULL;
   for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
@@ -119,11 +119,10 @@ process_wait (tid_t child_tid UNUSED)
   {
     return -1;
   }
-  lock_acquire(&thread_current()->wait_for_child);
+  //lock_acquire(&thread_current()->wait_for_child);
   while(get_thread(child_tid)!=NULL);
-  lock_release(&thread_current()->wait_for_child);
-  return child->ret;*/
-  //while(1);
+  //lock_release(&thread_current()->wait_for_child);
+  return child->ret;
   return -1;
 }
 
