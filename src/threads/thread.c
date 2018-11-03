@@ -479,6 +479,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->fd_num=1;
   t->exitcode=-2;
   t->wait=0;
+  t->self=NULL;
   list_push_back (&all_list, &t->allelem);
 }
 

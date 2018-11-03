@@ -105,7 +105,7 @@ struct thread
     int fd_num;
     struct list file_list;
     int wait;
-    
+    struct file* self;
     bool child_load;
     /* Owned by thread.c. */
 

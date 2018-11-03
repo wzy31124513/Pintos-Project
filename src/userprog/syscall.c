@@ -74,6 +74,15 @@ void exit (int status){
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
 	}
+	lock_acquire(&file_lock);
+	file_close(thread_current()->self);
+	for (e=list_begin(&thread_current()->&file_list);e!=list_tail(&thread_current()->&file_list); e=list_next(e))
+	{
+		file_close(list_entry(e,struct child_proc,elem)->f);
+		list_remove(e);
+		free(list_entry(e,struct child_proc,elem));
+	}	
+	lock_release(&file_lock);
 	thread_exit();
 }
 
@@ -170,6 +179,7 @@ int read (int fd, char *buffer, unsigned size){
 }
 
 int write (int fd, const void *buffer, unsigned size){
+	lock_acquire(&file_lock);
 	int ret;
 	if (fd==0)
 	{
@@ -185,11 +195,10 @@ int write (int fd, const void *buffer, unsigned size){
 		{
 			ret= -1;
 		}else{
-			lock_acquire(&file_lock);
 			ret= file_write(fds->f,buffer,size);
-			lock_release(&file_lock);
 		}
 	}
+	lock_release(&file_lock);
 	return ret;
 }
 
