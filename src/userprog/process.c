@@ -31,10 +31,10 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char* name=calloc(1,strlen(file_name));
-  strlcpy(name,file_name,strlen(file_name)+1);
+  char* name;
   char* p;
-  name=strtok_r(name," ",&p);
+  name=strtok_r((char*)file_name," ",&p);
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -490,16 +490,13 @@ setup_stack (void **esp,char* file_name)
     char* p;
     char* name;
     int argc=0;
-    char* fn_copy=calloc(1,strlen(file_name)+1);
-    strlcpy(fn_copy,file_name,strlen(file_name)+1);
-
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
       argc=argc+1;
     }
     int i=0;
     int* argv=calloc(argc,sizeof(int));
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
       *esp-=strlen(name)+1;
       memcpy(*esp,name,strlen(name)+1);
