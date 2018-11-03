@@ -498,8 +498,9 @@ setup_stack (void **esp,char* file_name)
     char* p;
     char* name;
     int argc=0;
-
-    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    char* fn_copy=calloc(1,strlen(file_name)+1);
+    strlcpy(fn_copy,file_name,strlen(file_name)+1);
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
       argc=argc+1;
     }
