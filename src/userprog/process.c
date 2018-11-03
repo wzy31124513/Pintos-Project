@@ -169,7 +169,7 @@ process_exit (void)
 
   lock_acquire(&file_lock);
   struct list_elem* e;
-  file_close(thread_current()->self);
+  //file_close(thread_current()->self);
   for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
   {
     file_close(list_entry(e,struct fds,elem)->f);
