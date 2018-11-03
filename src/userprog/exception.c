@@ -150,7 +150,7 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
 
-  if ((is_kernel_vaddr(fault_addr) && user)||not_present)
+  if ((!is_user_vaddr(fault_addr) && user)||not_present)
   {
     exit(-1);
   }
