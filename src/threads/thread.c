@@ -114,7 +114,7 @@ thread_start (void)
   /* Start preemptive thread scheduling. */
   intr_enable ();
 
-  /* Wait for the idle thread to initialize idle_thread. */
+  /*  for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
 
@@ -473,7 +473,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   sema_init(&t->wait_for_child,0);
   t->parent=running_thread();
-  t->child_load=0;
+  t->child_load=false;
   list_init(&t->children);
   list_init(&t->file_list);
   t->fd_num=1;
