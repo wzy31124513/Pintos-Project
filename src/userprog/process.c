@@ -145,11 +145,6 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  if (thread_current()->exitcode<0)
-  {
-    exit(-1);
-  }
-  
   lock_acquire(&file_lock);
   file_close(thread_current()->self);
   struct list_elem* e;
