@@ -43,11 +43,18 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
   struct child_proc* child=calloc(1,sizeof(struct child_proc));
   child->id=tid;
   list_push_back(&thread_current()->children,&child->elem);
+  child->waitd=true;
+  if (tid == TID_ERROR)
+    palloc_free_page (fn_copy);
+
+  sema_down(&thread_current()->wait_for_child);
+  if (thread_current()->child_load==false)
+  {
+    return -1;
+  }
   return tid;
 }
 
@@ -71,9 +78,11 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success){
+    thread_current()->parent->child_load=false;
     sema_up(&thread_current()->parent->wait_for_child);
     thread_exit ();
   }else{
+    thread_current()->parent->child_load=true;
     sema_up(&thread_current()->parent->wait_for_child);
   }
 
@@ -130,6 +139,11 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  struct list_elem* e;
+  struct child_proc* child;
+
+
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -147,17 +161,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  struct list_elem* e;
-  struct child_proc* child;
-  if (!list_empty(&thread_current()->children))
-  {
-    for (e = list_next(list_begin(&thread_current()->children)); e != list_end(&thread_current()->children); e=list_next(e))
-    {
-      child=list_entry(e,struct child_proc,elem);
-      list_remove(e);
-      free(child);
-    }
-  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -484,46 +487,51 @@ setup_stack (void **esp,char* file_name)
         *esp = PHYS_BASE;
       else{
         palloc_free_page (kpage);
-        return success;
       }
     }
     
     char* p;
-    char* name=strtok_r(file_name," ",&p);
-    int argc=1;
-    char* argv[128];
-    *esp-=strlen(name)+1;
-    strlcpy(*esp,name,strlen(name)+1);
-    argv[0]=*esp;
-    char* temp=strtok_r(NULL," ",&p);
-    while (temp!=NULL) {
-        *esp-=strlen(temp)+1;
-        strlcpy(*esp, temp, strlen(temp)+1);
-        argv[argc]=*esp;
-        argc++;
-        temp=strtok_r(NULL," ",&p);
+    char* name;
+    int argc=0;
+    char* fn_copy=calloc(1,strlen(file_name)+1);
+    strlcpy(fn_copy,file_name,strlen(file_name)+1);
+
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok(NULL," ",&p))
+    {
+      argc=argc+1;
     }
-    argv[argc]=0;
+    int i=0;
+    int* argv=calloc(argc,sizeof(int));
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok(NULL," ",&p))
+    {
+      *esp-=strlen(name)+1；
+      memcpy(*esp,name,strlen(name)+1);
+      argv[i]=*esp;
+      i++;
+    }
     while((int)*esp%4!=0){
-        *esp=*esp-1;
-        uint8_t o=0;
-        memcpy(*esp,&o,1);
+      char a=0;
+      *esp-=1;
+      memcpy(*esp,&a,1);
     }
     int null=0;
     *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    for (int i = argc-1; i >= 0; i--) {
-        *esp-=sizeof(int);
-        memcpy(*esp,&argv[i],sizeof(int));
+    memcpy(*esp,&zero,sizeof(int));
+    for ( i = argc-1; i >= 0; i--)
+    {
+      *esp-=sizeof(int);
+      memcpy(*esp,&argv[i],sizeof(int));
     }
-    int a=(int)*esp;
+    int aa=*esp;
     *esp-=sizeof(int);
-    memcpy(*esp,&a,sizeof(int));
+    memcpy(*esp,&aa,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    
+
+    free(fn_copy);
+    free(argv);
 
   return success;
 }

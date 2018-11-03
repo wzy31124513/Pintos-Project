@@ -93,9 +93,11 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-#ifdef USERPROG
+
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    #ifdef USERPROG
+    uint32_t *pagedir;
+    #endif                  /* Page directory. */
     int exitcode; /*return status*/
     struct thread* parent;
     struct semaphore wait_for_child;
@@ -103,7 +105,7 @@ struct thread
     int fd_num;
     struct list file_list;
     int wait;
-#endif
+
 
     /* Owned by thread.c. */
 
@@ -154,5 +156,4 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 struct lock file_lock;
-struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */

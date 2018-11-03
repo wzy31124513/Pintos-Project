@@ -184,9 +184,8 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  #ifdef USERPROG
-  t->parent=thread_current();
-  #endif
+
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -472,13 +471,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  #ifdef USERPROG
-  lock_init(&t->wait_for_child);
+  sema_init(&t->wait_for_child,0);
+  t->parent=running_thread();
   t->child_load=0;
   list_init(&t->children);
   list_init(&t->file_list);
   t->fd_num=1;
-  #endif
+  t->exitcode=-2;
+  t->wait=0;
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -595,16 +595,3 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-
-struct thread* get_thread(tid_t tid){
-  struct list_elem *e;
-  for (e = list_begin(&all_list); e != list_tail(&all_list); e=list_next(e))
-  {
-    if (list_entry(e,struct thread,allelem)->tid==tid)
-    {
-      return list_entry(e,struct thread,allelem);
-    }
-  }
-  return NULL;
-}
