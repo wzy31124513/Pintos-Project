@@ -551,7 +551,7 @@ setup_stack (void **esp,char* file_name)
 
     free(fn_copy);
     free(argv);
-*
+    return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
