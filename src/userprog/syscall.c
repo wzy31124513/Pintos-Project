@@ -59,8 +59,7 @@ void halt (void){
 
 void exit (int status){
 	thread_current()->exitcode=status;
-	
-
+	printf ("%s: exit(%d)\n",cur->name, cur->exitcode);
 	struct list_elem* e;
 	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 	{
