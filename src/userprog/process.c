@@ -270,7 +270,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   char* p;
-  char* name=strtok_r(fild_name," ",&p);
+  char* name=strtok_r(file_name," ",&p);
   file = filesys_open (name);
   if (file == NULL)
     {
