@@ -57,7 +57,7 @@ void exit (int status){
 	if (thread_current()->parent!=NULL)
 	{
 		struct list_elem* e;
-		for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
+		for (e=list_next(list_begin(&thread_current()->parent->children));e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 		{
 			if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
 			{
@@ -213,7 +213,7 @@ void close (int fd){
 	if (fds!=NULL)
 	{
 		struct list_elem* e;
-		for (e=list_begin(&file_list);e!=list_tail(&file_list);e=list_next(e))
+		for (e=list_next(list_begin(&file_list));e!=list_tail(&file_list);e=list_next(e))
 		{
 			if (list_entry(e,struct fds,elem)->fd==fd)
 			{
@@ -235,6 +235,7 @@ void
 syscall_init (void) 
 {
   fd_num=1;
+  list_init(&file_list);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -292,7 +293,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 struct fds* getfile(int fd){
 	struct list_elem *e;
 	struct fds* fds;
-	for(e=list_begin(&file_list);e!=list_end(&file_list);e=list_next(e)){
+	for(e=list_next(list_begin(&file_list));e!=list_end(&file_list);e=list_next(e)){
 		fds=list_entry(e,struct fds, elem);
 		if (fds->fd==fd)
 		{
