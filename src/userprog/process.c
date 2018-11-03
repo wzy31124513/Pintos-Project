@@ -91,7 +91,10 @@ start_process (void *file_name_)
     thread_current()->parent->child_load=true;
     sema_up(&thread_current()->parent->wait_for_child);
   }
-
+  char* p;
+  char* name=strtok_r(file_name," ",&p);
+  thread_current()->self=filesys_open(file_name);
+  file_deny_write(thread_current()->self);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -169,7 +172,8 @@ process_exit (void)
 
   lock_acquire(&file_lock);
   struct list_elem* e;
-  //file_close(thread_current()->self);
+  file_allow_write(thread_current()->self);
+  file_close(thread_current()->self);
   for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
   {
     file_close(list_entry(e,struct fds,elem)->f);
