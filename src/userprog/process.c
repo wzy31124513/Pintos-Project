@@ -164,10 +164,10 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
+  file_close(thread_current()->self);
 /*
   lock_acquire(&file_lock);
   struct list_elem* e;
-  file_close(thread_current()->self);
   for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
   {
     file_close(list_entry(e,struct fds,elem)->f);
@@ -374,9 +374,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
+  file_deny_write(file);
+  thread_current()->self = file;
  done:
   /* We arrive here whether the load is successful or not. */
+
   file_close (file);
   free(name);
   return success;
