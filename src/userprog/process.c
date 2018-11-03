@@ -46,7 +46,7 @@ process_execute (const char *file_name)
   struct child_proc* child=calloc(1,sizeof(struct child_proc));
   child->id=tid;
   list_push_back(&thread_current()->children,&child->elem);
-  child->waitd=true;
+  child->waited=true;
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
 
@@ -138,10 +138,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
-  struct list_elem* e;
-  struct child_proc* child;
-
 
 
   /* Destroy the current process's page directory and switch back
@@ -496,17 +492,17 @@ setup_stack (void **esp,char* file_name)
     char* fn_copy=calloc(1,strlen(file_name)+1);
     strlcpy(fn_copy,file_name,strlen(file_name)+1);
 
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok(NULL," ",&p))
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
       argc=argc+1;
     }
     int i=0;
     int* argv=calloc(argc,sizeof(int));
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok(NULL," ",&p))
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
-      *esp-=strlen(name)+1；
+      *esp-=strlen(name)+1;
       memcpy(*esp,name,strlen(name)+1);
-      argv[i]=*esp;
+      argv[i]=(int)*esp;
       i++;
     }
     while((int)*esp%4!=0){
@@ -516,13 +512,13 @@ setup_stack (void **esp,char* file_name)
     }
     int null=0;
     *esp-=sizeof(int);
-    memcpy(*esp,&zero,sizeof(int));
+    memcpy(*esp,&null,sizeof(int));
     for ( i = argc-1; i >= 0; i--)
     {
       *esp-=sizeof(int);
       memcpy(*esp,&argv[i],sizeof(int));
     }
-    int aa=*esp;
+    int aa=(int)*esp;
     *esp-=sizeof(int);
     memcpy(*esp,&aa,sizeof(int));
     *esp-=sizeof(int);
