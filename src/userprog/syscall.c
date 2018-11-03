@@ -145,9 +145,9 @@ int filesize (int fd){
 int read (int fd, char *buffer, unsigned size){
 
 	char* check=(char*)buffer;
-	for (int i = 0; i < size; ++i)
+	for (unsigned i = 0; i < size; ++i)
 	{
-		if (!is_user_vaddr(check) || check< 0x08048000)
+		if (!is_user_vaddr(check) || (int)check< 0x08048000)
 		{
 			exit(-1);
 			return -1;
@@ -182,19 +182,20 @@ int read (int fd, char *buffer, unsigned size){
 int write (int fd, const void *buffer, unsigned size){
 	int ret;
 
-	if (fd==0)
-	{
-		ret= -1;
-	}
 	char* check=(char*)buffer;
-	for (int i = 0; i < size; ++i)
+	for (unsigned i = 0; i < size; ++i)
 	{
-		if (!is_user_vaddr(check) || check< 0x08048000)
+		if (!is_user_vaddr(check) || (int)check< 0x08048000)
 		{
 			exit(-1);
 			return -1;
 		}
 		check=check+1;
+	}
+
+	if (fd==0)
+	{
+		ret= -1;
 	}
 	else if (fd==1)
 	{
@@ -311,8 +312,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_WRITE)
 	{
 		is_valid_vaddr(esp+7);
-		is_valid_vaddr(*(esp+6));
-		f->eax=write(*(esp+5),*(esp+6),*(esp+7));
+		is_valid_vaddr((void*)*(esp+6));
+		f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
 	}else if (*esp==SYS_SEEK)
 	{
 		is_valid_vaddr(esp+5);
