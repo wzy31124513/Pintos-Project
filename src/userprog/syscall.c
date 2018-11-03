@@ -150,7 +150,6 @@ int read (int fd, char *buffer, unsigned size){
 		if (!is_user_vaddr(check) || (int)check< 0x08048000)
 		{
 			exit(-1);
-			return -1;
 		}
 		check=check+1;
 	}
@@ -188,7 +187,6 @@ int write (int fd, const void *buffer, unsigned size){
 		if (!is_user_vaddr(check) || (int)check< 0x08048000)
 		{
 			exit(-1);
-			return -1;
 		}
 		check=check+1;
 	}
