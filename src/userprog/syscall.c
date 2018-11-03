@@ -155,6 +155,7 @@ int read (int fd, char *buffer, unsigned size){
 	lock_acquire (&file_lock); 
 	int ret;
 	struct fds* fds=getfile(fd);
+	is_valid_vaddr(fds->f);
 	if (fds==NULL)
 	{
 		ret = -1;
@@ -179,6 +180,7 @@ int write (int fd, const void *buffer, unsigned size){
 	}else{
 		lock_acquire(&file_lock);
 		struct fds* fds=getfile(fd);
+		is_valid_vaddr(fds>f);
 		if (fds==NULL)
 		{
 			ret= -1;
