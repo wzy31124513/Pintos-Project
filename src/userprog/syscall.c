@@ -151,7 +151,7 @@ int read (int fd, char *buffer, unsigned size){
 		{
 			exit(-1);
 		}
-		if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
+		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
 		{
 			exit(-1);
 		}
@@ -192,7 +192,7 @@ int write (int fd, const void *buffer, unsigned size){
 		{
 			exit(-1);
 		}
-		if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
+		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
 		{
 			exit(-1);
 		}
