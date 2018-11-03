@@ -41,7 +41,7 @@ void close (int fd);
 
 
 void* is_valid_vaddr(const void* esp){
-	if (*esp==NULL)
+	if (esp==NULL)
 	{
 		exit(0);
 		return 0;
