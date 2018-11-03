@@ -95,7 +95,6 @@ start_process (void *file_name_)
     sema_up(&thread_current()->parent->wait_for_child);
   }
 
-  name=strtok_r(file_name," ",&p);
   thread_current()->self=filesys_open(name);
   file_deny_write(thread_current()->self);
   free(name);
