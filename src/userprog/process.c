@@ -96,7 +96,7 @@ start_process (void *file_name_)
   }
 
   name=strtok_r(file_name," ",&p);
-  thread_current()->self=filesys_open(file_name);
+  thread_current()->self=filesys_open(name);
   file_deny_write(thread_current()->self);
   free(name);
   /* Start the user process by simulating a return from an
