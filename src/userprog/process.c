@@ -146,14 +146,16 @@ process_exit (void)
   uint32_t *pd;
 
   lock_acquire(&file_lock);
-  file_close(thread_current()->self);
   struct list_elem* e;
-  for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
+  for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children); e=list_next(e))
   {
-    file_close(list_entry(e,struct fds,elem)->f);
     list_remove(e);
     free(list_entry(e,struct child_proc,elem));
   } 
+  if (thread_current()->self!=NULL)
+  {
+    file_allow_write(thread_current()->self);
+  }
   lock_release(&file_lock);
 
   /* Destroy the current process's page directory and switch back
@@ -292,7 +294,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
-
+  file_deny_write(file);
+  thread_current()->self = file;
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -373,8 +376,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-  file_deny_write(file);
-  thread_current()->self = file;
+
  done:
   /* We arrive here whether the load is successful or not. */
   free(name);

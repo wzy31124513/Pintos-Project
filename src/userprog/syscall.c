@@ -63,10 +63,12 @@ void exit (int status){
 		}
 	}
 
+
 	if (thread_current()->parent->wait==thread_current()->tid)
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
 	}
+
 
 	thread_exit();
 }
