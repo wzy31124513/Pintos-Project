@@ -168,6 +168,7 @@ int read (int fd, char *buffer, unsigned size){
 int write (int fd, const void *buffer, unsigned size){
 	lock_acquire(&file_lock);
 	int ret;
+
 	if (fd==0)
 	{
 		ret= -1;
@@ -238,6 +239,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 	int *esp=f->esp;
 	is_valid_vaddr(esp);
+	is_valid_vaddr(esp+1);
+	is_valid_vaddr(esp+2);
+	is_valid_vaddr(esp+3);
 	if (*esp==SYS_HALT)
 	{
 		halt();
