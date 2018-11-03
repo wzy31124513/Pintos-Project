@@ -31,7 +31,8 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char* name;
+  char* name=calloc(1,strlen(file_name)+1);
+  strlcpy (name, file_name, strlen(file_name)+1);
   char* p;
   name=strtok_r((char*)file_name," ",&p);
 
@@ -44,8 +45,7 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
-
-
+  free(name);
 
   struct child_proc* child=calloc(1,sizeof(struct child_proc));
   child->id=tid;
