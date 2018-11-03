@@ -180,7 +180,7 @@ int write (int fd, const void *buffer, unsigned size){
 	}else{
 		lock_acquire(&file_lock);
 		struct fds* fds=getfile(fd);
-		is_valid_vaddr(fds>f);
+		is_valid_vaddr(fds->f);
 		if (fds==NULL)
 		{
 			ret= -1;
