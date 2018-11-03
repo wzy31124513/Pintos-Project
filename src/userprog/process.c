@@ -269,13 +269,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  lock_acquire(&file_lock);
   char* p;
   char* name=calloc(1,strlen(file_name)+1);
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
   file = filesys_open (name);
-  lock_release(&file_lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
