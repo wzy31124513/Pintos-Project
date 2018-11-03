@@ -131,6 +131,8 @@ process_wait (tid_t child_tid UNUSED)
   if (child->waited)
   {
     sema_down(&thread_current()->wait_for_child);
+  }else{
+    return -1;
   }
   list_remove(e1);
   return child->ret;
@@ -146,6 +148,7 @@ process_exit (void)
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+  printf ("%s: exit(%d)\n",cur->name, cur->exitcode);
   pd = cur->pagedir;
   if (pd != NULL)
     {
@@ -156,7 +159,7 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      printf ("%s: exit(%d)\n",cur->name, cur->exitcode);
+      
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);

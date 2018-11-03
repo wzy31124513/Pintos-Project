@@ -41,7 +41,7 @@ void close (int fd);
 
 
 void* is_valid_vaddr(const void* esp){
-	if(!is_user_vaddr(esp)){
+	if(esp==NULL && !is_user_vaddr(esp)){
 		exit(-1);
 		return 0;
 	}
@@ -70,7 +70,7 @@ void exit (int status){
 			list_entry(e,struct child_proc,elem)->waited=false;
 		}
 	}
-	
+
 	if (thread_current()->parent->wait==thread_current()->tid)
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
@@ -221,10 +221,9 @@ void close (int fd){
 		if (list_entry(e,struct fds,elem)->fd==fd)
 		{
 			file_close(list_entry(e,struct fds,elem)->f);
+			free(list_entry(e,struct fds,elem));
 			list_remove(e);
-			free(list_entry(e,struct fds,elem)->f);
-			lock_release(&file_lock);
-			return;
+			break;
 		}
 	}
 	lock_release(&file_lock);
