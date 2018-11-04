@@ -82,12 +82,11 @@ int exec (const char *cmd_line){
 	if (filesys_open(fn_copy)==NULL)
 	{
 		ret=-1;
-		lock_release(&file_lock);
 	}else{
 		file_close(filesys_open(fn_copy));
-		lock_release(&file_lock);
 		ret=process_execute(cmd_line);
 	}
+	lock_release(&file_lock);
 	return ret;
 }
 
@@ -182,7 +181,6 @@ int read (int fd, char *buffer, unsigned size){
 
 int write (int fd, const void *buffer, unsigned size){
 	int ret;
-    lock_acquire(&file_lock);
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size+1; ++i)
 	{
@@ -196,7 +194,7 @@ int write (int fd, const void *buffer, unsigned size){
 		}
 		check=check+1;
 	}
-
+    lock_acquire(&file_lock);
 	if (fd==0)
 	{
 		ret= -1;
@@ -229,13 +227,15 @@ void seek (int fd, unsigned position){
 unsigned tell (int fd){
 	lock_acquire(&file_lock);
 	struct fds* fds=getfile(fd);
+	unsigned ret;
 	if (fds!=NULL)
 	{
-		return file_tell(fds->f);
+		ret = file_tell(fds->f);
 	}else{
-		return 1;
+		ret = 1;
 	}
 	lock_release(&file_lock);
+	return ret;
 }
 
 void close (int fd){
