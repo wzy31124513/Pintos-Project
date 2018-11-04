@@ -17,7 +17,6 @@ static void syscall_handler (struct intr_frame *);
 struct fds* getfile(int fd);
 void* is_valid_vaddr(const void* esp);
 void halt (void);
-void exit (int status);
 int exec (const char *cmd_line);
 int wait (int pid);
 bool create (const char *file, unsigned initial_size);
@@ -144,7 +143,7 @@ int filesize (int fd){
 
 int read (int fd, char *buffer, unsigned size){
 
-	lock_acquire (&file_lock); 
+	int ret=size;
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size; ++i)
 	{
@@ -159,33 +158,31 @@ int read (int fd, char *buffer, unsigned size){
 		check=check+1;
 	}
 
-
+	lock_acquire (&file_lock); 
 	if (fd==0)
 	{
 		for (unsigned i = 0; i < size; i++)
 		{
 			buffer[i]=input_getc();
 		}
-		lock_release (&file_lock);
-		return size;
-
-	}
-	int ret;
-	struct fds* fds=getfile(fd);
-	//is_valid_vaddr(fds->f);
-	if (fds==NULL)
-	{
-		ret = -1;
 	}else{
-		ret = file_read(fds->f,buffer,size);
+		struct fds* fds=getfile(fd);
+		//is_valid_vaddr(fds->f);
+		if (fds==NULL)
+		{
+			ret = -1;
+		}else{
+			ret = file_read(fds->f,buffer,size);
+		}
 	}
+
 	lock_release (&file_lock);
 	return ret;
 }
 
 int write (int fd, const void *buffer, unsigned size){
 	int ret;
-
+    lock_acquire(&file_lock);
 	char* check=(char*)buffer;
 	for (unsigned i = 0; i < size+1; ++i)
 	{
@@ -209,7 +206,6 @@ int write (int fd, const void *buffer, unsigned size){
 		putbuf(buffer,size);
 		ret= size;
 	}else{
-		lock_acquire(&file_lock);
 		struct fds* fds=getfile(fd);
 		//is_valid_vaddr(fds->f);
 		if (fds==NULL)
@@ -218,9 +214,8 @@ int write (int fd, const void *buffer, unsigned size){
 		}else{
 			ret= file_write(fds->f,buffer,size);
 		}
-		lock_release(&file_lock);
-
 	}
+	lock_release(&file_lock);
 	return ret;
 }
 
