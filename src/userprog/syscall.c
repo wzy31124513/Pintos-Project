@@ -73,20 +73,22 @@ void exit (int status){
 }
 
 int exec (const char *cmd_line){
-	lock_acquire(&file_lock);
 	char* fn_copy=calloc(1,strlen(cmd_line)+1);
 	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
 	char* p;
 	fn_copy=strtok_r(fn_copy," ",&p);
 	int ret;
+	lock_acquire(&file_lock);
 	if (filesys_open(fn_copy)==NULL)
 	{
 		ret=-1;
+		lock_release(&file_lock);
 	}else{
 		file_close(filesys_open(fn_copy));
+		lock_release(&file_lock);
 		ret=process_execute(cmd_line);
 	}
-	lock_release(&file_lock);
+	
 	return ret;
 }
 
