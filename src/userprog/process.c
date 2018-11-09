@@ -46,7 +46,6 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  sema_down(&thread_current()->wait_for_child);
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   free(name);
 
@@ -57,7 +56,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
 
-  
+  sema_down(&thread_current()->wait_for_child);
   if (thread_current()->child_load==false)
   {
     return -1;
