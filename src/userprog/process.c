@@ -56,7 +56,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
 
-  sema_down(&thread_current()->wait_for_child);
+  //sema_down(&thread_current()->wait_for_child);
   if (thread_current()->child_load==false)
   {
     return -1;
