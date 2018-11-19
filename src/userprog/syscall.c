@@ -182,20 +182,6 @@ int read (int fd, char *buffer, unsigned size){
 
 int write (int fd, const void *buffer, unsigned size){
 	int ret;
-	char* check=(char*)buffer;
-	for (unsigned i = 0; i < size+1; ++i)
-	{
-		if (!is_user_vaddr(check) || check==NULL)
-		{
-			exit(-1);
-		}
-		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
-		{
-			exit(-1);
-		}
-		check=check+1;
-	}
-    lock_acquire(&file_lock);
 	if (fd==0)
 	{
 		ret= -1;
@@ -211,10 +197,12 @@ int write (int fd, const void *buffer, unsigned size){
 		{
 			ret= -1;
 		}else{
+			lock_acquire(&file_lock);
 			ret= file_write(fds->f,buffer,size);
+			lock_release(&file_lock);
+
 		}
 	}
-	lock_release(&file_lock);
 	return ret;
 }
 
