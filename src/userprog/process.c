@@ -151,7 +151,7 @@ process_exit (void)
   struct list_elem *e;
   while(!list_empty(&thread_current()->file_list)){
     e=list_pop_front(&thread_current()->file_list);
-    struct fds* f=list_entry(e,struc fds, elem);
+    struct fds* f=list_entry(e,struct fds, elem);
     file_close(f->f);
     list_remove(e);
     free(f);
