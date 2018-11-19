@@ -186,7 +186,7 @@ thread_create (const char *name, int priority,
   struct child_proc* c=malloc(sizeof(struct child_proc));
   c->id=tid;
   c->ret=t->exitcode;
-  c->waited=false;
+  c->waited=true;
   list_push_back(&running_thread()->children,&c->elem);
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
