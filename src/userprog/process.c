@@ -141,16 +141,20 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  if (thread_current()->exitcode==-2)
+  {
+    exit(-1);
+  }
+  printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
-  struct list_elem* e;
-  for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children); e=list_next(e))
-  {
+  file_close(&thread_current()->self);
+  struct list_elem *e;
+  while(!list_empty(&thread_current()->file_list)){
+    e=list_pop_front(&thread_current()->file_list);
+    struct *fds f=list_entry(e,struc fds, elem);
+    file_close(f->f);
     list_remove(e);
-    free(list_entry(e,struct child_proc,elem));
-  } 
-  if (thread_current()->self!=NULL)
-  {
-    file_allow_write(thread_current()->self);
+    free(f);
   }
   lock_release(&file_lock);
 

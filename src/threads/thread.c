@@ -297,7 +297,10 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-
+  while(!list_empty(&thread_current()->children)){
+    struct child_proc* c=list_entry(list_pop_front(&thread_current()->children),struct child_proc,elem);
+    free(c);
+  }
 
 
   /* Remove thread from all threads list, set our status to dying,

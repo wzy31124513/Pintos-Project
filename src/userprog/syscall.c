@@ -68,7 +68,6 @@ void exit (int status){
 		sema_up(&thread_current()->parent->wait_for_child);
 	}
 
-
 	thread_exit();
 }
 
