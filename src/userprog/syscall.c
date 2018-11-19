@@ -51,7 +51,6 @@ void halt (void){
 
 void exit (int status){
 	thread_current()->exitcode=status;
-	printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
 	struct list_elem* e;
 	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 	{
@@ -67,7 +66,7 @@ void exit (int status){
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
 	}
-
+	printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
 	thread_exit();
 }
 

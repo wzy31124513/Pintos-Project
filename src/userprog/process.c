@@ -144,7 +144,6 @@ process_exit (void)
   {
     exit(-1);
   }
-  printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
   file_close(thread_current()->self);
   struct list_elem *e;
