@@ -33,7 +33,7 @@ void close (int fd);
 
 
 void* is_valid_vaddr(const void* esp){
-	if(esp==NULL || !is_user_vaddr(esp)){
+	if(!is_user_vaddr(esp)){
 		exit(-1);
 		return 0;
 	}
@@ -50,7 +50,7 @@ void halt (void){
 }
 
 void exit (int status){
-	thread_current()->exitcode=status;
+	
 	struct list_elem* e;
 	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 	{
@@ -61,6 +61,7 @@ void exit (int status){
 		}
 	}
 
+    thread_current()->exitcode=status;
 
 	if (thread_current()->parent->wait==thread_current()->tid)
 	{
@@ -77,12 +78,13 @@ int exec (const char *cmd_line){
 	fn_copy=strtok_r(fn_copy," ",&p);
 	int ret;
 	lock_acquire(&file_lock);
-	if (filesys_open(fn_copy)==NULL)
+	struct file* f=filesys_open(fn_copy);
+	if (f==NULL)
 	{
 		ret=-1;
 		lock_release(&file_lock);
 	}else{
-		file_close(filesys_open(fn_copy));
+		file_close(f);
 		lock_release(&file_lock);
 		ret=process_execute(cmd_line);
 	}
@@ -239,7 +241,6 @@ unsigned tell (int fd){
 }
 
 void close (int fd){
-	lock_acquire(&file_lock);
 	struct list_elem* e;
 	struct fds* f;
 	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
@@ -249,11 +250,9 @@ void close (int fd){
 		{
 			file_close(f->f);
 			list_remove(e);
-			break;
 		}
 	}
 	free(f);
-	lock_release(&file_lock);
 }
 
 
