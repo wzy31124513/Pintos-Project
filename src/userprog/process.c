@@ -140,7 +140,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-
+  if (thread_current()->exitcode==-2)
+  {
+    exit(-1);
+  }
   printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
   file_close(thread_current()->self);
@@ -545,7 +548,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    free(fn_copy);
+    //free(fn_copy);
     free(argv);
     return success;
 }
