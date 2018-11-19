@@ -140,7 +140,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-
+  printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
   file_close(thread_current()->self);
   struct list_elem *e;
@@ -165,7 +165,6 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
