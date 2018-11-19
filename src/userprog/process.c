@@ -147,7 +147,7 @@ process_exit (void)
   }
   printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
-  file_close(&thread_current()->self);
+  file_close(thread_current()->self);
   struct list_elem *e;
   while(!list_empty(&thread_current()->file_list)){
     e=list_pop_front(&thread_current()->file_list);
