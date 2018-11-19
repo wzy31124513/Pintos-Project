@@ -548,7 +548,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-    //free(fn_copy);
+    free(fn_copy);
     free(argv);
     return success;
 }
