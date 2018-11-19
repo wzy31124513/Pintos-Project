@@ -67,7 +67,6 @@ void exit (int status){
 	{
 		sema_up(&thread_current()->parent->wait_for_child);
 	}
-	printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
 	thread_exit();
 }
 
