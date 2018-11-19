@@ -49,10 +49,6 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   free(name);
 
-  struct child_proc* child=calloc(1,sizeof(struct child_proc));
-  child->id=tid;
-  list_push_back(&thread_current()->children,&child->elem);
-  child->waited=true;
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
 
@@ -113,7 +109,7 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   struct list_elem* e;
-  struct list_elem* e1;
+  struct list_elem* e1=NULL;
   struct child_proc* child=NULL;
   for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
   {
@@ -123,7 +119,7 @@ process_wait (tid_t child_tid UNUSED)
       e1=e;
     }
   }
-  if (child==NULL)
+  if (child==NULL || e1==NULL)
   {
     return -1;
   }
@@ -289,13 +285,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
   file = filesys_open (name);
+  free(name);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
-  file_deny_write(file);
-  thread_current()->self = file;
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -376,10 +372,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
+  file_deny_write(file);
+  thread_current()->self = file;
  done:
   /* We arrive here whether the load is successful or not. */
-  free(name);
+
   lock_release(&file_lock);
   return success;
 }
@@ -548,8 +545,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp-=sizeof(int);
     memcpy(*esp,&null,sizeof(int));
-
-
+    free(fn_copy);
     free(argv);
     return success;
 }

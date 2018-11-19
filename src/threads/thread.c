@@ -15,7 +15,6 @@
 #include "userprog/process.h"
 #endif
 
-
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -184,8 +183,11 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
-
+  struct child_proc* c=malloc(sizeof(struct child_proc));
+  c->id=tid;
+  c->ret=t->exitcode;
+  c->waited=false;
+  list_push_back(&running_thread()->children,&c->elem);
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -295,6 +297,8 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
+
+
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
@@ -480,6 +484,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->exitcode=-2;
   t->wait=0;
   t->self=NULL;
+  t->waited=true;
   list_push_back (&all_list, &t->allelem);
 }
 

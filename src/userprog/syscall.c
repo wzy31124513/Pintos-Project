@@ -88,7 +88,7 @@ int exec (const char *cmd_line){
 		lock_release(&file_lock);
 		ret=process_execute(cmd_line);
 	}
-	
+	free(fn_copy);
 	return ret;
 }
 
@@ -245,14 +245,15 @@ void close (int fd){
 	struct list_elem* e;
 	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
 	{
-		if (list_entry(e,struct fds,elem)->fd==fd)
+		struct fds* f=list_entry(e,struct fds,elem);
+		if (f->fd==fd)
 		{
+			file_close(f->f);
 			list_remove(e);
-			file_close(list_entry(e,struct fds,elem)->f);
-			free(list_entry(e,struct fds,elem));
 			break;
 		}
 	}
+	free(f);
 	lock_release(&file_lock);
 }
 
