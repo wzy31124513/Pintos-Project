@@ -238,9 +238,9 @@ void close (int fd){
 		{
 			file_close(f->f);
 			list_remove(e);
+			free(f);
 		}
 	}
-	free(f);
 	lock_release(&file_lock);
 }
 
