@@ -239,6 +239,7 @@ void close (int fd){
 			file_close(f->f);
 			list_remove(e);
 			free(f);
+			break;
 		}
 	}
 	lock_release(&file_lock);
