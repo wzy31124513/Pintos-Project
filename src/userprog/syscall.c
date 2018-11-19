@@ -230,6 +230,7 @@ unsigned tell (int fd){
 void close (int fd){
 	struct list_elem* e;
 	struct fds* f;
+	lock_acquire(&file_lock);
 	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
 	{
 		f=list_entry(e,struct fds,elem);
@@ -240,6 +241,7 @@ void close (int fd){
 		}
 	}
 	free(f);
+	lock_release(&file_lock);
 }
 
 
