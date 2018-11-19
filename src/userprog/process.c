@@ -127,9 +127,8 @@ process_wait (tid_t child_tid UNUSED)
   if (child->waited)
   {
     sema_down(&thread_current()->wait_for_child);
-  }else{
-    return -1;
   }
+
   list_remove(e1);
   return child->ret;
 }
@@ -141,10 +140,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  if (thread_current()->exitcode==-2)
-  {
-    exit(-1);
-  }
+
   printf ("%s: exit(%d)\n",thread_current()->name, thread_current()->exitcode);
   lock_acquire(&file_lock);
   file_close(thread_current()->self);
