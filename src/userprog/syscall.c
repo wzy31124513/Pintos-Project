@@ -243,9 +243,10 @@ unsigned tell (int fd){
 void close (int fd){
 	lock_acquire(&file_lock);
 	struct list_elem* e;
+	struct fds* f;
 	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
 	{
-		struct fds* f=list_entry(e,struct fds,elem);
+		f=list_entry(e,struct fds,elem);
 		if (f->fd==fd)
 		{
 			file_close(f->f);
