@@ -14,6 +14,8 @@
 #include "devices/input.h"
 static void syscall_handler (struct intr_frame *);
 
+# Just to distinguish. Nothing more.
+
 struct fds* getfile(int fd);
 void* is_valid_vaddr(const void* esp);
 void halt (void);
