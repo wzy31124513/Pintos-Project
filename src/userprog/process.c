@@ -26,6 +26,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** esp);
+static void* push(uint8_t* kaddr, size_t* ofs,void* uaddr,size_t size);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -501,7 +502,7 @@ setup_stack (void **esp,char* file_name)
     struct frame* f=NULL;
     for (int i = 0; i < 3; i++)
     {
-      f=alloc_frame(p);
+      f=alloc_frame(page);
       if (f!=NULL)
       {
         break;
@@ -516,7 +517,7 @@ setup_stack (void **esp,char* file_name)
       page->mmap=true;
       ret=getarg(page->f->addr,page->addr,file_name,esp);
       lock_release(&page->f->lock);
-      return ret
+      return ret;
     }
   }
   return false;
@@ -543,7 +544,7 @@ static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** 
   for ( arg = strtok_r(file_name," ",&p); arg != NULL; arg=strtok_r(NULL," ",&p))
   {
     void* arg1=uaddr+(arg-(char*)kaddr);
-    if (push(kaddr,&offset,&arg1,sizeof(arg1)==NULL))
+    if (push(kaddr,&ofs,&arg1,sizeof(arg1)==NULL))
     {
       return false;
     }
@@ -565,6 +566,19 @@ static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** 
   *esp=uaddr+ofs;
   return true;
 }
+
+static void* push(uint8_t* kaddr, size_t* ofs,void* uaddr,size_t size){
+  size_t size1=ROUND_UP(size,sizeof(uint32_t));
+  if (*ofs<size1)
+  {
+    return NULL;
+  }
+  *ofs-=size1;
+  memcpy(kaddr+*ofs+size1-size,uaddr,size);
+  return kaddr+*ofs+size1-size;
+
+}
+
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
    If WRITABLE is true, the user process may modify the page;
