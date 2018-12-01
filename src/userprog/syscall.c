@@ -13,10 +13,9 @@
 #include "threads/malloc.h"
 #include "devices/input.h"
 #include "vm/page.h"
+
+
 static void syscall_handler (struct intr_frame *);
-
-# Just to distinguish. Nothing more.
-
 struct fds* getfile(int fd);
 void* is_valid_vaddr(const void* esp);
 void halt (void);
@@ -31,9 +30,9 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-mapid_t mmap (int fd, void *addr);
-void munmap (mapid_t mapping);
-
+int mmap (int fd, void *addr);
+void munmap (int mapping);
+struct mapping* getmap(int id);
 
 
 void* is_valid_vaddr(const void* esp){
@@ -328,19 +327,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 		close(*(esp+1));
 	}else if (*esp==SYS_MMAP){
 		is_valid_vaddr(esp+5);
-		f->eax=mmap(*(esp+4),*(esp+5));
+		f->eax=mmap((int)*(esp+4),(void*)*(esp+5));
 	}else if (*esp==SYS_MUNMAP)
 	{
 		is_valid_vaddr(esp+1);
 		f->eax=munmap((int)*(esp+1));
 	}
-}
-struct mapping{
-	int id;
-	struct file* file;
-	uint8_t * addr;
-	int num;
-	struct list_elem elem;
 }
 
 struct mapping* getmap(int id){
@@ -358,7 +350,7 @@ struct mapping* getmap(int id){
 
 
 
-void munmap (mapid_t mapping){
+void munmap (int mapping){
 	struct mapping* m=getmap(mapping);
 	list_remove(&m->elem);
 	while(m->num>0){
@@ -371,7 +363,7 @@ void munmap (mapid_t mapping){
 }
 
 
-mapid_t mmap (int fd, void *addr){
+int mmap (int fd, void *addr){
 	struct fds* fd=getfile(fd);
 	struct mapping* m = malloc(sizeof(struct mapping));
 	if (m==NULL || addr==NULL || pg_ofs(addr)!=0)
@@ -379,10 +371,10 @@ mapid_t mmap (int fd, void *addr){
 		return -1;
 	}
 
-	m->id=thread_current()->next++;
+	m->id=thread_current()->fd_num++;
 	lock_acquire(&file_lock);
-	m->file=file_reopen(fd->file);
-	if (! ->file)
+	m->file=file_reopen(fd->f);
+	if (!m->file)
 	{
 		free(m);
 		return -1;

@@ -109,10 +109,10 @@ struct thread
     bool child_load;
     /* Owned by thread.c. */
     struct hash* pages;
-    struct list mappings;
+    struct list mapping;
     int next;
     void* esp;
-    
+
     unsigned magic;                     /* Detects stack overflow. */
   };
 

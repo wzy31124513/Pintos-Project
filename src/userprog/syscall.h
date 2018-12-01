@@ -9,5 +9,13 @@ struct fds
     struct file *f;
     struct list_elem elem;
 };
+
+struct mapping{
+	int id;
+	struct file* file;
+	uint8_t * addr;
+	int num;
+	struct list_elem elem;
+};
 void exit (int status);
 #endif /* userprog/syscall.h */
