@@ -92,7 +92,7 @@ start_process (void *exec_)
   {
     lock_init(&exec->child_proc->lock);
     exec->child_proc->status=2;
-    exec->child_proc->tid=thread_current()->tid;
+    exec->child_proc->id=thread_current()->tid;
     sema_init(&exec->child_proc->exit,0);
   }
   exec->loaded=success;
@@ -166,7 +166,7 @@ process_exit (void)
     if (c->status==0)
     {
       lock_release(&c->lock);
-      free(c)
+      free(c);
     }else{
       lock_release(&c->lock);
     }
