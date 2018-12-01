@@ -34,7 +34,7 @@ int mmap (int fd, void *addr);
 void munmap (int mapping);
 struct mapping* getmap(int id);
 char* strcpy_to_kernel(const char* str);
-
+static void argcpy(void* cp,void* addr1,size_t size);
 
 void* is_valid_vaddr(const void* esp){
 	if(!is_user_vaddr(esp)){
@@ -299,7 +299,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     unsigned int func;
     int args[3];
     argcpy(&func,f->esp,sizeof(func));
-    if (func>=sizeof(syscall_table)/sizof(*syscall_table));
+    if (func>=(sizeof(syscall_table)/sizeof(*syscall_table)))
     {
     	exit(-1);
     }
@@ -331,7 +331,7 @@ void munmap (int mapping){
 		if (pagedir_is_dirty(thread_current()->pagedir,(m->addr+PGSIZE*i)))
 		{
 			lock_acquire(&file_lock);
-			file_write_at(m->file,(const void*)(m->addr+PGSIZE*i),(PGSIZE*(m->num)));
+			file_write_at(m->file,(const void*)(m->addr+PGSIZE*i),(PGSIZE*(m->num)),PGSIZE*i);
 			lock_release(&file_lock);
 		}
 	}
