@@ -11,6 +11,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/malloc.h"
+#include "threads/palloc.h"
 #include "devices/input.h"
 #include "vm/page.h"
 #include "vm/frame.h"
@@ -147,7 +148,7 @@ int read (int fd, char *buffer, unsigned size){
 
 	int read=0;
 	struct fds* f=getfile(fd);
-	uint8_t* b=buffer;
+	uint8_t* b=(uint8_t*)buffer;
 	while(size>0){
 		size_t page_left=PGSIZE-pg_ofs(b);
 		int32_t ret;
@@ -169,7 +170,7 @@ int read (int fd, char *buffer, unsigned size){
 			lock_release(&file_lock);
 			page_unlock(b);
 		}else{
-			for (int i = 0; i < read_size; ++i)
+			for (size_t i = 0; i < read_size; ++i)
 			{
 				char c=input_getc();
 				if (!page_lock(b,true))
@@ -185,12 +186,12 @@ int read (int fd, char *buffer, unsigned size){
 		{
 			if (read==0)
 			{
-				read==-1
+				read=-1;
 			}
 			break;
 		}
 		read+=ret;
-		if (ret!=read_size)
+		if (ret!=(int32_t)read_size)
 		{
 			break;
 		}
@@ -201,7 +202,7 @@ int read (int fd, char *buffer, unsigned size){
 }
 
 int write (int fd, const void *buffer, unsigned size){
-	uint8_t b=buffer;
+	uint8_t* b=(uint8_t*)buffer;
 	struct fds* f;
 	int write=0;
 	if (fd!=1)
