@@ -291,7 +291,7 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
-  syscall_exit ();
+  exit1();
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -471,17 +471,16 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->exit_code = -1;
-  t->wait_status = NULL;
-  list_init (&t->children);
-  sema_init (&t->timer_sema, 0);
-  t->pagedir = NULL;
-  t->pages = NULL;
-  t->bin_file = NULL;
-  list_init (&t->fds);
-  list_init (&t->mappings);
-  t->next_handle = 2;
   t->magic = THREAD_MAGIC;
+  t->exitcode=-1;
+  t->child_proc=NULL;
+  list_init(&t->children);
+  t->pages=NULL;
+  t->self=NULL;
+  t->pagedir=NULL;
+  list_init(&t->file_list);
+  list_init(&t->mapping);
+  t->fd_num=2;
   list_push_back (&all_list, &t->allelem);
 }
 

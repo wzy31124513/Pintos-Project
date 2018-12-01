@@ -6,45 +6,31 @@
 #include "filesys/off_t.h"
 #include "threads/synch.h"
 
-/* Virtual page. */
+
 struct page 
-  {
-    /* Immutable members. */
-    void *addr;                 /* User virtual address. */
-    bool read_only;             /* Read-only page? */
-    struct thread *thread;      /* Owning thread. */
+{
+  void* addr;
+  struct frame* frame;
+  struct thread* t;
+  bool read_only;
+  struct file* file;
+  int offset;
+  int rw_bytes;
+  block_sector_t swap;
+  bool mmap;
+  struct hash_elem elem;  
+};
 
-    /* Accessed only in owning process context. */
-    struct hash_elem hash_elem; /* struct thread `pages' hash element. */
-
-    /* Set only in owning process context with frame->frame_lock held.
-       Cleared only with scan_lock and frame->frame_lock held. */
-    struct frame *frame;        /* Page frame. */
-
-    /* Swap information, protected by frame->frame_lock. */
-    block_sector_t sector;       /* Starting sector of swap area, or -1. */
-    
-    /* Memory-mapped file information, protected by frame->frame_lock. */
-    bool private;               /* False to write back to file,
-                                   true to write back to swap. */
-    struct file *file;          /* File. */
-    off_t file_offset;          /* Offset in file. */
-    off_t file_bytes;           /* Bytes to read/write, 1...PGSIZE. */
-  };
-
+void init_page(struct hash* h);
+void page_destructor(struct hash_elem* e,void* aux UNUSED);
+struct page* page_alloc(void* addr, bool writable);
+bool load_fault(void* addr);
+bool load_page(struct page* p);
+bool recently_used(struct page* p);
+bool page_lock(const void* addr,bool writable);
+void page_unlock(const void* addr);
 void page_exit (void);
-
-struct page *page_allocate (void *, bool read_only);
 void page_deallocate (void *vaddr);
-
-bool page_in (void *fault_addr);
-bool page_out (struct page *);
-bool page_accessed_recently (struct page *);
-
-bool page_lock (const void *, bool will_write);
-void page_unlock (const void *);
-
-hash_hash_func page_hash;
-hash_less_func page_less;
-
-#endif /* vm/page.h */
+unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED);
+bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED);
+#endif
