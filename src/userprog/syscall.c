@@ -12,6 +12,7 @@
 #include "filesys/file.h"
 #include "threads/malloc.h"
 #include "devices/input.h"
+#include "vm/page.h"
 static void syscall_handler (struct intr_frame *);
 
 # Just to distinguish. Nothing more.
@@ -30,7 +31,8 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-
+mapid_t mmap (int fd, void *addr);
+void munmap (mapid_t mapping);
 
 
 
@@ -63,7 +65,12 @@ void exit (int status){
 		}
 	}
 
+	for (e = list_begin(thread_current()->mapping); e!=list_tail(thread_current()->mapping); e=list_next(e))
+	{
+		munmap(list_entry(e,struct mapping,elem)->id);
+	}
     thread_current()->exitcode=status;
+
 
 	if (thread_current()->parent->wait==thread_current()->tid)
 	{
@@ -319,8 +326,98 @@ syscall_handler (struct intr_frame *f UNUSED)
 	{
 		is_valid_vaddr(esp+1);
 		close(*(esp+1));
+	}else if (*esp==SYS_MMAP){
+		is_valid_vaddr(esp+5);
+		f->eax=mmap(*(esp+4),*(esp+5));
+	}else if (*esp==SYS_MUNMAP)
+	{
+		is_valid_vaddr(esp+1);
+		f->eax=munmap((int)*(esp+1));
 	}
 }
+struct mapping{
+	int id;
+	struct file* file;
+	uint8_t * addr;
+	int num;
+	struct list_elem elem;
+}
+
+struct mapping* getmap(int id){
+	struct list_elem* e;
+	for (e=list_begin(&thread_current()->mapping); e != list_tail(&thread_current()->mapping) ; e=list_next(e))
+	{
+		struct mapping* m=list_entry(e,struct mapping, elem);
+		if (m->id==id)
+		{
+			return m;
+		}
+	}
+	exit(-1);
+}
+
+
+
+void munmap (mapid_t mapping){
+	struct mapping* m=getmap(mapping);
+	list_remove(&m->elem);
+	while(m->num>0){
+		page_free(m->addr);
+		m->addr+=PGSIZE;
+		m->num--;
+	}
+	file_close(m->file);
+	free(m);
+}
+
+
+mapid_t mmap (int fd, void *addr){
+	struct fds* fd=getfile(fd);
+	struct mapping* m = malloc(sizeof(struct mapping));
+	if (m==NULL || addr==NULL || pg_ofs(addr)!=0)
+	{
+		return -1;
+	}
+
+	m->id=thread_current()->next++;
+	lock_acquire(&file_lock);
+	m->file=file_reopen(fd->file);
+	if (! ->file)
+	{
+		free(m);
+		return -1;
+	}
+	m->addr=addr;
+	m->num=0;
+	list_push_back(&thread_current()->mapping,&m->elem);
+	int length=file_length(m->file);
+	lock_release(&file_lock);
+	int offset=0;
+	while(length>0){
+		struct page* p=page_alloc(addr+offset,true);
+		if (!p)
+		{
+			munmap(m->id);
+			return -1;
+		}
+		p->mmap=false;
+		p->file=m->file;
+		p->offset=offset;
+		if (length>PGSIZE)
+		{
+			p->rw_bytes=PGSIZE;
+		}else{
+			p->rw_bytes=length;
+		}
+		offset+=p->rw_bytes;
+		length-=p->rw_bytes;
+		m->num++;
+
+	}
+	return m->id;
+}
+
+
 
 struct fds* getfile(int fd){
 	struct list_elem *e;

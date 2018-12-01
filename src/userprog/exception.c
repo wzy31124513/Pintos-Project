@@ -152,7 +152,11 @@ page_fault (struct intr_frame *f)
 
   if ((!is_user_vaddr(fault_addr) && user)||not_present)
   {
-    exit(-1);
+    if (load_fault(fault_addr)==NULL)
+    {
+      exit(-1);
+    }
+    return;
   }
 
   /* To implement virtual memory, delete the rest of the function
