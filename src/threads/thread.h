@@ -100,11 +100,13 @@ struct thread
     #endif                  /* Page directory. */
     int exitcode; /*return status*/
     struct thread* parent;
-    struct child_proc* child_proc;
+    struct semaphore wait_for_child;
     struct list children;
     int fd_num;
     struct list file_list;
+    int wait;
     struct file* self;
+    bool child_load;
     /* Owned by thread.c. */
     struct hash* pages;
     struct list mapping;
@@ -117,9 +119,7 @@ struct thread
   {
     tid_t id;
     int ret;
-    struct lock lock;
-    int status;
-    struct semaphore exit;
+    bool waited;
     struct list_elem elem;
   };
 
