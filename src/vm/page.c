@@ -224,7 +224,7 @@ page_allocate (void *vaddr, bool read_only)
       p->sector = (block_sector_t) -1;
 
       p->file = NULL;
-      p->file_offset = 0;read_only
+      p->file_offset = 0;
       p->file_bytes = 0;
 
       p->thread = thread_current ();
