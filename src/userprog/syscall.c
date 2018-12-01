@@ -272,77 +272,40 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-	
-	int *esp=f->esp;
-	//unsigned int func;
-
-	is_valid_vaddr(esp);
-
-	if (*esp==SYS_HALT)
-	{
-		halt();
-	}else if (*esp==SYS_EXIT)
-	{
-		is_valid_vaddr(esp+1);
-		exit(*(esp+1));
-	}else if (*esp==SYS_EXEC)
-	{
-		is_valid_vaddr(esp+1);
-		is_valid_vaddr((void*)*(esp+1));
-		f->eax=exec((char*)*(esp+1));
-	}else if (*esp==SYS_WAIT)
-	{
-		is_valid_vaddr(esp+1);
-		f->eax=wait((int)*(esp+1));
-	}else if (*esp==SYS_CREATE)
-	{
-		is_valid_vaddr(esp+5);
-		is_valid_vaddr((void*)*(esp+4));
-		f->eax=create((char*)*(esp+4),*(esp+5));
-	}else if (*esp==SYS_REMOVE)
-	{
-		is_valid_vaddr(esp+1);
-		is_valid_vaddr((void*)*(esp+1));
-		f->eax=remove((char*)*(esp+1));
-	}else if (*esp==SYS_OPEN){
-		is_valid_vaddr(esp+1);
-		is_valid_vaddr((void*)*(esp+1));
-		f->eax=open((char *)*(esp+1));
-	}
-	else if (*esp==SYS_FILESIZE)
-	{
-		is_valid_vaddr(esp+1);
-		f->eax=filesize((int)*(esp+1));
-	}else if (*esp==SYS_READ)
-	{
-		is_valid_vaddr(esp+7);
-		is_valid_vaddr((void*)*(esp+6));
-		f->eax=read(*(esp+5),(void*)*(esp+6),*(esp+7));
-	}else if (*esp==SYS_WRITE)
-	{
-		is_valid_vaddr(esp+7);
-		is_valid_vaddr((void*)*(esp+6));
-		f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
-	}else if (*esp==SYS_SEEK)
-	{
-		is_valid_vaddr(esp+5);
-		seek(*(esp+4),*(esp+5));
-	}else if (*esp==SYS_TELL)
-	{
-		is_valid_vaddr(esp+1);
-		f->eax=tell(*(esp+1));
-	}else if (*esp==SYS_CLOSE)
-	{
-		is_valid_vaddr(esp+1);
-		close(*(esp+1));
-	}else if (*esp==SYS_MMAP){
-		is_valid_vaddr(esp+5);
-		f->eax=mmap((int)*(esp+4),(void*)*(esp+5));
-	}else if (*esp==SYS_MUNMAP)
-	{
-		is_valid_vaddr(esp+1);
-		munmap((int)*(esp+1));
-	}
+	typedef int function (int,int,int);
+	struct syscall{
+		size_t arg_num;
+		function* func;
+	};
+    static const struct syscall syscall_table[] =
+    {
+      {0, (syscall_function *) halt},
+      {1, (syscall_function *) exit},
+      {1, (syscall_function *) exec},
+      {1, (syscall_function *) wait},
+      {2, (syscall_function *) create},
+      {1, (syscall_function *) remove},
+      {1, (syscall_function *) open},
+      {1, (syscall_function *) filesize},
+      {3, (syscall_function *) read},
+      {3, (syscall_function *) write},
+      {2, (syscall_function *) seek},
+      {1, (syscall_function *) tell},
+      {1, (syscall_function *) close},
+      {2, (syscall_function *) mmap},
+      {1, (syscall_function *) munmap},
+    };
+    const struct syscall* syscall;
+    unsigned int func;
+    int args[3];
+    argcpy(&func,f->esp,sizeof(func));
+    if (func>=sizeof(syscall_table)/sizof(*syscall_table));
+    {
+    	exit(-1);
+    }
+    memset(args,0,sizeof(args));
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*syscall->arg_num);
+    f->eax=sc->func(args[0],args[1],args[2]);
 }
 
 struct mapping* getmap(int id){
