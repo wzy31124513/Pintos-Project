@@ -12,11 +12,11 @@ void init_page(struct hash* h){
 }
 
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED){
-	return hash_entry(e,struct page,elem->addr >> 12);
+	return ((uint32_t)hash_entry(e,struct page,elem)->addr) >> 12;
 }
 
 bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED){
-	return hash_entry(a,struct page,elem)->addr < hash_entry(b,struct page,elem)->addr;
+	return (uint32_t)hash_entry(a,struct page,elem)->addr < (uint32_t)hash_entry(b,struct page,elem)->addr;
 }
 
 struct page * page_alloc(void* addr, bool writable){
@@ -40,20 +40,19 @@ struct page * page_alloc(void* addr, bool writable){
 struct page * find_page(void* addr){
 	if (addr<PHYS_BASE)
 	{
-		struct page* page;
+		struct page page;
 		struct hash_elem* e;
-		page.addr=pg_round_down(addr);
+		page.addr=(void*)pg_round_down(addr);
 		e=hash_find(thread_current()->pages,&page.elem);
 		if (e)
 		{
-			page=hash_entry(e,struct page,elem);
+			return hash_entry(e,struct page,elem);
 		}else if (PHYS_BASE-addr<=(1024*1024)){
 			if (addr>=thread_current()->esp-32)
 			{
-				page=page_alloc(addr,true);
+				return page_alloc(addr,true);
 			}
 		}
-		return page;
 	}
 	return NULL;
 }
