@@ -83,8 +83,16 @@ int exec (const char *cmd_line){
 	char* fn_copy=strcpy_to_kernel(cmd_line);
 	int ret;
 	lock_acquire(&file_lock);
-	ret=process_execute(cmd_line);
-	lock_release(&file_lock);
+	struct file* f=filesys_open(fn_copy);
+	if (f==NULL)
+	{
+		ret=-1;
+		lock_release(&file_lock);
+	}else{
+		file_close(f);
+		lock_release(&file_lock);
+		ret=process_execute(cmd_line);
+	}
 	palloc_free_page(fn_copy);
 	return ret;
 }
