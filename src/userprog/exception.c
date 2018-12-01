@@ -151,7 +151,7 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
 
-  if ((!is_user_vaddr(fault_addr) && user)||not_present)
+  if (user && not_present)
   {
     if (!load_fault(fault_addr))
     {
