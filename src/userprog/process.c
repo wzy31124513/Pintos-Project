@@ -392,7 +392,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+//static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -491,6 +491,18 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 
 
+
+static void
+reverse (int argc, char **argv) 
+{
+  for (; argc > 1; argc -= 2, argv++) 
+    {
+      char *tmp = argv[0];
+      argv[0] = argv[argc - 1];
+      argv[argc - 1] = tmp;
+    }
+}
+
 static void *
 push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
 {
@@ -577,9 +589,9 @@ setup_stack (void **esp,char* file_name)
   }
   page->writable=true;
   page->mmap=false;
-  bool ret=init_cmd_line (page->frame->base, page->addr, file_name, esp);
+  bool ret=init_cmd_line (page->f->addr, page->addr, file_name, esp);
 
-  lock_release(&page->f);
+  lock_release(&page->f->lock);
   return ret;
   /*char* p;
   char* name;
