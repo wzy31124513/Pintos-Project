@@ -7,10 +7,10 @@ static struct list frames;
 static struct lock frame_lock;
 
 
-void* frame_init(void){
+void frame_init(void){
 	lock_init(&frame_lock);
 	list_init(&frames);
-]	void* addr=palloc_get_page(PAL_USER);
+	void* addr=palloc_get_page(PAL_USER);
 	while(addr){
 		struct frame* f=malloc(sizeof(struct frame));
 		f->addr=addr;
@@ -73,7 +73,7 @@ void* alloc_frame(struct page* page){
 
 }
 
-void* free_frame(struct frame* f){
+void free_frame(struct frame* f){
 	f->page=NULL;
 	lock_release(&f->lock);
 }

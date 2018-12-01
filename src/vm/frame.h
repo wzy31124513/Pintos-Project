@@ -9,7 +9,7 @@ struct frame{
 	struct lock lock;
 };
 
-void* frame_init(void);
+void frame_init(void);
 void* alloc_frame(struct page*);
-void* free_frame(struct frame* f);
+void free_frame(struct frame* f);
 #endif
