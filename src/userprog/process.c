@@ -283,14 +283,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
-
+/*
   t->pages=malloc(sizeof(struct hash));
   if (t->pages==NULL)
   {
     goto done;
   }
   init_page(t->pages);
-
+*/
   /* Open executable file. */
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
