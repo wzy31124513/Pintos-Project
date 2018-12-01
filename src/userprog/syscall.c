@@ -37,19 +37,6 @@ struct mapping* getmap(int id);
 char* strcpy_to_kernel(const char* str);
 static void argcpy(void* cp,void* addr1,size_t size);
 
-void* is_valid_vaddr(const void* esp){
-	if(!is_user_vaddr(esp)){
-		exit(-1);
-		return 0;
-	}
-	if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
-	{
-		exit(-1);
-		return 0;
-	}
-	return pagedir_get_page(thread_current()->pagedir,esp);
-}
-
 void halt (void){
 	shutdown_power_off();
 }
@@ -332,6 +319,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     {
     	exit(-1);
     }
+    sc=syscall_table+func;
     memset(args,0,sizeof(args));
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
     f->eax=sc->func(args[0],args[1],args[2]);
