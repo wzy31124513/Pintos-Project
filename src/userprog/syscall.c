@@ -80,12 +80,23 @@ void exit (int status){
 }
 
 int exec (const char *cmd_line){
-	char* fn_copy=strcpy_to_kernel(cmd_line);
+	char* fn_copy=calloc(1,strlen(cmd_line)+1);
+	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
+	char* p;
+	fn_copy=strtok_r(fn_copy," ",&p);
 	int ret;
 	lock_acquire(&file_lock);
-	ret=process_execute(cmd_line);
-	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	struct file* f=filesys_open(fn_copy);
+	if (f==NULL)
+	{
+		ret=-1;
+		lock_release(&file_lock);
+	}else{
+		file_close(f);
+		lock_release(&file_lock);
+		ret=process_execute(cmd_line);
+	}
+	free(fn_copy);
 	return ret;
 }
 
@@ -95,29 +106,29 @@ int wait (int pid){
 
 bool create (const char *file, unsigned initial_size){
 	bool ret;
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret= filesys_create(fn_copy,initial_size);
+	ret= filesys_create(file,initial_size);
 	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return ret;
 }
 
 bool remove (const char *file){
 	bool ret;
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret = filesys_remove(fn_copy);
+	ret = filesys_remove(file);
 	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return ret;
 }
 
 int open (const char *file){
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire (&file_lock);
 	struct fds* fd=calloc(1,sizeof(struct fds)); 
-	fd->f=filesys_open(fn_copy);
+	fd->f=filesys_open(file);
 	if (fd->f==NULL)
 	{
 		fd->fd=-1;
@@ -127,7 +138,7 @@ int open (const char *file){
 		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return fd->fd;
 }
 
