@@ -302,6 +302,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     unsigned int func;
     int args[3];
     argcpy(&func,f->esp,sizeof(func));
+    
     if (func>=(sizeof(syscall_table)/sizeof(*syscall_table)))
     {
     	exit(-1);
