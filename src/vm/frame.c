@@ -3,31 +3,31 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
-static struct list frames;
+static struct frame* frames;
 static struct lock frame_lock;
-
+int count;
+int mark;
 
 void frame_init(void){
 	lock_init(&frame_lock);
-	list_init(&frames);
+	frames=malloc(sizeof(struct frame*init_ram_pages))
 	void* addr=palloc_get_page(PAL_USER);
 	while(addr){
-		struct frame* f=malloc(sizeof(struct frame));
+		struct frame* f=frames[count];
+		count++;
 		f->addr=addr;
 		f->page=NULL;
 		f->t=thread_current();
 		lock_init (&f->lock);
-		list_push_back(&frames,&f->elem);
 		addr=palloc_get_page(PAL_USER);
 	}
 }
 
 void* alloc_frame(struct page* page){
-	struct list_elem* e;
 	lock_acquire(&frame_lock);
-	for (e = list_begin(&frames); e!=list_tail(&frames); e=list_next(e))
+	for (int i = 0; i!=count; i++)
 	{
-		struct frame* f=list_entry(e,struct frame,elem);
+		struct frame* f=&frames[i];
 		if (!lock_try_acquire(&f->lock))
 		{
 			continue;
@@ -39,13 +39,12 @@ void* alloc_frame(struct page* page){
 			return f;
 		}
 	}
-	e = list_begin(&frames);
-	while(1){
-		struct frame* f=list_entry(e,struct frame,elem);
-		e=list_next(e);
-		if (e==list_tail(&frames))
+	for(int i=0;i<count*2;i++){
+		struct frame* f=&frames[mark];
+		mark++;
+		if (mark>=count)
 		{
-			e=list_begin(&frames);
+			mark=0;
 		}
 		if (!lock_try_acquire(&f->lock))
 		{
@@ -62,17 +61,17 @@ void* alloc_frame(struct page* page){
 			lock_release(&f->lock);
 			continue;
 		}
+		lock_release (&frame_lock);
 		if (!page_evict(f->page))
 		{
 			lock_release(&f->lock);
-			lock_release (&frame_lock);
 			return NULL;
 		}
-        lock_release (&frame_lock);
 		f->page=page;
 		return f;
 	}
-
+	lock_release (&frame_lock);
+	return NULL
 }
 
 void free_frame(struct frame* f){

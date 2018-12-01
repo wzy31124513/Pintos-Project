@@ -98,7 +98,17 @@ bool load_fault(void* addr){
 
 
 bool load_page(struct page* p){
-	p->f=alloc_frame(p);
+	struct frame* f=NULL;
+	for (int i = 0; i < 3; i++)
+	{
+		f=alloc_frame(p);
+		if (f!=NULL)
+		{
+			break;
+		}
+		timer_sleep(1000);
+	}
+	p->f=f;
 	if (p->f==NULL)
 	{
 		return false;
