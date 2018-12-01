@@ -267,7 +267,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 	
 	int *esp=f->esp;
-	unsigned int func;
+	//unsigned int func;
 
 	is_valid_vaddr(esp);
 
