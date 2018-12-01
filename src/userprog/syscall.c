@@ -260,7 +260,7 @@ void close (int fd){
 	lock_acquire(&file_lock);
 	file_close(f->f);
 	lock_release(&file_lock);
-	list_remove(&fd->elem);
+	list_remove(&f->elem);
 	free(fd);
 }
 
