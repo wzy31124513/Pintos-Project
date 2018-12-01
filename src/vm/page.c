@@ -6,6 +6,7 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 #include "devices/block.h"
+#include "devices/timer.h"
 #include <string.h>
 void init_page(struct hash* h){
 	hash_init(h, page_hash_func, less, NULL);
@@ -28,7 +29,7 @@ struct page * page_alloc(void* addr, bool writable){
 	p->file=NULL;
 	p->offset=0;
 	p->rw_bytes=0;
-	p->swap=-1;
+	p->swap=(block_sector_t)-1;
 	p->mmap=writable;
 	if (hash_insert(thread_current()->pages,&p->elem)!=NULL)
 	{
@@ -37,7 +38,7 @@ struct page * page_alloc(void* addr, bool writable){
 	}
 	return p;
 }
-struct page * find_page(void* addr){
+struct page * find_page(const void* addr){
 	if (addr<PHYS_BASE)
 	{
 		struct page page;
@@ -113,7 +114,7 @@ bool load_page(struct page* p){
 	{
 		return false;
 	}
-	if (p->swap!=-1)
+	if (p->swap!=(block_sector_t)-1)
 	{
 		swap_in(p);
 	}else if(p->file!=NULL){

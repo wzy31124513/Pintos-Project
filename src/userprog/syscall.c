@@ -151,7 +151,7 @@ int read (int fd, char *buffer, unsigned size){
 	uint8_t* b=(uint8_t*)buffer;
 	while(size>0){
 		size_t page_left=PGSIZE-pg_ofs(b);
-		int32_t ret;
+		int32_t ret=0;
 		size_t read_size;
 		if (size<page_left)
 		{
@@ -308,8 +308,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		size_t arg_num;
 		function* func;
 	};
-    static const struct syscall syscall_table[] =
-    {
+    static const struct syscall syscall_table[]={
       {0,(function*)halt},
       {1,(function*)exit},
       {1,(function*)exec},
@@ -324,9 +323,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       {1,(function*)tell},
       {1,(function*)close},
       {2,(function*)mmap},
-      {1,(function*)munmap},
-    };
-    const struct syscall* syscall;
+      {1,(function*)munmap},};
+    const struct syscall* sc;
     unsigned int func;
     int args[3];
     argcpy(&func,f->esp,sizeof(func));
@@ -335,8 +333,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     	exit(-1);
     }
     memset(args,0,sizeof(args));
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*syscall->arg_num);
-    f->eax=syscall->func(args[0],args[1],args[2]);
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
+    f->eax=sc->func(args[0],args[1],args[2]);
 }
 
 struct mapping* getmap(int id){

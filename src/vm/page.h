@@ -14,7 +14,7 @@ struct page
 	struct file* file;
 	int offset;
 	int rw_bytes;
-	uint32_t swap;
+	block_sector_t swap;
 	bool mmap;
 	struct hash_elem elem;	
 };
@@ -22,7 +22,7 @@ struct page
 
 void init_page(struct hash* h);
 struct page* page_alloc(void* addr, bool writable);
-struct page* find_page(void* addr);
+struct page* find_page(const void* addr);
 void page_free(struct page* p);
 bool load_fault(void* addr);
 bool load_page(struct page* p);
