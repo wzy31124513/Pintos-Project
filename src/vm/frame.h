@@ -1,6 +1,6 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
-#include "thread/thread.h"
+#include "threads/thread.h"
 #include "vm/page.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"

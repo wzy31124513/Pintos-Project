@@ -108,7 +108,11 @@ struct thread
     struct file* self;
     bool child_load;
     /* Owned by thread.c. */
-
+    struct hash* pages;
+    struct list mappings;
+    int next;
+    void* esp;
+    
     unsigned magic;                     /* Detects stack overflow. */
   };
 
