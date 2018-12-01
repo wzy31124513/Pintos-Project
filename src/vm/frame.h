@@ -12,8 +12,7 @@ struct frame{
 	struct thread* t;
 	struct list_elem elem;
 	struct lock lock;
-
-}
+};
 
 void* frame_init(void);
 void* alloc_frame(struct page*,enum palloc_flags flags);

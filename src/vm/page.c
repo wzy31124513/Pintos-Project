@@ -1,14 +1,14 @@
 #include "page.h"
 
 void init_page(struct hash* h){
-	hash_init(h, page_hash_func, hash_less_func, NULL);
+	hash_init(h, page_hash_func, less, NULL);
 }
 
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED){
 	return hash_entry(e,struct page,hash_elem)->addr >> 12;
 }
 
-bool hash_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED){
+bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED){
 	return hash_entry(a,struct page,hash_elem)->addr < hash_entry(b,struct page,hash_elem)->addr
 }
 
