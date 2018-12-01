@@ -11,20 +11,19 @@ int mark;
 void frame_init(void){
 	lock_init(&frame_lock);
 	frames=malloc(sizeof(struct frame)*init_ram_pages);
-	void* addr=palloc_get_page(PAL_USER);
-	while(addr!=NULL){
+	void* addr;
+	while((addr=palloc_get_page(PAL_USER))!=NULL){
 		struct frame* f=&frames[count];
 		count++;
 		f->addr=addr;
 		f->page=NULL;
 		lock_init (&f->lock);
-		addr=palloc_get_page(PAL_USER);
 	}
 }
 
 void* alloc_frame(struct page* page){
 	lock_acquire(&frame_lock);
-	for (int i = 0; i!=count; i++)
+	for (int i = 0; i<count; i++)
 	{
 		struct frame* f=&frames[i];
 		if (!lock_try_acquire(&f->lock))

@@ -14,7 +14,7 @@ struct page
 	struct file* file;
 	int offset;
 	int rw_bytes;
-	int swap;
+	uint32_t swap;
 	bool mmap;
 	struct hash_elem elem;	
 };

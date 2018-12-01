@@ -363,13 +363,30 @@ struct mapping* getmap(int id){
 void munmap (int mapping){
 	struct mapping* m=getmap(mapping);
 	list_remove(&m->elem);
-	while(m->num>0){
-		page_free(find_page(m->addr));
-		m->addr+=PGSIZE;
-		m->num--;
+	for (int i = 0; i < m->num; ++i)
+	{
+		if (pagedir_is_dirty(thread_current()->pagedir,(m->addr+PGSIZE*i)))
+		{
+			lock_acquire(&file_lock);
+			file_write_at(m->file,(const void*)(m->addr+PGSIZE*i),(PGSIZE*(m->num)));
+			lock_release(&file_lock);
+		}
 	}
-	file_close(m->file);
-	free(m);
+	for (int i = 0; i < m->num; ++i)
+	{
+		struct page* p=find_page(m->addr+PGSIZE * i);
+		if (p->f!=NULL)
+		{
+			lock_acquire(&p->f->lock);
+			if (p->file && !p->mmap)
+			{
+				page_evict(p);
+			}
+			free_frame(p->f);
+		}
+		hash_delete(thread_current()->pages,&p->elem);
+		free(p);
+	}
 }
 
 
@@ -384,20 +401,20 @@ int mmap (int fd, void *addr){
 	m->id=thread_current()->fd_num++;
 	lock_acquire(&file_lock);
 	m->file=file_reopen(f->f);
-	if (!m->file)
+	if (m->file==NULL)
 	{
 		free(m);
 		return -1;
 	}
 	m->addr=addr;
 	m->num=0;
-	list_push_back(&thread_current()->mapping,&m->elem);
+	list_push_front(&thread_current()->mapping,&m->elem);
 	int length=file_length(m->file);
 	lock_release(&file_lock);
 	int offset=0;
 	while(length>0){
 		struct page* p=page_alloc(addr+offset,true);
-		if (!p)
+		if (p==NULL)
 		{
 			munmap(m->id);
 			return -1;
@@ -449,7 +466,7 @@ char* strcpy_to_kernel(const char* str){
 		if (!page_lock(addr,false))
 		{
 			page_unlock(addr);
-			break;
+			return NULL;
 		}
 		while(str<addr+PGSIZE){
 			cp[length]=*str;
@@ -460,7 +477,6 @@ char* strcpy_to_kernel(const char* str){
 				return cp;
 			}else if (length>=PGSIZE)
 			{
-
 				goto error;
 			}
 			str++;
@@ -471,4 +487,25 @@ char* strcpy_to_kernel(const char* str){
 	  	palloc_free_page(cp);
 		exit(-1);
 	return NULL;
+}
+
+static void argcpy(void* cp,void* addr1,size_t size){
+	uint8_t* dst=cp;
+	const uint8_t* addr=addr1;
+	while(size>0){
+		size_t s=PGSIZE-pg_ofs(addr);
+		if (s>size)
+		{
+			s=size;
+		}
+		if (!page_lock(addr,false))
+		{
+			exit(-1);
+		}
+		memcpy(dst,addr,s);
+		page_unlock(addr);
+		dst+=s;
+		addr+=s;
+		size-=s;
+	}
 }

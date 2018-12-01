@@ -129,38 +129,32 @@ bool load_page(struct page* p){
 
 bool page_evict(struct page* p){
 	pagedir_clear_page(p->t->pagedir,p->addr);
+	bool ret;
+	bool dirty=pagedir_is_dirty(p->t->pagedir,p->addr);
+	if (!dirty)
+	{
+		ret=true;
+	}
+
 	if (p->file)
 	{
-		if (pagedir_is_dirty(p->t->pagedir,p->addr))
+		if (dirty)
 		{
 			if (p->mmap)
 			{
-				bool ret=swap_out(p);
-				if (ret)
-				{
-					p->f=NULL;
-				}
-				return ret;
+				ret=swap_out(p);
 			}else{
-				if(file_write_at(p->file,p->f->addr,p->rw_bytes,p->offset)==p->rw_bytes){
-					p->f=NULL;
-					return true;
-				}
-				return false;
+				ret=file_write_at(p->file,p->f->addr,p->rw_bytes,p->offset);
 			}
-		}else{
-			p->f=NULL;
-			return true;
-		}
+		}	
 	}else{
-		bool ret=swap_out(p);
-		if (ret)
-		{
-			p->f=NULL;
-		}
-		return ret;
+		ret=swap_out(p);
 	}
-	return false;
+	if (ret)
+	{
+		p->f=NULL;
+	}
+	return ret;
 }
 
 bool recently_used(struct page* p){
@@ -201,8 +195,7 @@ void page_destructor(struct hash_elem* e,void* aux UNUSED){
 	if (p->f!=NULL)
 	{
 		lock_acquire(&p->f->lock);
-		p->f->page=NULL;
-		lock_acquire(&p->f->lock);
+		free_frame(p->f);
 	}
 	free(p);
 }
