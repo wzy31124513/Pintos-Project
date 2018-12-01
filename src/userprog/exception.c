@@ -153,7 +153,7 @@ page_fault (struct intr_frame *f)
 
   if ((!is_user_vaddr(fault_addr) && user)||not_present)
   {
-    if (load_fault(fault_addr)==NULL)
+    if (!load_fault(fault_addr))
     {
       exit(-1);
     }
