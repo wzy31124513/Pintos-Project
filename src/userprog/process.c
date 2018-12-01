@@ -480,7 +480,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         p->offset=ofs;
         p->rw_bytes=page_read_bytes;
       }*/
-
+uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
 
