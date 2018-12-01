@@ -12,7 +12,7 @@ void init_page(struct hash* h){
 }
 
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED){
-	return hash_entry(e,struct page,elem)->addr >> 12;
+	return hash_entry(e,struct page,elem->addr >> 12);
 }
 
 bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED){
@@ -28,7 +28,7 @@ struct page * page_alloc(void* addr, bool writable){
 	p->file=NULL;
 	p->offset=0;
 	p->rw_bytes=0;
-	p->swap=block_sector_t-1;
+	p->swap=-1;
 	p->mmap=writable;
 	if (hash_insert(thread_current()->pages,&p->elem)!=NULL)
 	{
@@ -40,7 +40,7 @@ struct page * page_alloc(void* addr, bool writable){
 struct page * find_page(void* addr){
 	if (addr<PHYS_BASE)
 	{
-		struct page page;
+		struct page* page;
 		struct hash_elem* e;
 		page.addr=pg_round_down(addr);
 		e=hash_find(thread_current()->pages,&page.elem);
@@ -104,7 +104,7 @@ bool load_page(struct page* p){
 	{
 		return false;
 	}
-	if (p->swap!=block_sector_t-1)
+	if (p->swap!=-1)
 	{
 		swap_in(p);
 	}else if(p->file!=NULL){
