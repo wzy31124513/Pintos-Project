@@ -129,7 +129,7 @@ main (void)
   filesys_init (format_filesys);
 #endif
   //frame_init();
-  //swap_init();
+  swap_init();
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */

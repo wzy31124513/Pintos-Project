@@ -503,21 +503,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp,char* file_name)
 {
-  struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
-  if (page==NULL)
-  {
-    return false;
-  }  
-    
-  page->f=alloc_frame(page);
-  if (page->f!=NULL)
-  {
-    page->writable=true;
-    page->mmap=false;
-    lock_release(&page->f->lock);
-  }else{
-    return false;
-  }
+  uint8_t *kpage;
+  bool success = false;
+
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL)
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else{
+        palloc_free_page (kpage);
+      }
+    }
    
     char* p;
     char* name;
@@ -559,7 +557,7 @@ setup_stack (void **esp,char* file_name)
     memcpy(*esp,&null,sizeof(int));
     free(fn_copy);
     free(argv);
-    return true;
+    return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
