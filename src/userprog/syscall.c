@@ -64,7 +64,7 @@ void exit (int status){
 		}
 	}
 
-	for (e = list_begin(thread_current()->mapping); e!=list_tail(thread_current()->mapping); e=list_next(e))
+	for (e = list_begin(&thread_current()->mapping); e!=list_tail(&thread_current()->mapping); e=list_next(e))
 	{
 		munmap(list_entry(e,struct mapping,elem)->id);
 	}
@@ -331,7 +331,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_MUNMAP)
 	{
 		is_valid_vaddr(esp+1);
-		f->eax=munmap((int)*(esp+1));
+		munmap((int)*(esp+1));
 	}
 }
 
@@ -354,7 +354,7 @@ void munmap (int mapping){
 	struct mapping* m=getmap(mapping);
 	list_remove(&m->elem);
 	while(m->num>0){
-		page_free(m->addr);
+		page_free(find_page(m->addr));
 		m->addr+=PGSIZE;
 		m->num--;
 	}
@@ -364,7 +364,7 @@ void munmap (int mapping){
 
 
 int mmap (int fd, void *addr){
-	struct fds* fd=getfile(fd);
+	struct fds* f=getfile(fd);
 	struct mapping* m = malloc(sizeof(struct mapping));
 	if (m==NULL || addr==NULL || pg_ofs(addr)!=0)
 	{
@@ -373,7 +373,7 @@ int mmap (int fd, void *addr){
 
 	m->id=thread_current()->fd_num++;
 	lock_acquire(&file_lock);
-	m->file=file_reopen(fd->f);
+	m->file=file_reopen(f->f);
 	if (!m->file)
 	{
 		free(m);
