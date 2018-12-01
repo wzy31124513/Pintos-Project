@@ -90,8 +90,9 @@ bool load_fault(void* addr){
 		{
 			return false;
 		}
+	}else{
+		lock_acquire(&p->f->lock);
 	}
-	lock_try_acquire(&p->f->lock);
 	bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->f->addr,p->writable);
 	lock_release(&p->f->lock);
 	return ret;

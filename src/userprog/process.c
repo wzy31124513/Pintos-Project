@@ -44,12 +44,6 @@ process_execute (const char *file_name)
   struct exec_table exec;
   exec.file_name=file_name;
   sema_init(&exec.load,0);
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
@@ -129,9 +123,9 @@ process_wait (tid_t child_tid)
     struct child_proc* c=list_entry(e,struct child_proc,elem);
     if (c->id==child_tid)
     {
+      int ret=c->ret;
       list_remove(e);
       sema_down(&c->exit);
-      int ret=c->ret;
       lock_acquire(&c->lock);
       c->status--;
       if (c->status==0)
@@ -539,7 +533,7 @@ setup_stack (void **esp,const char* file_name)
     {
       bool ret;
       page->writable=true;
-      page->mmap=true;
+      page->mmap=false;
       ret=getarg(page->f->addr,page->addr,file_name,esp);
       lock_release(&page->f->lock);
       return ret;
