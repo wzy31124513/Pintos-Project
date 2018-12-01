@@ -33,6 +33,7 @@ void close (int fd);
 int mmap (int fd, void *addr);
 void munmap (int mapping);
 struct mapping* getmap(int id);
+char* strcpy_to_kernel(const char* str);
 
 
 void* is_valid_vaddr(const void* esp){
