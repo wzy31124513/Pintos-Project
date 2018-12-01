@@ -468,9 +468,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-    //  struct page* p=page_alloc(upage,writable);
+      struct page* p=page_alloc(upage,writable);
       /* Get a page of memory. */
- /*     if (p == NULL)
+      if (p == NULL)
         return false;
 
 
@@ -479,25 +479,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         p->file=file;
         p->offset=ofs;
         p->rw_bytes=page_read_bytes;
-      }*/
-uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
-
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
+      }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -512,7 +494,7 @@ uint8_t *kpage = palloc_get_page (PAL_USER);
 static bool
 setup_stack (void **esp,char* file_name)
 {
-  /*struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
+  struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
   if (page==NULL)
   {
     return false;
@@ -526,20 +508,8 @@ setup_stack (void **esp,char* file_name)
     lock_release(&page->f);
   }else{
     return false;
-  }*/
-  uint8_t *kpage;
-  bool success = false;
-
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else{
-        palloc_free_page (kpage);
-      }
-    }
+  }
+  
   char* p;
   char* name;
   int argc=0;
@@ -593,14 +563,14 @@ setup_stack (void **esp,char* file_name)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-
+/*
 static bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
 
-   /*Verify that there's not already a page at that virtual
-     address, then map our page there. */
+   Verify that there's not already a page at that virtual
+     address, then map our page there. 
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
+}*/
