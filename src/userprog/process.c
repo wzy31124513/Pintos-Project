@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <list.h>
-#include "devices/timer.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
@@ -26,8 +25,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-static bool getarg(uint8_t *kaddr, uint8_t* uaddr, const char* file_name, void** esp);
-static void* push(uint8_t* kaddr, size_t* ofs,const void* uaddr,size_t size);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -258,7 +256,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp,const char* file_name);
+static bool setup_stack (void **esp,char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -285,14 +283,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
-
+/*
   t->pages=malloc(sizeof(struct hash));
   if (t->pages==NULL)
   {
     goto done;
   }
   init_page(t->pages);
-
+*/
   /* Open executable file. */
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
@@ -471,23 +469,31 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-      struct page* p=page_alloc(upage,writable);
-      if (p==NULL)
-      {
-      return false;
-      }
-      if (page_read_bytes>0)
-      {
-        p->file=file;
-        p->offset=ofs;
-        p->rw_bytes=page_read_bytes;
-      }
+
+      /* Get a page of memory. */
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if (kpage == NULL)
+        return false;
+
+      /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          palloc_free_page (kpage);
+          return false;
+        }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable))
+        {
+          palloc_free_page (kpage);
+          return false;
+        }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      ofs+=page_read_bytes;
     }
   return true;
 }
@@ -495,88 +501,63 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp,const char* file_name)
+setup_stack (void **esp,char* file_name)
 {
-  struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
-  if (page!=NULL)
-  {
-    struct frame* f=NULL;
-    for (int i = 0; i < 3; i++)
+  uint8_t *kpage;
+  bool success = false;
+
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL)
     {
-      f=alloc_frame(page);
-      if (f!=NULL)
-      {
-        break;
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else{
+        palloc_free_page (kpage);
       }
-      timer_msleep(1000);
     }
-    page->f=f;
-    if (page->f!=NULL)
+   
+    char* p;
+    char* name;
+    int argc=0;
+    char* fn_copy=calloc(1,strlen(file_name)+1);
+    strlcpy(fn_copy,file_name,strlen(file_name)+1);
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
-      bool ret;
-      page->writable=true;
-      page->mmap=true;
-      ret=getarg(page->f->addr,page->addr,file_name,esp);
-      lock_release(&page->f->lock);
-      return ret;
+      argc=argc+1;
     }
-  }
-  return false;
-}
-
-static bool getarg(uint8_t *kaddr, uint8_t*uaddr, const char* file_name, void** esp){
-  size_t ofs=PGSIZE;
-  const char* null=NULL;
-  char* cmd_line;
-  char* arg;
-  char* p;
-  int argc;
-  char** argv;
-  cmd_line=push(kaddr,&ofs,file_name,strlen(file_name)+1);
-  if (cmd_line==NULL)
-  {
-    return false;
-  }
-  if (push(kaddr,&ofs,&null,sizeof(null))==NULL)
-  {
-    return false;
-  }
-  argc=0;
-  for ( arg = strtok_r(cmd_line," ",&p); arg != NULL; arg=strtok_r(NULL," ",&p))
-  {
-    void* arg1=uaddr+(arg-(char*)kaddr);
-    if (push(kaddr,&ofs,&arg1,sizeof(arg1))==NULL)
+    int i=0;
+    int* argv=calloc(argc,sizeof(int));
+    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
     {
-      return false;
+      *esp-=strlen(name)+1;
+      memcpy(*esp,name,strlen(name)+1);
+      argv[i]=(int)*esp;
+      i++;
     }
-    argc++;
-  }
-  argv=(char**)(uaddr+ofs);
-  while(argc>1){
-    char* temp=argv[0];
-    argv[0]=argv[argc-1];
-    argv[argc-1]=temp;
-    argc-=2;
-    argv++;
-  }
-  if (push(kaddr,&ofs,&argv,sizeof(argv))==NULL || push(kaddr,&ofs,&argc,sizeof(argc))==NULL|| push(kaddr,&ofs,&null,sizeof(null))==NULL)
-  {
-    return false;
-  }
-  *esp=uaddr+ofs;
-  return true;
-}
-
-static void* push(uint8_t* kaddr, size_t* ofs,const void* uaddr,size_t size){
-  size_t size1=ROUND_UP(size,sizeof(uint32_t));
-  if (*ofs<size1)
-  {
-    return NULL;
-  }
-  *ofs-=size1;
-  memcpy(kaddr+*ofs+size1-size,uaddr,size);
-  return kaddr+*ofs+size1-size;
-
+    while((int)*esp%4!=0){
+      char a=0;
+      *esp-=1;
+      memcpy(*esp,&a,1);
+    }
+    int null=0;
+    *esp-=sizeof(int);
+    memcpy(*esp,&null,sizeof(int));
+    for ( i = argc-1; i >= 0; i--)
+    {
+      *esp-=sizeof(int);
+      memcpy(*esp,&argv[i],sizeof(int));
+    }
+    int aa=(int)*esp;
+    *esp-=sizeof(int);
+    memcpy(*esp,&aa,sizeof(int));
+    *esp-=sizeof(int);
+    memcpy(*esp,&argc,sizeof(int));
+    *esp-=sizeof(int);
+    memcpy(*esp,&null,sizeof(int));
+    free(fn_copy);
+    free(argv);
+    return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
