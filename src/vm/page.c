@@ -5,17 +5,18 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
-
+#include "devices/block.h"
+#include <string.h>
 void init_page(struct hash* h){
 	hash_init(h, page_hash_func, less, NULL);
 }
 
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED){
-	return hash_entry(e,struct page,hash_elem)->addr >> 12;
+	return hash_entry(e,struct page,elem)->addr >> 12;
 }
 
 bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED){
-	return hash_entry(a,struct page,hash_elem)->addr < hash_entry(b,struct page,hash_elem)->addr
+	return hash_entry(a,struct page,elem)->addr < hash_entry(b,struct page,elem)->addr;
 }
 
 struct page * page_alloc(void* addr, bool writable){
@@ -41,18 +42,18 @@ struct page * find_page(void* addr){
 	{
 		struct page page;
 		struct hash_elem* e;
-		page.addr=pg_round_down(address);
+		page.addr=pg_round_down(addr);
 		e=hash_find(thread_current()->pages,&page.elem);
 		if (e)
 		{
-			p=hash_entry(e,struct page,elem);
+			page=hash_entry(e,struct page,elem);
 		}else if (PHYS_BASE-addr<=(1024*1024)){
 			if (addr>=thread_current()->esp-32)
 			{
-				p=page_alloc(addr,true);
+				page=page_alloc(addr,true);
 			}
 		}
-		return p;
+		return page;
 	}
 	return NULL;
 }
@@ -74,7 +75,7 @@ void page_free(struct page* p){
 
 
 bool load_fault(void* addr){
-	if (thread_current()->pages==NUL)
+	if (thread_current()->pages==NULL)
 	{
 		return false;
 	}
@@ -91,7 +92,7 @@ bool load_fault(void* addr){
 		}
 	}
 	lock_try_acquire(&p->f->lock);
-	ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->f->addr,p->writable);
+	bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->f->addr,p->writable);
 	lock_release(&p->f->lock);
 	return ret;
 }
@@ -108,13 +109,13 @@ bool load_page(struct page* p){
 		swap_in(p);
 	}else if(p->file!=NULL){
 		int rw_bytes=file_read_at(p->file,p->f->addr,p->rw_bytes,p->offset);
-		int zero_bytes=PGSIZE-read_bytes;
+		int zero_bytes=PGSIZE-rw_bytes;
 		memset(p->f->addr+rw_bytes,0,zero_bytes);
 
 	}else{
 		memset(p->f->addr,0,PGSIZE);
 	}
-	return true
+	return true;
 }
 
 bool page_evict(struct page* p){
