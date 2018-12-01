@@ -110,7 +110,6 @@ struct thread
     /* Owned by thread.c. */
     struct hash* pages;
     struct list mapping;
-    int next;
     void* esp;
 
     unsigned magic;                     /* Detects stack overflow. */

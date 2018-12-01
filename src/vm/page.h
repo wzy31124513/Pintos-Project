@@ -4,12 +4,6 @@
 #include <hash.h>
 #include "devices/block.h"
 #include "threads/thread.h"
-#include "frame.h"
-#include "swap.h"
-#include "threads/malloc.h"
-#include "threads/vaddr.h"
-#include "userprog/pagedir.h"
-#include "filesys/file.h"
 #include "devices/block.h"
 struct page
 {

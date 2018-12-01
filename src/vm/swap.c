@@ -1,6 +1,5 @@
 #include "swap.h"
 #include "vm/frame.h"
-#include "vm/page.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include <bitmap.h>
