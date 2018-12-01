@@ -1,7 +1,21 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
-
+#include <list.h>
 void syscall_init (void);
-void syscall_exit (void);
 
+struct fds
+{
+    int fd;
+    struct file *f;
+    struct list_elem elem;
+};
+
+struct mapping{
+	int id;
+	struct file* file;
+	uint8_t * addr;
+	int num;
+	struct list_elem elem;
+};
+void exit (int status);
 #endif /* userprog/syscall.h */
