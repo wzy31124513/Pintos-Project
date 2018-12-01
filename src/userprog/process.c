@@ -22,7 +22,7 @@
 #include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmd_line, void (**eip) (void), void **esp);
+static bool load (const char *file_name, void (**eip) (void), void **esp);
 static void* push(uint8_t* kaddr, size_t* ofs, const void* buf, size_t size);
 static bool getarg(uint8_t* kaddr, uint8_t* uaddr, const char* file_name,void** esp) ;
 
@@ -47,7 +47,7 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
   if (tid != TID_ERROR)
     {
-      sema_down(&exec.load_done);
+      sema_down(&exec.load);
       if (exec.loaded)
       {
         list_push_back(&thread_current()->children,&exec.child_proc->elem);
@@ -65,7 +65,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *exec_)
 {
-  struct exec_info *exec = exec_;
+  struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
 
@@ -144,7 +144,7 @@ process_exit (void)
   struct list_elem *e;
   uint32_t *pd;
 
-  printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
+  printf ("%s: exit(%d)\n", cur->name, cur->exitcode);
   if (thread_current()->child_proc!=NULL)
   {
     struct child_proc* c=thread_current()->child_proc;
@@ -275,7 +275,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (const char *cmd_line, void **esp);
+static bool setup_stack (void **esp,const char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -286,7 +286,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *cmd_line, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -311,7 +311,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   init_page(t->pages);
 
   strlcpy(name,file_name,strlen(file_name)+1);
-  name=strtok_r(name," ",&p);
+  strtok_r(name," ",&p);
   file = filesys_open (name);
   thread_current()->self=file;
   if (file == NULL) 
@@ -406,7 +406,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   /* We arrive here whether the load is successful or not. */
   return success;
 }
-
 /* load() helpers. */
 
 /* Checks whether PHDR describes a valid, loadable segment in
@@ -487,8 +486,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (page_read_bytes>0) 
       {
         p->file = file;
-        p->file_offset = ofs;
-        p->file_bytes = page_read_bytes;
+        p->offset = ofs;
+        p->rw_bytes = page_read_bytes;
       }
 
       /* Advance. */
@@ -547,21 +546,20 @@ static bool getarg(uint8_t* kaddr, uint8_t* uaddr, const char* file_name,void** 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (const char *cmd_line, void **esp) 
+setup_stack (const char *file_name, void **esp) 
 {
-  struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
+  struct page* page=page_alloc(((uint8_t *)PHYS_BASE)-PGSIZE,false);
   if (page != NULL) 
     {
-      page->frame = frame_alloc_and_lock (page);
-      if (page->frame != NULL)
-        {
-          bool ok;
-          page->read_only = false;
-          page->private = false;
-          ok = init_cmd_line (page->frame->base, page->addr, cmd_line, esp);
-          frame_unlock (page->frame);
-          return ok;
-        }
+      page->frame=frame_alloc(page);
+      if (page->frame!=NULL){
+        bool ok;
+        page->read_only=false;
+        page->mmap=false;
+        ok = getarg(page->frame->addr,page->addr,file_name,esp);
+        frame_unlock(page->frame);
+        return ok;
+      }
     }
   return false;
 }
@@ -574,6 +572,6 @@ static void* push(uint8_t* kaddr, size_t* ofs, const void* buf, size_t size)
     return NULL;
   }
   *ofs-=size1;
-  memcpy(kaddr+*ofs+size1-size,uaddr,size);
+  memcpy(kaddr+*ofs+size1-size,buf,size);
   return kaddr+*ofs+size1-size;
 }

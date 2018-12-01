@@ -73,7 +73,7 @@ static struct frame* try_frame_alloc (struct page *page){
   return NULL;
 }
 
-struct frame* frame_alloc(struct page* page){
+struct frame *frame_alloc(struct page*){
   size_t i;
   for (i = 0; i < 3; ++i) 
   {
