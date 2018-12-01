@@ -91,7 +91,6 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  lock_init (&file_lock);
   list_init (&ready_list);
   list_init (&all_list);
   /* Set up a thread structure for the running thread. */
@@ -184,11 +183,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  struct child_proc* c=malloc(sizeof(struct child_proc));
-  c->id=tid;
-  c->ret=t->exitcode;
-  c->waited=true;
-  list_push_back(&running_thread()->children,&c->elem);
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -299,10 +294,6 @@ thread_exit (void)
   process_exit ();
 #endif
   
-  while(!list_empty(&thread_current()->children)){
-    struct child_proc* c=list_entry(list_pop_front(&thread_current()->children),struct child_proc,elem);
-    free(c);
-  }
 
 
   /* Remove thread from all threads list, set our status to dying,
@@ -480,18 +471,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  sema_init(&t->wait_for_child,0);
-  t->parent=running_thread();
-  t->child_load=false;
-  list_init(&t->children);
-  list_init(&t->file_list);
-  t->fd_num=2;
   t->exitcode=-1;
-  t->wait=0;
-  t->self=NULL;
-  list_init(&t->mapping);
+  t->child_proc=NULL;
+  list_init(&t->children);
   t->pages=NULL;
+  t->self=NULL;
   t->pagedir=NULL;
+  list_init(&t->file_list);
+  list_init(&t->mapping);
+  t->fd_num=2;
   list_push_back (&all_list, &t->allelem);
 }
 

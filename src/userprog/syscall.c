@@ -44,25 +44,19 @@ void halt (void){
 void exit (int status){
 	
 	struct list_elem* e;
-	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
+	thread_current()->exitcode=status;
+	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
 	{
-		if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
-		{
-			list_entry(e,struct child_proc,elem)->ret=status;
-			list_entry(e,struct child_proc,elem)->waited=false;
-		}
+		struct fds* f=list_entry(e,struct fds,elem);
+		lock_acquire(&file_lock);
+		file_close(f->f);
+		lock_release(&file_lock);
+		free(f);
 	}
 
 	for (e = list_begin(&thread_current()->mapping); e!=list_tail(&thread_current()->mapping); e=list_next(e))
 	{
 		munmap(list_entry(e,struct mapping,elem)->id);
-	}
-    thread_current()->exitcode=status;
-
-
-	if (thread_current()->parent->wait==thread_current()->tid)
-	{
-		sema_up(&thread_current()->parent->wait_for_child);
 	}
 	thread_exit();
 }
@@ -70,7 +64,9 @@ void exit (int status){
 int exec (const char *cmd_line){
 	int ret;
 	char* fn_copy=strcpy_to_kernel(cmd_line);
+	lock_acquire(&file_lock);
 	ret=process_execute(fn_copy);
+	lock_release(&file_lock);
 	palloc_free_page(fn_copy);
 	return ret;
 }
@@ -108,8 +104,7 @@ int open (const char *file){
 	{
 		fd->fd=-1;
 	}else{
-		thread_current()->fd_num++;
-		fd->fd=thread_current()->fd_num;
+		fd->fd=thread_current()->fd_num++;
 		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
@@ -261,21 +256,12 @@ unsigned tell (int fd){
 }
 
 void close (int fd){
-	struct list_elem* e;
-	struct fds* f;
+	struct fds* f=getfile(fd);
 	lock_acquire(&file_lock);
-	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
-	{
-		f=list_entry(e,struct fds,elem);
-		if (f->fd==fd)
-		{
-			file_close(f->f);
-			list_remove(e);
-			free(f);
-			break;
-		}
-	}
+	file_close(f->f);
 	lock_release(&file_lock);
+	list_remove(&fd->elem);
+	free(fd);
 }
 
 
@@ -284,6 +270,7 @@ void close (int fd){
 void
 syscall_init (void) 
 {
+  lock_init (&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -429,7 +416,7 @@ struct fds* getfile(int fd){
 			return fds;
 		}
 	}
-	return NULL;
+	exit(-1);
 }
 
 char* strcpy_to_kernel(const char* str){
