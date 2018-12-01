@@ -3,15 +3,14 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
-static list frames;
+static struct list frames;
 static struct lock frame_lock;
 
 
 void* frame_init(void){
 	lock_init(&frame_lock);
 	list_init(&frames);
-	frame_num=init_ram_pages;
-	void* addr=palloc_get_page(PAL_USER);
+]	void* addr=palloc_get_page(PAL_USER);
 	while(addr){
 		struct frame* f=malloc(sizeof(struct frame));
 		f->addr=addr;
@@ -38,7 +37,7 @@ void* alloc_frame(struct page* page){
 			return f;
 		}
 	}
-	e = list_begin(&frames)
+	e = list_begin(&frames);
 	while(1){
 		struct frame* f=list_entry(e,struct frame,elem);
 		e=list_next(e);

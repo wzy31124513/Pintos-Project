@@ -1,7 +1,6 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 #include "threads/thread.h"
-
 struct frame{
 	struct page* page;
 	void* addr;
@@ -11,6 +10,6 @@ struct frame{
 };
 
 void* frame_init(void);
-void* alloc_frame(struct page*,enum palloc_flags flags);
+void* alloc_frame(struct page*);
 void* free_frame(struct frame* f);
 #endif
