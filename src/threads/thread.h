@@ -91,12 +91,12 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    struct list_elem elem;
     /* Owned by userprog/process.c. */
     #ifdef USERPROG
     uint32_t *pagedir;
-    #endif                  /* Page directory. */
-    int exitcode; /*return status*/
+    #endif 
+    int exitcode; 
     struct thread* parent;
     struct child_proc* child_proc;
     struct list children;
