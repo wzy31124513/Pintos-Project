@@ -13,7 +13,7 @@
 #include "threads/malloc.h"
 #include "devices/input.h"
 #include "vm/page.h"
-
+#include "vm/frame.h"
 
 static void syscall_handler (struct intr_frame *);
 struct fds* getfile(int fd);
@@ -305,7 +305,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     memset(args,0,sizeof(args));
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*syscall->arg_num);
-    f->eax=sc->func(args[0],args[1],args[2]);
+    f->eax=syscall->func(args[0],args[1],args[2]);
 }
 
 struct mapping* getmap(int id){
