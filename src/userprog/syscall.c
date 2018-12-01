@@ -433,13 +433,13 @@ char* strcpy_to_kernel(const char* str){
 		exit(-1);
 	}
 	while(1){
-		page=pg_round_down(str);
+		addr=pg_round_down(str);
 		if (!page_lock(addr,false))
 		{
 			page_unlock(addr);
 			break;
 		}
-		while(str<page+PGSIZE){
+		while(str<addr+PGSIZE){
 			cp[length]=*str;
 			length++;
 			if (*str=='\0')
