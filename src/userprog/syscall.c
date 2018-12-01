@@ -79,23 +79,12 @@ void exit (int status){
 }
 
 int exec (const char *cmd_line){
-	char* fn_copy=calloc(1,strlen(cmd_line)+1);
-	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
-	char* p;
-	fn_copy=strtok_r(fn_copy," ",&p);
+	char* fn_copy=strcpy_to_kernel(cmd_line);
 	int ret;
 	lock_acquire(&file_lock);
-	struct file* f=filesys_open(fn_copy);
-	if (f==NULL)
-	{
-		ret=-1;
-		lock_release(&file_lock);
-	}else{
-		file_close(f);
-		lock_release(&file_lock);
-		ret=process_execute(cmd_line);
-	}
-	free(fn_copy);
+	ret=process_execute(cmd_line);
+	lock_release(&file_lock);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
@@ -105,24 +94,29 @@ int wait (int pid){
 
 bool create (const char *file, unsigned initial_size){
 	bool ret;
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret= filesys_create(file,initial_size);
+	ret= filesys_create(fn_copy,initial_size);
 	lock_release(&file_lock);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
 bool remove (const char *file){
 	bool ret;
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret = filesys_remove(file);
+	ret = filesys_remove(fn_copy);
 	lock_release(&file_lock);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
 int open (const char *file){
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire (&file_lock);
 	struct fds* fd=calloc(1,sizeof(struct fds)); 
-	fd->f=filesys_open(file);
+	fd->f=filesys_open(fn_copy);
 	if (fd->f==NULL)
 	{
 		fd->fd=-1;
@@ -132,6 +126,7 @@ int open (const char *file){
 		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
+	palloc_free_page(fn_copy);
 	return fd->fd;
 }
 
@@ -423,6 +418,41 @@ struct fds* getfile(int fd){
 		if (fds->fd==fd)
 		{
 			return fds;
+		}
+	}
+	return NULL;
+}
+
+char* strcpy_to_kernel(const char* str){
+	char* cp;
+	int length=0;
+	char* addr;
+	cp=palloc_get_page(0);
+	if (cp==NULL)
+	{
+		exit(-1);
+	}
+	while(1){
+		page=pg_round_down(str);
+		if (!page_lock(addr,false))
+		{
+			page_unlock(addr);
+			break;
+		}
+		while(str<page+PGSIZE){
+			cp[length]=*str;
+			length++;
+			if (*str=='\0')
+			{
+				page_unlock(addr);
+				return cp;
+			}else if (length>=PGSIZE)
+			{
+				palloc_free_page(cp);
+				exit(-1);
+				break;
+			}
+			str++;
 		}
 	}
 	return NULL;
