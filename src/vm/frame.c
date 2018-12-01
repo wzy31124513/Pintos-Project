@@ -10,10 +10,10 @@ int mark;
 
 void frame_init(void){
 	lock_init(&frame_lock);
-	frames=malloc(sizeof(struct frame*init_ram_pages))
+	frames=malloc(sizeof(struct frame)*init_ram_pages);
 	void* addr=palloc_get_page(PAL_USER);
 	while(addr){
-		struct frame* f=frames[count];
+		struct frame* f=&frames[count];
 		count++;
 		f->addr=addr;
 		f->page=NULL;
@@ -71,7 +71,7 @@ void* alloc_frame(struct page* page){
 		return f;
 	}
 	lock_release (&frame_lock);
-	return NULL
+	return NULL;
 }
 
 void free_frame(struct frame* f){
