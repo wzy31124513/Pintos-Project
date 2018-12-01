@@ -25,7 +25,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** esp);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -495,63 +495,76 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp,char* file_name)
 {
-  uint8_t *kpage;
-  bool success = false;
-
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
+  struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
+  if (page!=NULL)
+  {
+    struct frame* f=NULL;
+    for (int i = 0; i < 3; i++)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else{
-        palloc_free_page (kpage);
+      f=alloc_frame(p);
+      if (f!=NULL)
+      {
+        break;
       }
+      timer_sleep(1000);
     }
-   
-    char* p;
-    char* name;
-    int argc=0;
-    char* fn_copy=calloc(1,strlen(file_name)+1);
-    strlcpy(fn_copy,file_name,strlen(file_name)+1);
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    page->f=f;
+    if (page->f!=NULL)
     {
-      argc=argc+1;
+      bool ret;
+      page->writable=true;
+      page->mmap=true;
+      ret=getarg(page->f->addr,page->addr,file_name,esp);
+      lock_release(&page->f->lock);
+      return ret
     }
-    int i=0;
-    int* argv=calloc(argc,sizeof(int));
-    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
-    {
-      *esp-=strlen(name)+1;
-      memcpy(*esp,name,strlen(name)+1);
-      argv[i]=(int)*esp;
-      i++;
-    }
-    while((int)*esp%4!=0){
-      char a=0;
-      *esp-=1;
-      memcpy(*esp,&a,1);
-    }
-    int null=0;
-    *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    for ( i = argc-1; i >= 0; i--)
-    {
-      *esp-=sizeof(int);
-      memcpy(*esp,&argv[i],sizeof(int));
-    }
-    int aa=(int)*esp;
-    *esp-=sizeof(int);
-    memcpy(*esp,&aa,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&argc,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    free(fn_copy);
-    free(argv);
-    return success;
+  }
+  return false;
 }
 
+static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** esp){
+  size_t ofs=PGSIZE;
+  char* const null=NULL;
+  char* cmd_line;
+  char* arg;
+  char* p;
+  int argc;
+  char** argv;
+  cmd_line=push(kaddr,&ofs,file_name,strlen(file_name)+1);
+  if (cmd_line==NULL)
+  {
+    return false;
+  }
+  if (push(kaddr,&ofs,&null,sizeof(null))==NULL)
+  {
+    return false;
+  }
+  argc=0;
+  for ( arg = strtok_r(file_name," ",&p); arg != NULL; arg=strtok_r(NULL," ",&p))
+  {
+    void* arg1=uaddr+(arg-(char*)kaddr);
+    if (push(kaddr,&offset,&arg1,sizeof(arg1)==NULL))
+    {
+      return false;
+    }
+    argc++;
+  }
+  argv=(char**)(uaddr+ofs);
+  reverse (argc, (char **) (kaddr + ofs));
+  while(argc>1){
+    char* temp=argv[0];
+    argv[0]=argv[argc-1];
+    argv[argc-1]=temp;
+    argc-=2;
+    argv++;
+  }
+  if (push(kaddr,&ofs,&argv,sizeof(argv))==NULL || push(kaddr,&ofs,&argc,sizeof(argc))==NULL|| push(kaddr,&ofs,&null,sizeof(null))==NULL)
+  {
+    return false;
+  }
+  *esp=uaddr+ofs;
+  return true;
+}
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
    If WRITABLE is true, the user process may modify the page;
