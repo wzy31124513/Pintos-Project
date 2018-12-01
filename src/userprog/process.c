@@ -153,10 +153,10 @@ process_exit (void)
     free(f);
   }
   lock_release(&file_lock);
-  if (thread_current()->pages!=NULL)
+  /*if (thread_current()->pages!=NULL)
   {
     hash_destroy(thread_current()->pages,page_destructor);
-  }
+  }*/
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
