@@ -17,7 +17,7 @@ void frame_init(void){
 		f->page=NULL;
 		f->t=thread_current();
 		lock_init (&f->lock);
-		list_push_back(&f->elem);
+		list_push_back(&frames,&f->elem);
 		addr=palloc_get_page(PAL_USER);
 	}
 }
