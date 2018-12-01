@@ -43,7 +43,7 @@ process_execute (const char *file_name)
   name=strtok_r(name," ",&p);
   struct exec_table exec;
   exec.file_name=file_name;
-  sema.init(&exec.load,0);
+  sema_init(&exec.load,0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -52,7 +52,7 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (name, PRI_DEFAULT, start_process, exec);
+  tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
   free(name);
   if (tid!=TID_ERROR)
   {
@@ -88,12 +88,12 @@ start_process (void *exec_)
     exec->child_proc=thread_current()->child_proc;
     success=exec->child_proc!=NULL;
   }
-  if (successss)
+  if (success)
   {
     lock_init(&exec->child_proc->lock);
     exec->child_proc->status=2;
-    exec->child_proc->itd=thread_current()->tid;
-    sema_init(&exec->child_proc_>dead,0);
+    exec->child_proc->tid=thread_current()->tid;
+    sema_init(&exec->child_proc->exit,0);
   }
   exec->loaded=success;
   sema_up(&exec->load);
@@ -127,7 +127,7 @@ process_wait (tid_t child_tid)
   for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children);e=list_next(e))
   {
     struct child_proc* c=list_entry(e,struct child_proc,elem);
-    if (c->tid==child_tid)
+    if (c->id==child_tid)
     {
       list_remove(e);
       sema_down(&c->exit);
@@ -137,7 +137,7 @@ process_wait (tid_t child_tid)
       if (c->status==0)
       {
         lock_release(&c->lock);
-        free(c)
+        free(c);
       }else{
         lock_release(&c->lock);
       }
@@ -181,7 +181,7 @@ process_exit (void)
     if (c->status==0)
     {
       lock_release(&c->lock);
-      free(c)
+      free(c);
     }else{
       lock_release(&c->lock);
     }
