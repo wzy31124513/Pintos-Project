@@ -279,21 +279,21 @@ syscall_handler (struct intr_frame *f UNUSED)
 	};
     static const struct syscall syscall_table[] =
     {
-      {0, (syscall_function *) halt},
-      {1, (syscall_function *) exit},
-      {1, (syscall_function *) exec},
-      {1, (syscall_function *) wait},
-      {2, (syscall_function *) create},
-      {1, (syscall_function *) remove},
-      {1, (syscall_function *) open},
-      {1, (syscall_function *) filesize},
-      {3, (syscall_function *) read},
-      {3, (syscall_function *) write},
-      {2, (syscall_function *) seek},
-      {1, (syscall_function *) tell},
-      {1, (syscall_function *) close},
-      {2, (syscall_function *) mmap},
-      {1, (syscall_function *) munmap},
+      {0,(function*)halt},
+      {1,(function*)exit},
+      {1,(function*)exec},
+      {1,(function*)wait},
+      {2,(function*)create},
+      {1,(function*)remove},
+      {1,(function*)open},
+      {1,(function*)filesize},
+      {3,(function*)read},
+      {3,(function*)write},
+      {2,(function*)seek},
+      {1,(function*)tell},
+      {1,(function*)close},
+      {2,(function*)mmap},
+      {1,(function*)munmap},
     };
     const struct syscall* syscall;
     unsigned int func;
