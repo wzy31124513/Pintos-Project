@@ -20,7 +20,6 @@ void swap_init(void){
 	{
 		return;
 	}
-	bitmap_set_all(swap_map,SWAP_FREE);
 	lock_init(&swap_lock);
 }
 
@@ -35,7 +34,7 @@ void swap_in(struct page* p){
 		block_read(swap_block,p->swap+i,p->f->addr+BLOCK_SECTOR_SIZE*i);
 	}
 	bitmap_reset(swap_map,p->swap/PGSIZE/BLOCK_SECTOR_SIZE);
-	p->swap=block_sector_t-1;
+	p->swap=-1;
 	lock_release(&swap_lock);
 }
 
