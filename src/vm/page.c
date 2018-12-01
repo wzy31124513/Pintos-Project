@@ -185,3 +185,14 @@ void page_unlock(void* addr){
 		lock_release(&p->f->lock);
 	}
 }
+
+void page_destructor(struct hash_elem* e,void* aux UNUSED){
+	struct page* p=hash_entry(e,struct page,elem);
+	if (p->f!=NULL)
+	{
+		lock_acquire(&p->f->lock);
+		p->f->page=NULL;
+		lock_acquire(&p->f->lock);
+	}
+	free(p);
+}

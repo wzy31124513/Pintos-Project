@@ -265,7 +265,10 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+	
 	int *esp=f->esp;
+	unsigned int func;
+
 	is_valid_vaddr(esp);
 
 	if (*esp==SYS_HALT)

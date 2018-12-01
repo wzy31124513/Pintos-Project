@@ -153,7 +153,10 @@ process_exit (void)
     free(f);
   }
   lock_release(&file_lock);
-
+  if (thread_current()->pages!=NULL)
+  {
+    hash_destroy(thread_current()->pages,page_destructor);
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -465,26 +468,18 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
+      struct page* p=page_alloc(upage,writable);
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
+      if (p == NULL)
         return false;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
+      if (page_read_bytes>0)
+      {
+        p->file=file;
+        p->offset=ofs;
+        p->rw_bytes=page_read_bytes;
+      }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -499,61 +494,64 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp,char* file_name)
 {
-  uint8_t *kpage;
-  bool success = false;
-
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else{
-        palloc_free_page (kpage);
-      }
-    }
-   
-    char* p;
-    char* name;
-    int argc=0;
-    char* fn_copy=calloc(1,strlen(file_name)+1);
-    strlcpy(fn_copy,file_name,strlen(file_name)+1);
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
-    {
-      argc=argc+1;
-    }
-    int i=0;
-    int* argv=calloc(argc,sizeof(int));
-    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
-    {
-      *esp-=strlen(name)+1;
-      memcpy(*esp,name,strlen(name)+1);
-      argv[i]=(int)*esp;
-      i++;
-    }
-    while((int)*esp%4!=0){
-      char a=0;
-      *esp-=1;
-      memcpy(*esp,&a,1);
-    }
-    int null=0;
+  struct page* page=page_alloc((uint8_t*)PHYS_BASE-PGSIZE,true);
+  if (page==NULL)
+  {
+    return false;
+  }  
+    
+  page->frame=alloc_frame(page);
+  if (page->frame!=NULL)
+  {
+    page->writable=true;
+    page->mmap=false;
+    lock_release(&page->frame);
+  }else{
+    return false;
+  }
+  
+  char* p;
+  char* name;
+  int argc=0;
+  char* fn_copy=calloc(1,strlen(file_name)+1);
+  strlcpy(fn_copy,file_name,strlen(file_name)+1);
+  for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+  {
+    argc=argc+1;
+  }
+  int i=0;
+  int* argv=calloc(argc,sizeof(int));
+  for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+  {
+    *esp-=strlen(name)+1;
+    memcpy(*esp,name,strlen(name)+1);
+    argv[i]=(int)*esp;
+    i++;
+  }
+  while((int)*esp%4!=0){
+    char a=0;
+    *esp-=1;
+    memcpy(*esp,&a,1);
+  }
+  int null=0;
+  *esp-=sizeof(int);
+  memcpy(*esp,&null,sizeof(int));
+  for ( i = argc-1; i >= 0; i--)
+  {
     *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    for ( i = argc-1; i >= 0; i--)
-    {
-      *esp-=sizeof(int);
-      memcpy(*esp,&argv[i],sizeof(int));
-    }
-    int aa=(int)*esp;
-    *esp-=sizeof(int);
-    memcpy(*esp,&aa,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&argc,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    free(fn_copy);
-    free(argv);
-    return success;
+    memcpy(*esp,&argv[i],sizeof(int));
+  }
+  int aa=(int)*esp;
+  *esp-=sizeof(int);
+  memcpy(*esp,&aa,sizeof(int));
+  *esp-=sizeof(int);
+  memcpy(*esp,&argc,sizeof(int));
+  *esp-=sizeof(int);
+  memcpy(*esp,&null,sizeof(int));
+  free(fn_copy);
+  free(argv);
+  return true;
+    
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
