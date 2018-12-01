@@ -174,7 +174,7 @@ bool recently_used(struct page* p){
 
 bool page_lock(void* addr,bool writable){
 	struct page* p=find_page(addr);
-	if (!p || (!p->writable && !writable))
+	if (!p || (!p->writable && writable))
 	{
 		return false;
 	}
