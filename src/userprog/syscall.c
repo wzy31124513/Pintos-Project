@@ -11,10 +11,9 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/malloc.h"
-#include "threads/palloc.h"
 #include "devices/input.h"
 #include "vm/page.h"
-#include "vm/frame.h"
+
 
 static void syscall_handler (struct intr_frame *);
 struct fds* getfile(int fd);
@@ -35,7 +34,20 @@ int mmap (int fd, void *addr);
 void munmap (int mapping);
 struct mapping* getmap(int id);
 char* strcpy_to_kernel(const char* str);
-static void argcpy(void* cp,void* addr1,size_t size);
+
+
+void* is_valid_vaddr(const void* esp){
+	if(!is_user_vaddr(esp)){
+		exit(-1);
+		return 0;
+	}
+	if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
+	{
+		exit(-1);
+		return 0;
+	}
+	return pagedir_get_page(thread_current()->pagedir,esp);
+}
 
 void halt (void){
 	shutdown_power_off();
@@ -44,30 +56,47 @@ void halt (void){
 void exit (int status){
 	
 	struct list_elem* e;
-	thread_current()->exitcode=status;
-	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list); e=list_next(e))
+	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
 	{
-		struct fds* f=list_entry(e,struct fds,elem);
-		lock_acquire(&file_lock);
-		file_close(f->f);
-		lock_release(&file_lock);
-		free(f);
+		if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
+		{
+			list_entry(e,struct child_proc,elem)->ret=status;
+			list_entry(e,struct child_proc,elem)->waited=false;
+		}
 	}
 
 	for (e = list_begin(&thread_current()->mapping); e!=list_tail(&thread_current()->mapping); e=list_next(e))
 	{
 		munmap(list_entry(e,struct mapping,elem)->id);
 	}
+    thread_current()->exitcode=status;
+
+
+	if (thread_current()->parent->wait==thread_current()->tid)
+	{
+		sema_up(&thread_current()->parent->wait_for_child);
+	}
 	thread_exit();
 }
 
 int exec (const char *cmd_line){
+	char* fn_copy=calloc(1,strlen(cmd_line)+1);
+	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
+	char* p;
+	fn_copy=strtok_r(fn_copy," ",&p);
 	int ret;
-	char* fn_copy=strcpy_to_kernel(cmd_line);
 	lock_acquire(&file_lock);
-	ret=process_execute(fn_copy);
-	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	struct file* f=filesys_open(fn_copy);
+	if (f==NULL)
+	{
+		ret=-1;
+		lock_release(&file_lock);
+	}else{
+		file_close(f);
+		lock_release(&file_lock);
+		ret=process_execute(cmd_line);
+	}
+	free(fn_copy);
 	return ret;
 }
 
@@ -77,26 +106,26 @@ int wait (int pid){
 
 bool create (const char *file, unsigned initial_size){
 	bool ret;
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret= filesys_create(fn_copy,initial_size);
+	ret= filesys_create(file,initial_size);
 	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return ret;
 }
 
 bool remove (const char *file){
 	bool ret;
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret = filesys_remove(fn_copy);
+	ret = filesys_remove(file);
 	lock_release(&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return ret;
 }
 
 int open (const char *file){
-	char* fn_copy=strcpy_to_kernel(file);
+	//char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire (&file_lock);
 	struct fds* fd=calloc(1,sizeof(struct fds)); 
 	fd->f=filesys_open(file);
@@ -104,11 +133,12 @@ int open (const char *file){
 	{
 		fd->fd=-1;
 	}else{
-		fd->fd=thread_current()->fd_num++;
+		thread_current()->fd_num=thread_current()->fd_num+1;
+		fd->fd=thread_current()->fd_num;
 		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
-	palloc_free_page(fn_copy);
+	//palloc_free_page(fn_copy);
 	return fd->fd;
 }
 
@@ -128,110 +158,67 @@ int filesize (int fd){
 
 int read (int fd, char *buffer, unsigned size){
 
-	int read=0;
-	struct fds* f=getfile(fd);
-	uint8_t* b=(uint8_t*)buffer;
-	while(size>0){
-		size_t page_left=PGSIZE-pg_ofs(b);
-		int32_t ret=0;
-		size_t read_size;
-		if (size<page_left)
+	int ret=size;
+	char* check=(char*)buffer;
+	for (unsigned i = 0; i < size; ++i)
+	{
+		if (!is_user_vaddr(check) || check==NULL)
 		{
-			read_size=size;
-		}else{
-			read_size=page_left;
+			exit(-1);
 		}
-		if (fd!=0)
+		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
 		{
-			if (!page_lock(b,true))
-			{
-				exit(-1);
-			}
-			lock_acquire(&file_lock);
-			ret=file_read(f->f,b,read_size);
-			lock_release(&file_lock);
-			page_unlock(b);
-		}else{
-			for (size_t i = 0; i < read_size; ++i)
-			{
-				char c=input_getc();
-				if (!page_lock(b,true))
-				{
-					exit(-1);
-				}
-				b[i]=c;
-				page_unlock(b);
-			}
-			read=read_size;
+			exit(-1);
 		}
-		if (ret<0)
-		{
-			if (read==0)
-			{
-				read=-1;
-			}
-			break;
-		}
-		read+=ret;
-		if (ret!=(int32_t)read_size)
-		{
-			break;
-		}
-		b+=ret;
-		size-=ret;
+		check=check+1;
 	}
-	return read;
+
+	lock_acquire (&file_lock); 
+	if (fd==0)
+	{
+		for (unsigned i = 0; i < size; i++)
+		{
+			buffer[i]=input_getc();
+		}
+	}else{
+		struct fds* fds=getfile(fd);
+		//is_valid_vaddr(fds->f);
+		if (fds==NULL)
+		{
+			ret = -1;
+		}else{
+			ret = file_read(fds->f,buffer,size);
+		}
+	}
+
+	lock_release (&file_lock);
+	return ret;
 }
 
 int write (int fd, const void *buffer, unsigned size){
-	uint8_t* b=(uint8_t*)buffer;
-	struct fds* f;
-	int write=0;
-	if (fd!=1)
+	int ret;
+	if (fd==0)
 	{
-		f=getfile(fd);
+		ret= -1;
 	}
-	while(size>0){
-		size_t page_left=PGSIZE-pg_ofs(b);
-		size_t write_size;
-		int32_t ret;
-		if (size<page_left)
+	else if (fd==1)
+	{
+		putbuf(buffer,size);
+		ret= size;
+	}else{
+		struct fds* fds=getfile(fd);
+		//is_valid_vaddr(fds->f);
+		if (fds==NULL)
 		{
-			write_size=size;
+			ret= -1;
 		}else{
-			write_size=page_left;
+			lock_acquire(&file_lock);
+			ret= file_write(fds->f,buffer,size);
+			lock_release(&file_lock);
+
 		}
-		if (!page_lock(b,false))
-		{
-			exit(-1);		
-		}
-		lock_acquire(&file_lock);
-		if (fd==1)
-		{
-			putbuf((char*)b,write_size);
-			ret=write_size;
-		}else{
-			ret=file_write(f->f,b,write_size);
-		}
-		lock_release(&file_lock);
-		page_unlock(b);
-		if (ret<0)
-		{
-			if (write==0)
-			{
-				write=-1;
-			}
-			break;
-		}
-		write+=ret;
-		if (ret!=(int32_t)write_size)
-		{
-			break;
-		}
-		b+=ret;
-		size-=ret;
 	}
-	return write;
+	return ret;
 }
 
 void seek (int fd, unsigned position){
@@ -256,12 +243,21 @@ unsigned tell (int fd){
 }
 
 void close (int fd){
-	struct fds* f=getfile(fd);
+	struct list_elem* e;
+	struct fds* f;
 	lock_acquire(&file_lock);
-	file_close(f->f);
+	for (e=list_begin(&thread_current()->file_list);e!=list_tail(&thread_current()->file_list);e=list_next(e))
+	{
+		f=list_entry(e,struct fds,elem);
+		if (f->fd==fd)
+		{
+			file_close(f->f);
+			list_remove(e);
+			free(f);
+			break;
+		}
+	}
 	lock_release(&file_lock);
-	list_remove(&fd->elem);
-	free(fd);
 }
 
 
@@ -270,47 +266,83 @@ void close (int fd){
 void
 syscall_init (void) 
 {
-  lock_init (&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-	typedef int function (int,int,int);
-	struct syscall{
-		size_t arg_num;
-		function* func;
-	};
-    static const struct syscall syscall_table[]={
-      {0,(function*)halt},
-      {1,(function*)exit},
-      {1,(function*)exec},
-      {1,(function*)wait},
-      {2,(function*)create},
-      {1,(function*)remove},
-      {1,(function*)open},
-      {1,(function*)filesize},
-      {3,(function*)read},
-      {3,(function*)write},
-      {2,(function*)seek},
-      {1,(function*)tell},
-      {1,(function*)close},
-      {2,(function*)mmap},
-      {1,(function*)munmap},};
-    const struct syscall* sc;
-    unsigned int func;
-    int args[3];
-    argcpy(&func,f->esp,sizeof(func));
-    
-    if (func>=(sizeof(syscall_table)/sizeof(*syscall_table)))
-    {
-    	exit(-1);
-    }
-    sc=syscall_table+func;
-    memset(args,0,sizeof(args));
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
-    f->eax=sc->func(args[0],args[1],args[2]);
+	
+	int *esp=f->esp;
+	//unsigned int func;
+
+	is_valid_vaddr(esp);
+
+	if (*esp==SYS_HALT)
+	{
+		halt();
+	}else if (*esp==SYS_EXIT)
+	{
+		is_valid_vaddr(esp+1);
+		exit(*(esp+1));
+	}else if (*esp==SYS_EXEC)
+	{
+		is_valid_vaddr(esp+1);
+		is_valid_vaddr((void*)*(esp+1));
+		f->eax=exec((char*)*(esp+1));
+	}else if (*esp==SYS_WAIT)
+	{
+		is_valid_vaddr(esp+1);
+		f->eax=wait((int)*(esp+1));
+	}else if (*esp==SYS_CREATE)
+	{
+		is_valid_vaddr(esp+5);
+		is_valid_vaddr((void*)*(esp+4));
+		f->eax=create((char*)*(esp+4),*(esp+5));
+	}else if (*esp==SYS_REMOVE)
+	{
+		is_valid_vaddr(esp+1);
+		is_valid_vaddr((void*)*(esp+1));
+		f->eax=remove((char*)*(esp+1));
+	}else if (*esp==SYS_OPEN){
+		is_valid_vaddr(esp+1);
+		is_valid_vaddr((void*)*(esp+1));
+		f->eax=open((char *)*(esp+1));
+	}
+	else if (*esp==SYS_FILESIZE)
+	{
+		is_valid_vaddr(esp+1);
+		f->eax=filesize((int)*(esp+1));
+	}else if (*esp==SYS_READ)
+	{
+		is_valid_vaddr(esp+7);
+		is_valid_vaddr((void*)*(esp+6));
+		f->eax=read(*(esp+5),(void*)*(esp+6),*(esp+7));
+	}else if (*esp==SYS_WRITE)
+	{
+		is_valid_vaddr(esp+7);
+		is_valid_vaddr((void*)*(esp+6));
+		f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
+	}else if (*esp==SYS_SEEK)
+	{
+		is_valid_vaddr(esp+5);
+		seek(*(esp+4),*(esp+5));
+	}else if (*esp==SYS_TELL)
+	{
+		is_valid_vaddr(esp+1);
+		f->eax=tell(*(esp+1));
+	}else if (*esp==SYS_CLOSE)
+	{
+		is_valid_vaddr(esp+1);
+		close(*(esp+1));
+	}else if (*esp==SYS_MMAP){
+		is_valid_vaddr(esp+5);
+		f->eax=mmap((int)*(esp+4),(void*)*(esp+5));
+	}else if (*esp==SYS_MUNMAP)
+	{
+		is_valid_vaddr(esp+1);
+		munmap((int)*(esp+1));
+	}
 }
 
 struct mapping* getmap(int id){
@@ -331,30 +363,13 @@ struct mapping* getmap(int id){
 void munmap (int mapping){
 	struct mapping* m=getmap(mapping);
 	list_remove(&m->elem);
-	for (int i = 0; i < m->num; ++i)
-	{
-		if (pagedir_is_dirty(thread_current()->pagedir,(m->addr+PGSIZE*i)))
-		{
-			lock_acquire(&file_lock);
-			file_write_at(m->file,(const void*)(m->addr+PGSIZE*i),(PGSIZE*(m->num)),PGSIZE*i);
-			lock_release(&file_lock);
-		}
+	while(m->num>0){
+		page_free(find_page(m->addr));
+		m->addr+=PGSIZE;
+		m->num--;
 	}
-	for (int i = 0; i < m->num; ++i)
-	{
-		struct page* p=find_page(m->addr+PGSIZE * i);
-		if (p->f!=NULL)
-		{
-			lock_acquire(&p->f->lock);
-			if (p->file && !p->mmap)
-			{
-				page_evict(p);
-			}
-			free_frame(p->f);
-		}
-		hash_delete(thread_current()->pages,&p->elem);
-		free(p);
-	}
+	file_close(m->file);
+	free(m);
 }
 
 
@@ -369,20 +384,20 @@ int mmap (int fd, void *addr){
 	m->id=thread_current()->fd_num++;
 	lock_acquire(&file_lock);
 	m->file=file_reopen(f->f);
-	if (m->file==NULL)
+	if (!m->file)
 	{
 		free(m);
 		return -1;
 	}
 	m->addr=addr;
 	m->num=0;
-	list_push_front(&thread_current()->mapping,&m->elem);
+	list_push_back(&thread_current()->mapping,&m->elem);
 	int length=file_length(m->file);
 	lock_release(&file_lock);
 	int offset=0;
 	while(length>0){
 		struct page* p=page_alloc(addr+offset,true);
-		if (p==NULL)
+		if (!p)
 		{
 			munmap(m->id);
 			return -1;
@@ -417,7 +432,7 @@ struct fds* getfile(int fd){
 			return fds;
 		}
 	}
-	exit(-1);
+	return NULL;
 }
 
 char* strcpy_to_kernel(const char* str){
@@ -434,7 +449,7 @@ char* strcpy_to_kernel(const char* str){
 		if (!page_lock(addr,false))
 		{
 			page_unlock(addr);
-			return NULL;
+			break;
 		}
 		while(str<addr+PGSIZE){
 			cp[length]=*str;
@@ -445,6 +460,7 @@ char* strcpy_to_kernel(const char* str){
 				return cp;
 			}else if (length>=PGSIZE)
 			{
+
 				goto error;
 			}
 			str++;
@@ -455,25 +471,4 @@ char* strcpy_to_kernel(const char* str){
 	  	palloc_free_page(cp);
 		exit(-1);
 	return NULL;
-}
-
-static void argcpy(void* cp,void* addr1,size_t size){
-	uint8_t* dst=cp;
-	const uint8_t* addr=addr1;
-	while(size>0){
-		size_t s=PGSIZE-pg_ofs(addr);
-		if (s>size)
-		{
-			s=size;
-		}
-		if (!page_lock(addr,false))
-		{
-			exit(-1);
-		}
-		memcpy(dst,addr,s);
-		page_unlock(addr);
-		dst+=s;
-		addr+=s;
-		size-=s;
-	}
 }
