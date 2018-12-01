@@ -1,5 +1,14 @@
 #include "swap.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include <bitmap.h>
+#include "devices/block.h"
 
+struct lock swap_lock;
+struct bitmap* swap_map;
+struct block* swap_block;
 
 void swap_init(void){
 	swap_block=block_get_role(BLOCK_SWAP);

@@ -1,4 +1,10 @@
 #include "page.h"
+#include "frame.h"
+#include "swap.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "filesys/file.h"
 
 void init_page(struct hash* h){
 	hash_init(h, page_hash_func, less, NULL);

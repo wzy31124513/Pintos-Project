@@ -1,5 +1,8 @@
 #include "frame.h"
-
+#include "vm/page.h"
+#include "threads/palloc.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
 static list frames;
 static struct lock frame_lock;
 
