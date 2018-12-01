@@ -80,23 +80,10 @@ void exit (int status){
 }
 
 int exec (const char *cmd_line){
-	char* fn_copy=calloc(1,strlen(cmd_line)+1);
-	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
-	char* p;
-	fn_copy=strtok_r(fn_copy," ",&p);
 	int ret;
-	lock_acquire(&file_lock);
-	struct file* f=filesys_open(fn_copy);
-	if (f==NULL)
-	{
-		ret=-1;
-		lock_release(&file_lock);
-	}else{
-		file_close(f);
-		lock_release(&file_lock);
-		ret=process_execute(cmd_line);
-	}
-	free(fn_copy);
+	char* fn_copy=strcpy_to_kernel(cmd_line);
+	ret=process_execute(fn_copy);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
@@ -106,26 +93,26 @@ int wait (int pid){
 
 bool create (const char *file, unsigned initial_size){
 	bool ret;
-	//char* fn_copy=strcpy_to_kernel(file);
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret= filesys_create(file,initial_size);
+	ret= filesys_create(fn_copy,initial_size);
 	lock_release(&file_lock);
-	//palloc_free_page(fn_copy);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
 bool remove (const char *file){
 	bool ret;
-	//char* fn_copy=strcpy_to_kernel(file);
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire(&file_lock);
-	ret = filesys_remove(file);
+	ret = filesys_remove(fn_copy);
 	lock_release(&file_lock);
-	//palloc_free_page(fn_copy);
+	palloc_free_page(fn_copy);
 	return ret;
 }
 
 int open (const char *file){
-	//char* fn_copy=strcpy_to_kernel(file);
+	char* fn_copy=strcpy_to_kernel(file);
 	lock_acquire (&file_lock);
 	struct fds* fd=calloc(1,sizeof(struct fds)); 
 	fd->f=filesys_open(file);
@@ -133,12 +120,12 @@ int open (const char *file){
 	{
 		fd->fd=-1;
 	}else{
-		thread_current()->fd_num=thread_current()->fd_num+1;
+		thread_current()->fd_num++;
 		fd->fd=thread_current()->fd_num;
 		list_push_back(&thread_current()->file_list,&fd->elem);
 	}
 	lock_release (&file_lock);
-	//palloc_free_page(fn_copy);
+	palloc_free_page(fn_copy);
 	return fd->fd;
 }
 
@@ -158,67 +145,110 @@ int filesize (int fd){
 
 int read (int fd, char *buffer, unsigned size){
 
-	int ret=size;
-	char* check=(char*)buffer;
-	for (unsigned i = 0; i < size; ++i)
-	{
-		if (!is_user_vaddr(check) || check==NULL)
+	int read=0;
+	struct fds* f=getfile(fd);
+	uint8_t* b=buffer;
+	while(size>0){
+		size_t page_left=PGSIZE-pg_ofs(b);
+		int32_t ret;
+		size_t read_size;
+		if (size<page_left)
 		{
-			exit(-1);
-		}
-		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
-		{
-			exit(-1);
-		}
-		check=check+1;
-	}
-
-	lock_acquire (&file_lock); 
-	if (fd==0)
-	{
-		for (unsigned i = 0; i < size; i++)
-		{
-			buffer[i]=input_getc();
-		}
-	}else{
-		struct fds* fds=getfile(fd);
-		//is_valid_vaddr(fds->f);
-		if (fds==NULL)
-		{
-			ret = -1;
+			read_size=size;
 		}else{
-			ret = file_read(fds->f,buffer,size);
+			read_size=page_left;
 		}
+		if (fd!=0)
+		{
+			if (!page_lock(b,true))
+			{
+				exit(-1);
+			}
+			lock_acquire(&file_lock);
+			ret=file_read(f->f,b,read_size);
+			lock_release(&file_lock);
+			page_unlock(b);
+		}else{
+			for (int i = 0; i < read_size; ++i)
+			{
+				char c=input_getc();
+				if (!page_lock(b,true))
+				{
+					exit(-1);
+				}
+				b[i]=c;
+				page_unlock(b);
+			}
+			read=read_size;
+		}
+		if (ret<0)
+		{
+			if (read==0)
+			{
+				read==-1
+			}
+			break;
+		}
+		read+=ret;
+		if (ret!=read_size)
+		{
+			break;
+		}
+		b+=ret;
+		size-=ret;
 	}
-
-	lock_release (&file_lock);
-	return ret;
+	return read;
 }
 
 int write (int fd, const void *buffer, unsigned size){
-	int ret;
-	if (fd==0)
+	uint8_t b=buffer;
+	struct fds* f;
+	int write=0;
+	if (fd!=1)
 	{
-		ret= -1;
+		f=getfile(fd);
 	}
-	else if (fd==1)
-	{
-		putbuf(buffer,size);
-		ret= size;
-	}else{
-		struct fds* fds=getfile(fd);
-		//is_valid_vaddr(fds->f);
-		if (fds==NULL)
+	while(size>0){
+		size_t page_left=PGSIZE-pg_ofs(b);
+		size_t write_size;
+		int32_t ret;
+		if (size<page_left)
 		{
-			ret= -1;
+			write_size=size;
 		}else{
-			lock_acquire(&file_lock);
-			ret= file_write(fds->f,buffer,size);
-			lock_release(&file_lock);
-
+			write_size=page_left;
 		}
+		if (!page_lock(b,false))
+		{
+			exit(-1);		
+		}
+		lock_acquire(&file_lock);
+		if (fd==1)
+		{
+			putbuf((char*)b,write_size);
+			ret=write_size;
+		}else{
+			ret=file_write(f->f,b,write_size);
+		}
+		lock_release(&file_lock);
+		page_unlock(b);
+		if (ret<0)
+		{
+			if (write==0)
+			{
+				write=-1;
+			}
+			break;
+		}
+		write+=ret;
+		if (ret!=write_size)
+		{
+			break;
+		}
+		b+=ret;
+		size-=ret;
 	}
-	return ret;
+	return write;
 }
 
 void seek (int fd, unsigned position){

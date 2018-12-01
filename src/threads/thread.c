@@ -485,7 +485,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->child_load=false;
   list_init(&t->children);
   list_init(&t->file_list);
-  t->fd_num=1;
+  t->fd_num=2;
   t->exitcode=-1;
   t->wait=0;
   t->self=NULL;
