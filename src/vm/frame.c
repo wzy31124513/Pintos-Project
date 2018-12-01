@@ -12,12 +12,11 @@ void frame_init(void){
 	lock_init(&frame_lock);
 	frames=malloc(sizeof(struct frame)*init_ram_pages);
 	void* addr=palloc_get_page(PAL_USER);
-	while(addr){
+	while(addr!=NULL){
 		struct frame* f=&frames[count];
 		count++;
 		f->addr=addr;
 		f->page=NULL;
-		f->t=thread_current();
 		lock_init (&f->lock);
 		addr=palloc_get_page(PAL_USER);
 	}

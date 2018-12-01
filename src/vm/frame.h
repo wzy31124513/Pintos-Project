@@ -4,7 +4,6 @@
 struct frame{
 	struct page* page;
 	void* addr;
-	struct thread* t;
 	struct list_elem elem;
 	struct lock lock;
 };
