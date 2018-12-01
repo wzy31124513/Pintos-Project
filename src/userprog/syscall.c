@@ -449,12 +449,15 @@ char* strcpy_to_kernel(const char* str){
 				return cp;
 			}else if (length>=PGSIZE)
 			{
-				palloc_free_page(cp);
-				exit(-1);
-				break;
+
+				goto error;
 			}
 			str++;
 		}
+		page_unlock(addr);
 	}
+	error:
+	  	palloc_free_page(cp);
+		exit(-1);
 	return NULL;
 }
