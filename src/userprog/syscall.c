@@ -242,7 +242,7 @@ int write (int fd, const void *buffer, unsigned size){
 			break;
 		}
 		write+=ret;
-		if (ret!=write_size)
+		if (ret!=(int32_t)write_size)
 		{
 			break;
 		}

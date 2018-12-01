@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <list.h>
+#include "devices/timer.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
@@ -25,8 +26,8 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** esp);
-static void* push(uint8_t* kaddr, size_t* ofs,void* uaddr,size_t size);
+static bool getarg(uint8_t *kaddr, uint8_t* uaddr, const char* file_name, void** esp);
+static void* push(uint8_t* kaddr, size_t* ofs,const void* uaddr,size_t size);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -507,7 +508,7 @@ setup_stack (void **esp,char* file_name)
       {
         break;
       }
-      timer_sleep(1000);
+      timer_msleep(1000);
     }
     page->f=f;
     if (page->f!=NULL)
@@ -523,9 +524,9 @@ setup_stack (void **esp,char* file_name)
   return false;
 }
 
-static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** esp){
+static bool getarg(uint8_t *kaddr, uint8_t*uaddr, const char* file_name, void** esp){
   size_t ofs=PGSIZE;
-  char* const null=NULL;
+  const char* null=NULL;
   char* cmd_line;
   char* arg;
   char* p;
@@ -541,17 +542,16 @@ static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** 
     return false;
   }
   argc=0;
-  for ( arg = strtok_r(file_name," ",&p); arg != NULL; arg=strtok_r(NULL," ",&p))
+  for ( arg = strtok_r(cmd_line," ",&p); arg != NULL; arg=strtok_r(NULL," ",&p))
   {
     void* arg1=uaddr+(arg-(char*)kaddr);
-    if (push(kaddr,&ofs,&arg1,sizeof(arg1)==NULL))
+    if (push(kaddr,&ofs,&arg1,sizeof(arg1))==NULL)
     {
       return false;
     }
     argc++;
   }
   argv=(char**)(uaddr+ofs);
-  reverse (argc, (char **) (kaddr + ofs));
   while(argc>1){
     char* temp=argv[0];
     argv[0]=argv[argc-1];
@@ -567,7 +567,7 @@ static bool getarg(uint8_t *kaddr, uint8_t uaddr, const char* file_name, void** 
   return true;
 }
 
-static void* push(uint8_t* kaddr, size_t* ofs,void* uaddr,size_t size){
+static void* push(uint8_t* kaddr, size_t* ofs,const void* uaddr,size_t size){
   size_t size1=ROUND_UP(size,sizeof(uint32_t));
   if (*ofs<size1)
   {

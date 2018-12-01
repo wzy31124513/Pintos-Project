@@ -106,7 +106,7 @@ bool load_page(struct page* p){
 		{
 			break;
 		}
-		timer_sleep(1000);
+		timer_msleep(1000);
 	}
 	p->f=f;
 	if (p->f==NULL)
@@ -166,7 +166,7 @@ bool recently_used(struct page* p){
 	return recently_used;
 }
 
-bool page_lock(void* addr,bool writable){
+bool page_lock(const void* addr,bool writable){
 	struct page* p=find_page(addr);
 	if (!p || (!p->writable && writable))
 	{
@@ -182,7 +182,7 @@ bool page_lock(void* addr,bool writable){
 
 }
 
-void page_unlock(void* addr){
+void page_unlock(const void* addr){
 	struct page* p=find_page(addr);
 	if (p->f)
 	{
