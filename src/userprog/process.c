@@ -44,12 +44,12 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
   if (tid != TID_ERROR)
     {
-      sema_down (&exec.load);
-      if (exec.loaded){
-        list_push_back (&thread_current ()->children, &exec.child_proc->elem);
+      sema_down(&exec.load);
+      if(exec.loaded){
+        list_push_back(&thread_current()->children,&exec.child_proc->elem);
       }
       else{
-        tid = TID_ERROR;
+        tid=TID_ERROR;
       }
     }
   return tid;
@@ -276,12 +276,12 @@ bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
-  char name[16];
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  char *cp;
+  char name[16];
+  char *p;
   int i;
 
   /* Allocate and activate page directory. */
@@ -298,9 +298,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   while (*file_name == ' ')
     file_name++;
   strlcpy (name, file_name, sizeof name);
-  cp = strchr (name, ' ');
-  if (cp != NULL)
-    *cp = '\0';
+  p = strchr (name, ' ');
+  if (p != NULL)
+    *p = '\0';
   /* Open executable file. */
   file=filesys_open(name);
   t->self=file;
