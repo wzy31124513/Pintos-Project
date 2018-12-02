@@ -52,7 +52,7 @@ static struct page * find_page(const void* addr){
     }else if (PHYS_BASE-addr<=(1024*1024)){
       if (addr>=thread_current()->esp-32)
       {
-        return page_alloc(addr,false);
+        return page_alloc((void*)addr,false);
       }
     }
   }

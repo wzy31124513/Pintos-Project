@@ -263,7 +263,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp,char* file_name);
+static bool setup_stack (void** esp,char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -384,7 +384,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp,file_name))
+  if (!setup_stack (esp,(char*)file_name))
     goto done;
 
   /* Start address. */
@@ -487,7 +487,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 static void * push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size); 
-static bool setup_stack (void** esp,char* file_name);
 static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void** esp);
 static void reverse (int argc, char **argv);
 /* Create a minimal stack by mapping a zeroed page at the top of
