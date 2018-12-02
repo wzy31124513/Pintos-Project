@@ -16,8 +16,6 @@
 #include "threads/vaddr.h"
 #include "vm/page.h"
 #include "vm/frame.h"
-
-
 struct fds
 {
     struct file *file;
@@ -103,64 +101,6 @@ static int remove(const char* file)
   return ret;
 }
 
-void
-syscall_init (void)
-{
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&file_lock);
-}
-
-static void
-syscall_handler (struct intr_frame *f)
-{
-  typedef int syscall_function (int, int, int);
-
-  struct syscall
-    {
-      size_t arg_cnt;           /* Number of arguments. */
-      syscall_function *func;   /* Implementation. */
-    };
-
-  /* Table of system calls. */
-  static const struct syscall syscall_table[] =
-    {
-      {0, (syscall_function *)halt},
-      {1, (syscall_function *)exit1},
-      {1, (syscall_function *)exec},
-      {1, (syscall_function *)wait},
-      {2, (syscall_function *)create},
-      {1, (syscall_function *)remove},
-      {1, (syscall_function *)open},
-      {1, (syscall_function *)filesize},
-      {3, (syscall_function *)read},
-      {3, (syscall_function *)write},
-      {2, (syscall_function *)seek},
-      {1, (syscall_function *)tell},
-      {1, (syscall_function *)close},
-      {2, (syscall_function *)mmap},
-      {1, (syscall_function *)munmap},
-    };
-
-  const struct syscall *sc;
-  unsigned call_nr;
-  int args[3];
-
-  /* Get the system call. */
-  copy_in (&call_nr, f->esp, sizeof call_nr);
-  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
-    thread_exit ();
-  sc = syscall_table + call_nr;
-
-  /* Get the system call arguments. */
-  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
-  memset (args, 0, sizeof args);
-  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
-
-  /* Execute the system call,
-     and set the return value. */
-  f->eax = sc->func (args[0], args[1], args[2]);
-}
-
 static int open(const char* file)
 {
   char* fn_copy=copy_in_string(file);
@@ -185,8 +125,6 @@ static int open(const char* file)
   return fd;
 }
 
-
-
 static int filesize(int fd)
 {
   struct fds* f=getfile(fd);
@@ -196,7 +134,6 @@ static int filesize(int fd)
   lock_release (&file_lock);
   return ret;
 }
-
 
 static int read (int fd, void *buffer, unsigned size)
 {
@@ -254,7 +191,6 @@ static int read (int fd, void *buffer, unsigned size)
   }
   return read;
 }
-
 
 static int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
@@ -315,7 +251,6 @@ static int seek (int fd, unsigned position){
   return 0;
 }
 
-
 static int tell (int fd)
 {
   lock_acquire(&file_lock);
@@ -342,142 +277,153 @@ static int close(int fd)
   return 0;
 }
 
-static struct fds* getfile(int fd){
-  struct list_elem *e;
-  struct fds* fds;
-  for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
-  {
-    fds=list_entry(e,struct fds,elem);
-      if(fds->fd == fd){
-        return fds;
-      }
-  }
-  thread_exit ();
-}
-
-static struct mapping *
-lookup_mapping (int fd)
+static int mmap(int fd, void *addr)
 {
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-
-  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
-       e = list_next (e))
-    {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      if (m->id == fd)
-        return m;
-    }
-
-  thread_exit ();
-}
-
-
-static void
-unmap (struct mapping *m)
-{
-  /* Remove this mapping from the list of mapping for this process. */
-  list_remove(&m->elem);
-
-  /* For each page in the memory mapped file... */
-  for(int i = 0; i < m->num; i++)
+  struct fds* f=getfile(fd);
+  struct mapping* m = malloc(sizeof(struct mapping));
+  if (m==NULL || addr==NULL || pg_ofs(addr)!=0)
   {
-    /* ...determine whether or not the page is dirty (modified). If so, write that page back out to disk. */
-    if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->addr) + (PGSIZE * i)))))
-    {
-      lock_acquire (&file_lock);
-      file_write_at(m->file, (const void *) (m->addr + (PGSIZE * i)), (PGSIZE*(m->num)), (PGSIZE * i));
-      lock_release (&file_lock);
-    }
-  }
-
-  /* Finally, deallocate all memory mapped pages (free up the process memory). */
-  for(int i = 0; i < m->num; i++)
-  {
-    page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
-  }
-}
-
-static int
-mmap (int handle, void *addr)
-{
-  struct fds *fd = getfile (handle);
-  struct mapping *m = malloc (sizeof *m);
-  size_t offset;
-  off_t length;
-
-  if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
     return -1;
+  }
 
-  m->id = thread_current ()->fd_num++;
-  lock_acquire (&file_lock);
-  m->file = file_reopen (fd->file);
-  lock_release (&file_lock);
-  if (m->file == NULL)
+  m->id=thread_current()->fd_num++;
+  lock_acquire(&file_lock);
+  m->file=file_reopen(f->file);
+  if (m->file==NULL)
+  {
+    free(m);
+    return -1;
+  }
+  m->addr=addr;
+  m->num=0;
+  list_push_front(&thread_current()->mapping,&m->elem);
+  int length=file_length(m->file);
+  lock_release(&file_lock);
+  int offset=0;
+  while(length>0){
+    struct page* p=page_alloc(addr+offset,false);
+    if (p==NULL)
     {
-      free (m);
+      munmap(m->id);
       return -1;
     }
-  m->addr = addr;
-  m->num = 0;
-  list_push_front (&thread_current ()->mapping, &m->elem);
-
-  offset = 0;
-  lock_acquire (&file_lock);
-  length = file_length (m->file);
-  lock_release (&file_lock);
-  while (length > 0)
+    p->mmap=false;
+    p->file=m->file;
+    p->offset=offset;
+    if (length>PGSIZE)
     {
-      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
-      if (p == NULL)
-        {
-          unmap (m);
-          return -1;
-        }
-      p->mmap = false;
-      p->file = m->file;
-      p->offset = offset;
-      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->rw_bytes;
-      length -= p->rw_bytes;
-      m->num++;
+      p->rw_bytes=PGSIZE;
+    }else{
+      p->rw_bytes=length;
     }
+    offset+=p->rw_bytes;
+    length-=p->rw_bytes;
+    m->num++;
 
+  }
   return m->id;
 }
 
-static int
-munmap (int mapping)
+static int munmap (int mapping)
 {
-  struct mapping *map = lookup_mapping(mapping);
+  struct mapping *map=getmap(mapping);
   unmap(map);
   return 0;
 }
-void
-exit2 (void)
+
+static void unmap(struct mapping* m)
 {
-  struct thread *cur = thread_current ();
-  struct list_elem *e, *next;
-
-  for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list); e = next)
+  list_remove(&m->elem);
+  for(int i = 0; i<m->num; ++i)
+  {
+    if(pagedir_is_dirty(thread_current()->pagedir,(const void *)(m->addr+PGSIZE*i)))
     {
-      struct fds *fd = list_entry (e, struct fds, elem);
-      next = list_next (e);
       lock_acquire (&file_lock);
-      file_close (fd->file);
+      file_write_at(m->file,(const void*)(m->addr+PGSIZE*i),(PGSIZE*(m->num)),PGSIZE*i);
       lock_release (&file_lock);
-      free (fd);
     }
+  }
+  for (int i = 0; i < m->num; ++i)
+  {
+    page_deallocate((void*)(m->addr+PGSIZE*i));
+  }
+}
 
-  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
-       e = next)
+void exit2 (void)
+{
+  struct list_elem *e;
+  for (e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
     {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      next = list_next (e);
-      unmap (m);
+      struct fds* fd=list_entry(e,struct fds,elem);
+      lock_acquire (&file_lock);
+      file_close(fd->file);
+      lock_release(&file_lock);
+      free(fd);
+    }
+  for(e=list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=list_next(e))
+    {
+      struct mapping* m=list_entry(e,struct mapping,elem);
+      unmap(m);
     }
 }
 
+void
+syscall_init (void)
+{
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&file_lock);
+}
+
+static void
+syscall_handler (struct intr_frame *f)
+{
+  typedef int syscall_function (int, int, int);
+
+  struct syscall
+    {
+      size_t arg_cnt;           /* Number of arguments. */
+      syscall_function *func;   /* Implementation. */
+    };
+
+  /* Table of system calls. */
+  static const struct syscall syscall_table[] =
+    {
+      {0, (syscall_function *)halt},
+      {1, (syscall_function *)exit1},
+      {1, (syscall_function *)exec},
+      {1, (syscall_function *)wait},
+      {2, (syscall_function *)create},
+      {1, (syscall_function *)remove},
+      {1, (syscall_function *)open},
+      {1, (syscall_function *)filesize},
+      {3, (syscall_function *)read},
+      {3, (syscall_function *)write},
+      {2, (syscall_function *)seek},
+      {1, (syscall_function *)tell},
+      {1, (syscall_function *)close},
+      {2, (syscall_function *)mmap},
+      {1, (syscall_function *)munmap},
+    };
+
+  const struct syscall *sc;
+  unsigned call_nr;
+  int args[3];
+
+  /* Get the system call. */
+  copy_in (&call_nr, f->esp, sizeof call_nr);
+  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
+    thread_exit ();
+  sc = syscall_table + call_nr;
+
+  /* Get the system call arguments. */
+  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
+  memset (args, 0, sizeof args);
+  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
+
+  /* Execute the system call,
+     and set the return value. */
+  f->eax = sc->func (args[0], args[1], args[2]);
+}
 
 static void
 copy_in (void *dst_, const void *usrc_, size_t size)
@@ -540,4 +486,30 @@ static char * copy_in_string (const char *us)
  lock_error:
   palloc_free_page (ks);
   thread_exit ();
+}
+
+static struct fds* getfile(int fd){
+  struct list_elem *e;
+  struct fds* fds;
+  for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
+  {
+    fds=list_entry(e,struct fds,elem);
+      if(fds->fd == fd){
+        return fds;
+      }
+  }
+  thread_exit ();
+}
+
+static struct mapping* getmap(int id){
+  struct list_elem* e;
+  for (e=list_begin(&thread_current()->mapping); e != list_tail(&thread_current()->mapping) ; e=list_next(e))
+  {
+    struct mapping* m=list_entry(e,struct mapping, elem);
+    if (m->id==id)
+    {
+      return m;
+    }
+  }
+  thread_exit();
 }
