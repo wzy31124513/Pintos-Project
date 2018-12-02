@@ -74,7 +74,7 @@ start_process (void *exec_table)
   if(success){
     exec->child_proc=malloc(sizeof(struct child_proc));
     thread_current()->child_proc=exec->child_proc;
-    if(child_proc==NULL){
+    if(exec->child_proc==NULL){
       success=false;
     }
   }
