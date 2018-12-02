@@ -32,20 +32,20 @@ struct mapping
   struct list_elem elem;
 };
 
-static int halt (void);
-static int exec (const char *cmd_line);
-static int wait (int pid);
-static int create (const char *file, unsigned initial_size);
-static int remove (const char *file);
-static int open (const char *file);
-static int filesize (int fd);
-static int read (int fd, void *buffer, unsigned size);
-static int write (int fd,  void *buffer, unsigned size);
-static int seek (int fd, unsigned position);
-static int tell (int fd);
-static int close (int fd);
-static int mmap (int fd, void *addr);
-static int munmap (int mapping);
+void halt (void);
+int exec (const char *cmd_line);
+int wait (int pid);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+int read (int fd, void *buffer, unsigned size);
+int write (int fd,  void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
+int mmap (int fd, void *addr);
+void munmap (mapid_t mapping);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
@@ -81,7 +81,7 @@ void exit1(int status)
   thread_exit ();
 }
 
-static int exec(const char* cmd_line)
+int exec(const char* cmd_line)
 {
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
@@ -92,12 +92,12 @@ static int exec(const char* cmd_line)
   return ret;
 }
 
-static int wait(int pid)
+int wait(int pid)
 {
   return process_wait(pid);
 }
 
-static int create(const char *file, unsigned initial_size)
+bool create(const char *file, unsigned initial_size)
 {
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
@@ -108,7 +108,7 @@ static int create(const char *file, unsigned initial_size)
   return ret;
 }
 
-static int remove(const char* file)
+bool remove(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
   bool ret;
@@ -119,7 +119,7 @@ static int remove(const char* file)
   return ret;
 }
 
-static int open(const char* file)
+int open(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* f;
@@ -143,7 +143,7 @@ static int open(const char* file)
   return fd;
 }
 
-static int filesize(int fd)
+int filesize(int fd)
 {
   struct fds* f=getfile(fd);
   int ret;
@@ -153,7 +153,7 @@ static int filesize(int fd)
   return ret;
 }
 
-static int read (int fd, void *buffer, unsigned size)
+int read (int fd, void *buffer, unsigned size)
 {
   int read=0;
   struct fds* f=getfile(fd);
@@ -210,7 +210,7 @@ static int read (int fd, void *buffer, unsigned size)
   return read;
 }
 
-static int write (int fd,  void *buffer, unsigned size){
+int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
   struct fds* f;
   int write=0;
@@ -261,15 +261,14 @@ static int write (int fd,  void *buffer, unsigned size){
   return write;
 }
 
-static int seek (int fd, unsigned position){
+void seek (int fd, unsigned position){
   lock_acquire (&file_lock); 
   struct fds* fds=getfile(fd);
   file_seek(fds->file,position);
   lock_release (&file_lock);
-  return 0;
 }
 
-static int tell (int fd)
+unsigned tell (int fd)
 {
   lock_acquire(&file_lock);
   struct fds* fds=getfile(fd);
