@@ -163,7 +163,7 @@ process_exit(void)
     lock_release(&c->lock);
     if(temp==0)
     {
-      free(cs);
+      free(c);
     }
   }
   page_exit();  
