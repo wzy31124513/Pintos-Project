@@ -32,16 +32,17 @@ tid_t
 process_execute (const char *file_name) 
 {
   struct exec_table exec;
-  char name[16];
+  char name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
   exec.file_name=file_name;
   sema_init (&exec.load,0);
 
   /* Create a new thread to execute FILE_NAME. */
-  strlcpy (name,file_name,sizeof(name));
+  strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
-  tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
+  tid = thread_create (name, PRI_DEFAULT, start_process,&exec);
+  free(name);
   if (tid != TID_ERROR)
     {
       sema_down(&exec.load);

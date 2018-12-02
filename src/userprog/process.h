@@ -8,10 +8,10 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 struct exec_table 
-  {
+{
 	const char* file_name;
 	struct semaphore load;
 	struct child_proc* child_proc;
 	bool loaded;
 };
-#endif /* userprog/process.h */
+#endif
