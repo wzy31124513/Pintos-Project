@@ -45,14 +45,14 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 int mmap (int fd, void *addr);
-void munmap (mapid_t mapping);
+void munmap (int mapping);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static struct fds* getfile(int fd);
 static struct mapping* getmap (int fd);
 
-static int halt(void)
+void halt(void)
 {
   shutdown_power_off ();
 }
