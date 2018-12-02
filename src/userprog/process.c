@@ -290,28 +290,26 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  /* Create page hash table. */
   t->pages = malloc (sizeof *t->pages);
   if (t->pages == NULL)
     goto done;
-  hash_init (t->pages, page_hash_func, less, NULL);
+  init_page(t->pages);
 
-  /* Extract file_name from command line. */
   while (*file_name == ' ')
     file_name++;
-  strlcpy (name, cmd_line, sizeof name);
+  strlcpy (name, file_name, sizeof name);
   cp = strchr (name, ' ');
   if (cp != NULL)
     *cp = '\0';
-
   /* Open executable file. */
-  t->bin_file = file = filesys_open (name);
+  file=filesys_open(name);
+  t->self=file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  file_deny_write (t->bin_file);
+  file_deny_write (file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -472,14 +470,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     {
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-      struct page *p = page_allocate (upage, !writable);
+      struct page *p = page_alloc (upage, !writable);
       if (p == NULL)
         return false;
       if (page_read_bytes > 0) 
         {
           p->file = file;
-          p->file_offset = ofs;
-          p->file_bytes = page_read_bytes;
+          p->offset = ofs;
+          p->rw_bytes = page_read_bytes;
         }
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -576,16 +574,16 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
 static bool
 setup_stack (void **esp,char* file_name)
 {
-  struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
+  struct page *page=page_alloc(((uint8_t *) PHYS_BASE) - PGSIZE, false);
   if (page != NULL) 
     {
-      page->frame = frame_alloc_and_lock (page);
-      if (page->frame != NULL)
+      page->frame=frame_alloc(page);
+      if (page->frame!=NULL)
         {
           bool ok;
           page->read_only = false;
-          page->private = false;
-          ok = init_cmd_line (page->frame->base, page->addr, cmd_line, esp);
+          page->mmap = false;
+          ok = init_cmd_line (page->frame->addr, page->addr, file_name, esp);
           frame_unlock (page->frame);
           return ok;
         }
