@@ -297,11 +297,12 @@ int mmap (int fd, void *addr)
   struct fds* f=getfile(fd);
   struct mapping* m=malloc(sizeof(struct mapping));
   size_t offset;
-  off_t length;
-  if (m==NULL || addr==NULL || pg_ofs(addr)!=0){
+  uint32_t read_bytes;
+  if (m==NULL || addr==NULL || (uint32_t)addr%PGSIZE!=0){
     return -1;
   }
-  m->id=thread_current()->fd_num++;
+  thread_current()->fd_num++;
+  m->id=thread_current()->fd_num;
   lock_acquire(&file_lock);
   m->file=file_reopen(f->file);
   lock_release(&file_lock);
@@ -316,9 +317,9 @@ int mmap (int fd, void *addr)
 
   offset=0;
   lock_acquire(&file_lock);
-  length=file_length(m->file);
+  read_bytes=file_length(m->file);
   lock_release(&file_lock);
-  while(length>0){
+  while(read_bytes>0){
     struct page* p=page_alloc((uint8_t*)addr+offset,false);
     if(p==NULL){
       munmap(m->id);
@@ -334,7 +335,7 @@ int mmap (int fd, void *addr)
       p->rw_bytes=length;
     }
     offset+=p->rw_bytes;
-    length-=p->rw_bytes;
+    read_bytes-=p->rw_bytes;
     m->num++;
   }
   return m->id;
