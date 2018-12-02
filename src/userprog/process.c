@@ -32,7 +32,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   struct exec_table exec;
-  char name=malloc(strlen(file_name)+1);
+  char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
   exec.file_name=file_name;
