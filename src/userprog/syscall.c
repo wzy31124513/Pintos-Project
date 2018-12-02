@@ -32,21 +32,21 @@ struct mapping
   struct list_elem elem;
 };
 
-static int sys_halt (void);
-static int sys_exit (int status);
-static int sys_exec (const char *cmd_line);
-static int sys_wait (int pid);
-static int sys_create (const char *file, unsigned initial_size);
-static int sys_remove (const char *file);
-static int sys_open (const char *file);
-static int sys_filesize (int fd);
-static int sys_read (int fd, void *buffer, unsigned size);
-static int sys_write (int fd, void *buffer, unsigned size);
-static int sys_seek (int fd, unsigned position);
-static int sys_tell (int fd);
-static int sys_close (int fd);
-static int sys_mmap (int fd, void *addr);
-static int sys_munmap (int mapping);
+static int halt (void);
+static int exit (int status);
+static int exec (const char *cmd_line);
+static int wait (int pid);
+static int create (const char *file, unsigned initial_size);
+static int remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, void *buffer, unsigned size);
+static int write (int fd, void *buffer, unsigned size);
+static int seek (int fd, unsigned position);
+static int tell (int fd);
+static int close (int fd);
+static int mmap (int fd, void *addr);
+static int munmap (int mapping);
 char* strcpy_to_kernel(const char* str);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
@@ -73,21 +73,21 @@ syscall_handler (struct intr_frame *f)
 
   static const struct syscall syscall_table[] =
     {
-      {0, (syscall_function *) sys_halt},
-      {1, (syscall_function *) sys_exit},
-      {1, (syscall_function *) sys_exec},
-      {1, (syscall_function *) sys_wait},
-      {2, (syscall_function *) sys_create},
-      {1, (syscall_function *) sys_remove},
-      {1, (syscall_function *) sys_open},
-      {1, (syscall_function *) sys_filesize},
-      {3, (syscall_function *) sys_read},
-      {3, (syscall_function *) sys_write},
-      {2, (syscall_function *) sys_seek},
-      {1, (syscall_function *) sys_tell},
-      {1, (syscall_function *) sys_close},
-      {2, (syscall_function *) sys_mmap},
-      {1, (syscall_function *) sys_munmap},
+      {0,(syscall_function *)halt},
+      {1,(syscall_function *)exit},
+      {1,(syscall_function *)exec},
+      {1,(syscall_function *)wait},
+      {2,(syscall_function *)create},
+      {1,(syscall_function *)remove},
+      {1,(syscall_function *)open},
+      {1,(syscall_function *)filesize},
+      {3,(syscall_function *)read},
+      {3,(syscall_function *)write},
+      {2,(syscall_function *)seek},
+      {1,(syscall_function *)tell},
+      {1,(syscall_function *)close},
+      {2,(syscall_function *)mmap},
+      {1,(syscall_function *)munmap},
     };
   unsigned call_nr;
   int args[3];
@@ -154,18 +154,18 @@ char* strcpy_to_kernel(const char* str){
   thread_exit ();
 }
 
-static int sys_halt (void)
+static int halt (void)
 {
   shutdown_power_off ();
 }
 
-static int sys_exit (int status)
+static int exit (int status)
 {
   thread_current ()->exitcode=status;
   thread_exit ();
 }
 
-static int sys_exec(const char *cmd_line)
+static int exec(const char *cmd_line)
 {
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
@@ -176,12 +176,12 @@ static int sys_exec(const char *cmd_line)
   return ret;
 }
 
-static int sys_wait(int pid)
+static int wait(int pid)
 {
   return process_wait(pid);
 }
 
-static int sys_create (const char *file, unsigned initial_size)
+static int create (const char *file, unsigned initial_size)
 {
   char *fn_copy=strcpy_to_kernel(file);
   bool ret;
@@ -192,7 +192,7 @@ static int sys_create (const char *file, unsigned initial_size)
   return ret;
 }
 
-static int sys_remove(const char *file)
+static int remove(const char *file)
 {
   char *fn_copy=strcpy_to_kernel(file);
   bool ok;
@@ -203,8 +203,9 @@ static int sys_remove(const char *file)
   return ok;
 }
 
-static int sys_open (const char *file)
+static int open (const char *file)
 {
+  /*
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* fd;
   int ret = -1;
@@ -224,7 +225,29 @@ static int sys_open (const char *file)
     lock_release (&file_lock);
   }
   palloc_free_page(fn_copy);
-  return ret;
+  return ret;*/
+  char *fn_copy = copy_in_string (file);
+  struct fds *fd;
+  int handle = -1;
+
+  fd = malloc (sizeof *fd);
+  if (fd != NULL)
+    {
+      lock_acquire (&file_lock);
+      fd->file = filesys_open (fn_copy);
+      if (fd->file != NULL)
+        {
+          struct thread *cur = thread_current ();
+          handle = fd->fd = cur->fd_num++;
+          list_push_front (&cur->file_list, &fd->elem);
+        }
+      else
+        free (fd);
+      lock_release (&file_lock);
+    }
+
+  palloc_free_page (fn_copy);
+  return handle;
 }
 
 
@@ -241,7 +264,7 @@ static struct fds* getfile(int fd)
   thread_exit ();
 }
 
-static int sys_filesize(int fd)
+static int filesize(int fd)
 {
   struct fds* f=getfile(fd);
   int ret;
@@ -251,7 +274,7 @@ static int sys_filesize(int fd)
   return ret;
 }
 
-static int sys_read(int fd,void *buffer, unsigned size)
+static int read(int fd,void *buffer, unsigned size)
 {
   uint8_t *udst = buffer;
   struct fds *f=getfile(fd);
@@ -297,7 +320,7 @@ static int sys_read(int fd,void *buffer, unsigned size)
   return bytes_read;
 }
 
-static int sys_write (int fd, void *buffer, unsigned size){
+static int write (int fd, void *buffer, unsigned size){
   uint8_t *usrc=buffer;
   struct fds* f = NULL;
   int bytes_written = 0;
@@ -336,7 +359,7 @@ static int sys_write (int fd, void *buffer, unsigned size){
   return bytes_written;
 }
 
-static int sys_seek (int fd, unsigned position){
+static int seek (int fd, unsigned position){
   struct fds *f=getfile(fd);
   lock_acquire (&file_lock);
   if ((int32_t)position>= 0){
@@ -346,7 +369,7 @@ static int sys_seek (int fd, unsigned position){
   return 0;
 }
 
-static int sys_tell(int fd)
+static int tell(int fd)
 {
   struct fds* f=getfile(fd);
   off_t ret;
@@ -356,7 +379,7 @@ static int sys_tell(int fd)
   return ret;
 }
 
-static int sys_close (int fd)
+static int close (int fd)
 {
   struct fds *f=getfile(fd);
   lock_acquire(&file_lock);
@@ -396,7 +419,7 @@ static void unmap(struct mapping *m)
     page_deallocate((void *)((m->addr)+(PGSIZE * i)));
   }
 }
-static int sys_mmap (int fd, void *addr)
+static int mmap (int fd, void *addr)
 {
   struct fds *f=getfile(fd);
   struct mapping *m = malloc (sizeof(struct mapping));
@@ -439,7 +462,7 @@ static int sys_mmap (int fd, void *addr)
   return m->id;
 }
 
-static int sys_munmap (int mapping)
+static int munmap (int mapping)
 {
   struct mapping *map = getmap(mapping);
   unmap(map);
