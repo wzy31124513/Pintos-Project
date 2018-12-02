@@ -442,7 +442,7 @@ exit2 (void)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
       next = list_next (e);
-      unmap (m->id);
+      munmap (m->id);
     }
 }
 
