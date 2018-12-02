@@ -481,8 +481,6 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   list_init(&t->file_list);
   list_init(&t->mapping);
   t->fd_num=2;
-  sema_init (&t->child_proc->exit,0);
-  sema_init (&t->load,0);
   list_push_back (&all_list, &t->allelem);
 }
 
