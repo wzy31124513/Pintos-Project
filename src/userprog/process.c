@@ -31,10 +31,10 @@ static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  struct exec_table exec;
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
+  struct exec_table exec;
   exec.file_name=file_name;
   sema_init (&exec.load,0);
 
@@ -59,9 +59,8 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *exec_)
+start_process (void *exec_table)
 {
-  struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
   /* Initialize interrupt frame and load executable. */
@@ -69,11 +68,15 @@ start_process (void *exec_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+  struct exec_table *exec = exec_table;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
   if(success){
-    exec->child_proc=thread_current ()->child_proc=malloc(sizeof(struct child_proc));
-    success=exec->child_proc!=NULL; 
+    exec->child_proc=malloc(sizeof(struct child_proc));
+    thread_current()->child_proc=exec->child_proc;
+    if(child_proc==NULL){
+      success=false;
+    }
   }
   if (success) 
   {
@@ -83,7 +86,7 @@ start_process (void *exec_)
     sema_init (&exec->child_proc->exit,0);
   }
   exec->loaded=success;
-  sema_up (&exec->load);
+  sema_up(&exec->load);
   if (!success){
     thread_exit ();
   }
@@ -115,12 +118,12 @@ process_wait (tid_t child_tid)
     struct child_proc* c=list_entry(e,struct child_proc,elem);
     if (c->id == child_tid) 
       {
-        list_remove (e);
-        sema_down (&c->exit);
+        list_remove(e);
+        sema_down(&c->exit);
         int ret = c->ret;
-        lock_acquire (&c->lock);
+        lock_acquire(&c->lock);
         int temp=--c->status;
-        lock_release (&c->lock);
+        lock_release(&c->lock);
         if (temp==0)
         {
           free(c);
@@ -144,9 +147,9 @@ process_exit (void)
     struct child_proc *c = cur->child_proc;
     c->ret = cur->exitcode;
     sema_up (&c->exit);
-    lock_acquire (&c->lock);
+    lock_acquire(&c->lock);
     int temp=--c->status;
-    lock_release (&c->lock);
+    lock_release(&c->lock);
     if (temp==0)
     {
       free(c);
@@ -287,7 +290,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  char name[16];
+  char name=malloc(strlen(file_name)+1);
   char *p;
   int i;
 
@@ -302,20 +305,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   init_page(t->pages);
 
-  while(*file_name==' '){
-    file_name++;
-  }
-  strlcpy (name,file_name,sizeof(name));
+  strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
   /* Open executable file. */
   file=filesys_open(name);
   t->self=file;
+  free(name)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  file_deny_write (file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -397,7 +397,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
+  file_deny_write (file);
  done:
   /* We arrive here whether the load is successful or not. */
   return success;
