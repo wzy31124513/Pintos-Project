@@ -251,7 +251,7 @@ static int sys_filesize(int fd)
   return ret;
 }
 
-static int read(int fd,void *buffer, unsigned size)
+static int sys_read(int fd,void *buffer, unsigned size)
 {
   uint8_t *udst = buffer;
   struct fds *f=getfile(fd);
