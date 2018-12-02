@@ -33,7 +33,7 @@ static bool getarg(uint8_t* kaddr, uint8_t* uaddr, const char* file_name,void** 
 tid_t
 process_execute (const char *file_name) 
 {
-  struct exec_info exec;
+  struct exec_table exec;
   char name[16];
   char *p;
   tid_t tid;
@@ -43,7 +43,7 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name, file_name, sizeof name);
   strtok_r (name, " ", &p);
-  tid = thread_create (thread_name, PRI_DEFAULT, start_process, &exec);
+  tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
   if (tid != TID_ERROR)
     {
       sema_down (&exec.load);
@@ -156,7 +156,13 @@ process_exit (void)
       struct child_proc *cs = cur->child_proc;
       cs->ret = cur->exitcode;
       sema_up (&cs->exit);
-      release_child (cs);
+              lock_acquire(&cs->lock);
+        int temp=cs->status--;
+        lock_release(&cs->lock);
+        if (temp==0)
+        {
+          free(cs);
+        }
     }
 
   /* Free entries of children list. */
@@ -165,7 +171,13 @@ process_exit (void)
     {
       struct child_proc *cs = list_entry (e, struct child_proc, elem);
       next = list_remove (e);
-      release_child (cs);
+              lock_acquire(&cs->lock);
+        int temp=cs->status--;
+        lock_release(&cs->lock);
+        if (temp==0)
+        {
+          free(cs);
+        }
     }
 
   /* Destroy the page hash table. */
