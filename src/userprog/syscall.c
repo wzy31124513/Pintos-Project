@@ -35,14 +35,11 @@ static int sys_munmap (int mapping);
 
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
-
-static struct lock fs_lock;
-
 void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&fs_lock);
+  lock_init (&file_lock);
 }
 
 /* System call handler. */
@@ -180,9 +177,8 @@ sys_halt (void)
 static int
 sys_exit (int exit_code)
 {
-  thread_current ()->exit_code = exit_code;
+  thread_current ()->exitcode = exit_code;
   thread_exit ();
-  NOT_REACHED ();
 }
 
 /* Exec system call. */
@@ -192,9 +188,9 @@ sys_exec (const char *ufile)
   tid_t tid;
   char *kfile = copy_in_string (ufile);
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   tid = process_execute (kfile);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   palloc_free_page (kfile);
 
@@ -215,9 +211,9 @@ sys_create (const char *ufile, unsigned initial_size)
   char *kfile = copy_in_string (ufile);
   bool ok;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   ok = filesys_create (kfile, initial_size);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   palloc_free_page (kfile);
 
@@ -231,9 +227,9 @@ sys_remove (const char *ufile)
   char *kfile = copy_in_string (ufile);
   bool ok;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   ok = filesys_remove (kfile);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   palloc_free_page (kfile);
 
@@ -259,17 +255,17 @@ sys_open (const char *ufile)
   fd = malloc (sizeof *fd);
   if (fd != NULL)
     {
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       fd->file = filesys_open (kfile);
       if (fd->file != NULL)
         {
           struct thread *cur = thread_current ();
-          handle = fd->handle = cur->next_handle++;
-          list_push_front (&cur->fds, &fd->elem);
+          handle = fd->handle = cur->fd_num++;
+          list_push_front (&cur->file_list, &fd->elem);
         }
       else
         free (fd);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
     }
 
   palloc_free_page (kfile);
@@ -285,8 +281,7 @@ lookup_fd (int handle)
   struct thread *cur = thread_current ();
   struct list_elem *e;
 
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds);
-       e = list_next (e))
+  for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list);e = list_next (e))
     {
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
@@ -304,9 +299,9 @@ sys_filesize (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   int size;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   size = file_length (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return size;
 }
@@ -332,9 +327,9 @@ sys_read (int handle, void *udst_, unsigned size)
         {
           if (!page_lock (udst, true))
             thread_exit ();
-          lock_acquire (&fs_lock);
+          lock_acquire (&file_lock);
           retval = file_read (fd->file, udst, read_amt);
-          lock_release (&fs_lock);
+          lock_release (&file_lock);
           page_unlock (udst);
         }
       else
@@ -396,7 +391,7 @@ sys_write (int handle, void *usrc_, unsigned size)
       /* Write from page into file. */
       if (!page_lock (usrc, false))
         thread_exit ();
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       if (handle == STDOUT_FILENO)
         {
           putbuf ((char *) usrc, write_amt);
@@ -404,7 +399,7 @@ sys_write (int handle, void *usrc_, unsigned size)
         }
       else
         retval = file_write (fd->file, usrc, write_amt);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
       page_unlock (usrc);
 
       /* Handle return value. */
@@ -434,10 +429,10 @@ sys_seek (int handle, unsigned position)
 {
   struct file_descriptor *fd = lookup_fd (handle);
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   if ((off_t) position >= 0)
     file_seek (fd->file, position);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return 0;
 }
@@ -449,9 +444,9 @@ sys_tell (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   unsigned position;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   position = file_tell (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return position;
 }
@@ -461,9 +456,9 @@ static int
 sys_close (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   file_close (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   list_remove (&fd->elem);
   free (fd);
   return 0;
@@ -488,8 +483,7 @@ lookup_mapping (int handle)
   struct thread *cur = thread_current ();
   struct list_elem *e;
 
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
-       e = list_next (e))
+  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping); e = list_next (e))
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
       if (m->handle == handle)
@@ -513,9 +507,9 @@ unmap (struct mapping *m)
     /* ...determine whether or not the page is dirty (modified). If so, write that page back out to disk. */
     if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->base) + (PGSIZE * i)))))
     {
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       file_write_at(m->file, (const void *) (m->base + (PGSIZE * i)), (PGSIZE*(m->page_cnt)), (PGSIZE * i));
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
     }
   }
 
@@ -538,10 +532,10 @@ sys_mmap (int handle, void *addr)
   if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
     return -1;
 
-  m->handle = thread_current ()->next_handle++;
-  lock_acquire (&fs_lock);
+  m->handle = thread_current ()->fd_num++;
+  lock_acquire (&file_lock);
   m->file = file_reopen (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   if (m->file == NULL)
     {
       free (m);
@@ -549,26 +543,26 @@ sys_mmap (int handle, void *addr)
     }
   m->base = addr;
   m->page_cnt = 0;
-  list_push_front (&thread_current ()->mappings, &m->elem);
+  list_push_front (&thread_current ()->mapping, &m->elem);
 
   offset = 0;
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   length = file_length (m->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   while (length > 0)
     {
-      struct page *p = page_allocate ((uint8_t *) addr + offset, false);
+      struct page *p = page_alloc((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
           unmap (m);
           return -1;
         }
-      p->private = false;
+      p->mmap = false;
       p->file = m->file;
-      p->file_offset = offset;
-      p->file_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->file_bytes;
-      length -= p->file_bytes;
+      p->offset = offset;
+      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
+      offset += p->rw_bytes;
+      length -= p->rw_bytes;
       m->page_cnt++;
     }
 
@@ -584,25 +578,23 @@ sys_munmap (int mapping)
   unmap(map);
   return 0;
 }
-
-/* On thread exit, close all open files and unmap all mappings. */
-void
-syscall_exit (void)
+
+void exit2 (void)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e, *next;
 
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds); e = next)
+  for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list); e = next)
     {
       struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       file_close (fd->file);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
       free (fd);
     }
 
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
+  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
        e = next)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
