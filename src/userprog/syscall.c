@@ -57,7 +57,7 @@ static int halt(void)
   shutdown_power_off ();
 }
 
-static int exit1(int status)
+void exit1(int status)
 {
   thread_current()->exitcode=status;
   struct thread *cur = thread_current();
@@ -385,7 +385,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_EXIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=exit1(args[0]);
+    exit1(args[0]);
   }else if (func==SYS_EXEC)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
