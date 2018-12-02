@@ -205,7 +205,6 @@ static int remove(const char *file)
 
 static int open (const char *file)
 {
-  /*
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* fd;
   int ret = -1;
@@ -225,29 +224,7 @@ static int open (const char *file)
     lock_release (&file_lock);
   }
   palloc_free_page(fn_copy);
-  return ret;*/
-  char *fn_copy = strcpy_to_kernel (file);
-  struct fds *fd;
-  int handle = -1;
-
-  fd = malloc (sizeof *fd);
-  if (fd != NULL)
-    {
-      lock_acquire (&file_lock);
-      fd->file = filesys_open (fn_copy);
-      if (fd->file != NULL)
-        {
-          struct thread *cur = thread_current ();
-          handle = fd->fd = cur->fd_num++;
-          list_push_front (&cur->file_list, &fd->elem);
-        }
-      else
-        free (fd);
-      lock_release (&file_lock);
-    }
-
-  palloc_free_page (fn_copy);
-  return handle;
+  return ret;
 }
 
 
