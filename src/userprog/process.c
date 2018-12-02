@@ -273,10 +273,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *cmd_line, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
-  char file_name[NAME_MAX + 2];
+  char name[16];
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
@@ -297,15 +297,15 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   hash_init (t->pages, page_hash_func, less, NULL);
 
   /* Extract file_name from command line. */
-  while (*cmd_line == ' ')
-    cmd_line++;
-  strlcpy (file_name, cmd_line, sizeof file_name);
-  cp = strchr (file_name, ' ');
+  while (*file_name == ' ')
+    file_name++;
+  strlcpy (name, cmd_line, sizeof name);
+  cp = strchr (name, ' ');
   if (cp != NULL)
     *cp = '\0';
 
   /* Open executable file. */
-  t->bin_file = file = filesys_open (file_name);
+  t->bin_file = file = filesys_open (name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -386,7 +386,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (cmd_line, esp))
+  if (!setup_stack (esp,file_name))
     goto done;
 
   /* Start address. */
