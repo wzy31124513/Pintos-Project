@@ -289,7 +289,7 @@ void close(int fd)
   lock_release(&file_lock);
   list_remove(&f->elem);
   free(f);
-  return 0;
+  return;
 }
 
 int mmap (int fd, void *addr)
@@ -358,7 +358,7 @@ void munmap (int mapping)
   {
     page_deallocate((void *)(m->addr+PGSIZE * i));
   }
-  return 0;
+  return;
 }
 
 void
@@ -387,7 +387,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_EXEC)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=exec(args[0]);
+    f->eax=exec((const char *)args[0]);
   }else if (func==SYS_WAIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -395,11 +395,11 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_CREATE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=create(args[0],args[1]);
+    f->eax=create((const char *)args[0],(unsigned)args[1]);
   }else if (func==SYS_REMOVE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=remove(args[0]);
+    f->eax=remove((const char*)args[0]);
   }else if (func==SYS_OPEN){
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=open(args[0]);
@@ -411,11 +411,11 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_READ)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=read(args[0],args[1],args[2]);
+    f->eax=read((int)args[0],(void*)args[1],(unsigned)args[2]);
   }else if (func==SYS_WRITE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=write(args[0],args[1],args[2]);
+    f->eax=write((int)args[0],(void*)args[1],(unsigned)args[2]);
   }else if (func==SYS_SEEK)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
@@ -431,7 +431,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=mmap(args[0],args[1]);
+    f->eax=mmap(args[0],(void*)args[1]);
   }else if (func==SYS_MUNMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -503,7 +503,7 @@ static struct fds* getfile(int fd){
         return fds;
       }
   }
-  exit1(-1);
+  return NULL;
 }
 
 static struct mapping* getmap (int fd)
@@ -516,5 +516,5 @@ static struct mapping* getmap (int fd)
       return m;
     }
   }
-  exit1(-1);
+  return NULL;
 }
