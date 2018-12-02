@@ -10,11 +10,11 @@
 
 static struct frame *frames;
 static size_t count;
-static struct lock frame_lock;
+static struct lock scan_lock;
 static size_t mark;
 
 void frame_init(void){
-  lock_init (&frame_lock);
+  lock_init (&scan_lock);
   void *addr;
   frames=malloc(init_ram_pages*sizeof(struct frame));
   while((addr=palloc_get_page(PAL_USER))!=NULL){
@@ -27,7 +27,7 @@ void frame_init(void){
 
 static struct frame* try_frame_alloc (struct page *page){
   size_t i;
-  lock_acquire(&frame_lock);
+  lock_acquire(&scan_lock);
   for (i = 0; i < count; ++i)
     {
       struct frame* f=&frames[i];
@@ -36,7 +36,7 @@ static struct frame* try_frame_alloc (struct page *page){
       }
       if (f->page==NULL){
         f->page = page;
-        lock_release(&frame_lock);
+        lock_release(&scan_lock);
         return f;
       } 
       lock_release (&f->lock);
@@ -53,7 +53,7 @@ static struct frame* try_frame_alloc (struct page *page){
     if (f->page==NULL) 
       {
         f->page=page;
-        lock_release(&frame_lock);
+        lock_release(&scan_lock);
         return f;
       } 
     if(recently_used(f->page)) 
@@ -61,7 +61,7 @@ static struct frame* try_frame_alloc (struct page *page){
       lock_release (&f->lock);
       continue;
     }
-    lock_release (&frame_lock);
+    lock_release (&scan_lock);
     if(!page_evict(f->page)){
       lock_release(&f->lock);
       return NULL;
@@ -69,11 +69,11 @@ static struct frame* try_frame_alloc (struct page *page){
     f->page=page;
     return f;
   }
-  lock_release (&frame_lock);
+  lock_release (&scan_lock);
   return NULL;
 }
 
-struct frame *frame_alloc(struct page*){
+struct frame *frame_alloc(struct page* page){
   size_t i;
   for (i = 0; i < 3; ++i) 
   {
