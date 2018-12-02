@@ -534,22 +534,19 @@ static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void**
       argc++;
     }
   argv =(char **)(upage+ofs);
-  reverse(argc,(char**)(kpage + ofs));
+  char** kargv=(char**)(kpage + ofs);
+  while(argc>1){
+    char *temp=kargv[0];
+    kargv[0]=kargv[argc-1];
+    kargv[argc-1]=temp;
+    argc-=2;
+    kargv++;
+  }
   if(push(kpage, &ofs, &argv, sizeof(argv))==NULL || push(kpage,&ofs,&argc,sizeof(argc))==NULL|| push(kpage,&ofs,&null,sizeof(null))==NULL){
     return false;
   }
   *esp=upage +ofs;
   return true;
-}
-
-static void reverse (int argc, char **argv){
-  while(argc>1){
-    char *temp=argv[0];
-    argv[0]=argv[argc-1];
-    argv[argc-1]=temp;
-    argc-=2;
-    argv++;
-  }
 }
 
 static void *push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size){

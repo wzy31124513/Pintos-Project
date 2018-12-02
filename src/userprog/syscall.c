@@ -423,7 +423,7 @@ static void argcpy(void* cp,const void* addr1,size_t size){
     if(s>size){
       s=size;
     }
-    if(!page_lock (addr, false)){
+    if(!page_lock(addr,false)){
       thread_exit();
     }
     memcpy(dst,addr,s);
