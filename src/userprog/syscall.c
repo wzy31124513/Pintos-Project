@@ -463,7 +463,7 @@ static char * strcpy_to_kernel (const char *str)
         else if (length>=PGSIZE){
           palloc_free_page (cp);
           thread_exit ();
-          return NULL
+          return NULL;
         }
       str++;
     }
