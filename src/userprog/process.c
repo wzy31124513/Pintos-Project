@@ -116,6 +116,7 @@ process_wait (tid_t child_tid)
 {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   struct list_elem*e;
 
   for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children);e=list_next(e)){
@@ -134,6 +135,8 @@ process_wait (tid_t child_tid)
       }
       return ret;
 =======
+=======
+>>>>>>> parent of 07837ee... Update process.c
 =======
 >>>>>>> parent of 07837ee... Update process.c
   struct thread *cur = thread_current ();
@@ -159,6 +162,9 @@ process_wait (tid_t child_tid)
           return exitcode;
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 07837ee... Update process.c
+=======
 >>>>>>> parent of 07837ee... Update process.c
 =======
 >>>>>>> parent of 07837ee... Update process.c
@@ -181,6 +187,7 @@ process_exit (void)
     {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
       struct child_proc* c=cur->child_proc;
       c->ret=cur->exitcode;
       sema_up(&c->exit);
@@ -194,6 +201,8 @@ process_exit (void)
 =======
 =======
 >>>>>>> parent of 07837ee... Update process.c
+=======
+>>>>>>> parent of 07837ee... Update process.c
       struct child_proc *cs = cur->child_proc;
       cs->ret = cur->exitcode;
       sema_up (&cs->exit);
@@ -205,6 +214,9 @@ process_exit (void)
           free(cs);
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 07837ee... Update process.c
+=======
 >>>>>>> parent of 07837ee... Update process.c
 =======
 >>>>>>> parent of 07837ee... Update process.c
@@ -216,8 +228,11 @@ process_exit (void)
     {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
       free(c);
 =======
+=======
+>>>>>>> parent of 07837ee... Update process.c
 =======
 >>>>>>> parent of 07837ee... Update process.c
       struct child_proc *cs = list_entry (e, struct child_proc, elem);
@@ -230,6 +245,9 @@ process_exit (void)
           free(cs);
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 07837ee... Update process.c
+=======
 >>>>>>> parent of 07837ee... Update process.c
 =======
 >>>>>>> parent of 07837ee... Update process.c
