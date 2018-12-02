@@ -32,35 +32,43 @@ struct mapping
   struct list_elem elem;
 };
 
-void halt (void);
-int exec (const char *cmd_line);
-int wait (int pid);
-bool create (const char *file, unsigned initial_size);
-bool remove (const char *file);
-int open (const char *file);
-int filesize (int fd);
-int read (int fd, void *buffer, unsigned size);
-int write (int fd,  void *buffer, unsigned size);
-void seek (int fd, unsigned position);
-unsigned tell (int fd);
-void close (int fd);
-int mmap (int fd, void *addr);
-void munmap (int mapping);
+static int halt (void);
+static int exit1 (int status);
+static int exec (const char *cmd_line);
+static int wait (int pid);
+static int create (const char *file, unsigned initial_size);
+static int remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, void *buffer, unsigned size);
+static int write (int fd,  void *buffer, unsigned size);
+static int seek (int fd, unsigned position);
+static int tell (int fd);
+static int close (int fd);
+static int mmap (int fd, void *addr);
+static int munmap (int mapping);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static struct fds* getfile(int fd);
 static struct mapping* getmap (int fd);
+void exit2 (void);
 
-void halt(void)
+static int halt(void)
 {
   shutdown_power_off ();
 }
 
-void exit1(int status)
+static int exit1(int status)
+{
+  thread_current()->exitcode=status;
+  thread_exit ();
+}
+
+void
+exit2 (void)
 {
   struct thread *cur = thread_current();
-  cur->exitcode=status;
   struct list_elem *e;
   struct list_elem *next;
   for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
@@ -78,10 +86,9 @@ void exit1(int status)
     struct mapping *m=list_entry(e,struct mapping,elem);
     munmap(m->id);
   }
-  thread_exit ();
 }
 
-int exec(const char* cmd_line)
+static int exec(const char* cmd_line)
 {
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
@@ -92,12 +99,12 @@ int exec(const char* cmd_line)
   return ret;
 }
 
-int wait(int pid)
+static int wait(int pid)
 {
   return process_wait(pid);
 }
 
-bool create(const char *file, unsigned initial_size)
+static int create(const char *file, unsigned initial_size)
 {
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
@@ -108,7 +115,7 @@ bool create(const char *file, unsigned initial_size)
   return ret;
 }
 
-bool remove(const char* file)
+static int remove(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
   bool ret;
@@ -119,29 +126,31 @@ bool remove(const char* file)
   return ret;
 }
 
-int open(const char* file)
+static int open(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
-  struct fds* f=malloc(sizeof(struct fds));
+  struct fds* f;
   int fd=-1;
-  lock_acquire(&file_lock);
-  f->file=filesys_open(fn_copy);
-  if(f->file!=NULL)
-    {
-      thread_current()->fd_num++;
-      fd=thread_current()->fd_num;
-      f->fd=fd;
-      list_push_back(&thread_current()->file_list,&f->elem);
-    }
-    else{
-      free(f);
-    }
-    lock_release (&file_lock);
+  f=malloc(sizeof(struct fds));
+  if(f!=NULL)
+  {
+    lock_acquire(&file_lock);
+    f->file=filesys_open(fn_copy);
+      if(f->file!=NULL)
+      {
+        fd=f->fd=thread_current()->fd_num++;
+        list_push_front(&thread_current()->file_list,&f->elem);
+      }
+      else{
+        free(f);
+      }
+      lock_release (&file_lock);
+  }
   palloc_free_page (fn_copy);
   return fd;
 }
 
-int filesize(int fd)
+static int filesize(int fd)
 {
   struct fds* f=getfile(fd);
   int ret;
@@ -151,7 +160,7 @@ int filesize(int fd)
   return ret;
 }
 
-int read (int fd, void *buffer, unsigned size)
+static int read (int fd, void *buffer, unsigned size)
 {
   int read=0;
   struct fds* f=getfile(fd);
@@ -170,7 +179,7 @@ int read (int fd, void *buffer, unsigned size)
     {
       if (!page_lock(b,true))
       {
-        exit1(-1);
+        thread_exit();
       }
       lock_acquire(&file_lock);
       ret=file_read(f->file,b,read_size);
@@ -182,7 +191,7 @@ int read (int fd, void *buffer, unsigned size)
         char c=input_getc();
         if (!page_lock(b,true))
         {
-          exit1(-1);
+          thread_exit();
         }
         b[i]=c;
         page_unlock(b);
@@ -208,7 +217,7 @@ int read (int fd, void *buffer, unsigned size)
   return read;
 }
 
-int write (int fd,  void *buffer, unsigned size){
+static int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
   struct fds* f;
   int write=0;
@@ -228,7 +237,7 @@ int write (int fd,  void *buffer, unsigned size){
     }
     if (!page_lock(b,false))
     {
-      exit1(-1);   
+      thread_exit();   
     }
     lock_acquire(&file_lock);
     if (fd==1)
@@ -259,14 +268,15 @@ int write (int fd,  void *buffer, unsigned size){
   return write;
 }
 
-void seek (int fd, unsigned position){
+static int seek (int fd, unsigned position){
   lock_acquire (&file_lock); 
   struct fds* fds=getfile(fd);
   file_seek(fds->file,position);
   lock_release (&file_lock);
+  return 0;
 }
 
-unsigned tell (int fd)
+static int tell (int fd)
 {
   lock_acquire(&file_lock);
   struct fds* fds=getfile(fd);
@@ -281,7 +291,7 @@ unsigned tell (int fd)
   return ret;
 }
 
-void close(int fd)
+static int close(int fd)
 {
   struct fds* f=getfile(fd);
   lock_acquire(&file_lock);
@@ -289,20 +299,19 @@ void close(int fd)
   lock_release(&file_lock);
   list_remove(&f->elem);
   free(f);
-  return;
+  return 0;
 }
 
-int mmap (int fd, void *addr)
+static int mmap (int fd, void *addr)
 {
   struct fds* f=getfile(fd);
   struct mapping* m=malloc(sizeof(struct mapping));
   size_t offset;
-  uint32_t read_bytes;
-  if (m==NULL || addr==NULL || (uint32_t)addr%PGSIZE!=0){
+  off_t length;
+  if (m==NULL || addr==NULL || pg_ofs(addr)!=0){
     return -1;
   }
-  thread_current()->fd_num++;
-  m->id=thread_current()->fd_num;
+  m->id=thread_current()->fd_num++;
   lock_acquire(&file_lock);
   m->file=file_reopen(f->file);
   lock_release(&file_lock);
@@ -317,9 +326,9 @@ int mmap (int fd, void *addr)
 
   offset=0;
   lock_acquire(&file_lock);
-  read_bytes=file_length(m->file);
+  length=file_length(m->file);
   lock_release(&file_lock);
-  while(read_bytes>0){
+  while(length>0){
     struct page* p=page_alloc((uint8_t*)addr+offset,false);
     if(p==NULL){
       munmap(m->id);
@@ -328,20 +337,20 @@ int mmap (int fd, void *addr)
     p->mmap=false;
     p->file=m->file;
     p->offset=offset;
-    if (read_bytes>=PGSIZE)
+    if (length>=PGSIZE)
     {
       p->rw_bytes=PGSIZE;
     }else{
-      p->rw_bytes=read_bytes;
+      p->rw_bytes=length;
     }
     offset+=p->rw_bytes;
-    read_bytes-=p->rw_bytes;
+    length-=p->rw_bytes;
     m->num++;
   }
   return m->id;
 }
 
-void munmap (int mapping)
+static int munmap (int mapping)
 {
   struct mapping *m = getmap(mapping);
   list_remove(&m->elem);
@@ -358,85 +367,52 @@ void munmap (int mapping)
   {
     page_deallocate((void *)(m->addr+PGSIZE * i));
   }
-  return;
+  return 0;
 }
 
 void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&file_lock);
 }
 
 static void
 syscall_handler (struct intr_frame *f)
 {
+  typedef int syscall_function (int,int,int);
+  struct syscall
+    {
+      size_t arg_num;
+      syscall_function *func;
+    };
+  static const struct syscall syscall_table[]={
+      {0,(syscall_function *)halt},
+      {1,(syscall_function *)exit1},
+      {1,(syscall_function *)exec},
+      {1,(syscall_function *)wait},
+      {2,(syscall_function *)create},
+      {1,(syscall_function *)remove},
+      {1,(syscall_function *)open},
+      {1,(syscall_function *)filesize},
+      {3,(syscall_function *)read},
+      {3,(syscall_function *)write},
+      {2,(syscall_function *)seek},
+      {1,(syscall_function *)tell},
+      {1,(syscall_function *)close},
+      {2,(syscall_function *)mmap},
+      {1,(syscall_function *)munmap},};
+  const struct syscall *sc;
   unsigned func;
   int args[3];
   argcpy(&func,f->esp,sizeof(func));
-  if(func>=15){
-    exit1(-1);
+  if(func>=sizeof(syscall_table)/sizeof(*syscall_table)){
+    thread_exit();
   }
+  sc=syscall_table+func;
   memset(args,0,sizeof(args));
-  if (func==SYS_HALT)
-  {
-    halt();
-  }else if (func==SYS_EXIT)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    exit1(args[0]);
-  }else if (func==SYS_EXEC)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=exec((const char *)args[0]);
-  }else if (func==SYS_WAIT)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=wait(args[0]);
-  }else if (func==SYS_CREATE)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=create((const char *)args[0],(unsigned)args[1]);
-  }else if (func==SYS_REMOVE)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=remove((const char*)args[0]);
-  }else if (func==SYS_OPEN){
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=open((const char*)args[0]);
-  }
-  else if (func==SYS_FILESIZE)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=filesize(args[0]);
-  }else if (func==SYS_READ)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=read((int)args[0],(void*)args[1],(unsigned)args[2]);
-  }else if (func==SYS_WRITE)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=write((int)args[0],(void*)args[1],(unsigned)args[2]);
-  }else if (func==SYS_SEEK)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    seek(args[0],args[1]);
-  }else if (func==SYS_TELL)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=tell(args[0]);
-  }else if (func==SYS_CLOSE)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    close(args[0]);
-  }else if (func==SYS_MMAP)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=mmap(args[0],(void*)args[1]);
-  }else if (func==SYS_MUNMAP)
-  {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    munmap(args[0]);
-  }
+  argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
+  f->eax=sc->func(args[0],args[1],args[2]);
 }
 
 static void argcpy(void* cp,const void* addr1,size_t size){
@@ -447,8 +423,8 @@ static void argcpy(void* cp,const void* addr1,size_t size){
     if(s>size){
       s=size;
     }
-    if(!page_lock(addr,false)){
-      exit1(-1);
+    if(!page_lock (addr, false)){
+      thread_exit();
     }
     memcpy(dst,addr,s);
     page_unlock(addr);
@@ -465,14 +441,14 @@ static char * strcpy_to_kernel (const char *str)
   size_t length;
   cp=palloc_get_page(0);
   if(cp==NULL){
-    exit1(-1);
+    thread_exit ();
   }
   length=0;
   while(1){
     addr=pg_round_down (str);
     if(!page_lock(addr,false)){
       palloc_free_page (cp);
-      exit1(-1);
+      thread_exit ();
       return NULL;
     }
     while(str<addr+PGSIZE){
@@ -503,7 +479,7 @@ static struct fds* getfile(int fd){
         return fds;
       }
   }
-  return NULL;
+  thread_exit ();
 }
 
 static struct mapping* getmap (int fd)
@@ -516,5 +492,5 @@ static struct mapping* getmap (int fd)
       return m;
     }
   }
-  return NULL;
+  thread_exit ();
 }
