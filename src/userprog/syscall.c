@@ -33,7 +33,6 @@ struct mapping
 };
 
 static int halt (void);
-static int exit1 (int status);
 static int exec (const char *cmd_line);
 static int wait (int pid);
 static int create (const char *file, unsigned initial_size);
@@ -59,7 +58,7 @@ static int halt(void)
   shutdown_power_off ();
 }
 
-static int exit1(int status)
+void exit1(int status);
 {
   thread_current()->exitcode=status;
   thread_exit ();
