@@ -299,14 +299,14 @@ static int mmap(int fd, void *addr)
   m->addr=addr;
   m->num=0;
   list_push_front(&thread_current()->mapping,&m->elem);
-  int length=file_length(m->file);
+  int32_t length=file_length(m->file);
   lock_release(&file_lock);
-  int offset=0;
+  size_t offset=0;
   while(length>0){
-    struct page* p=page_alloc(addr+offset,false);
+    struct page* p=page_alloc((uint8_t*)addr+offset,false);
     if (p==NULL)
     {
-      munmap(m->id);
+      unmap(m);
       return -1;
     }
     p->mmap=false;
