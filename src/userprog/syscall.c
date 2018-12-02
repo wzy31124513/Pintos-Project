@@ -41,7 +41,7 @@ static int remove (const char *file);
 static int open (const char *file);
 static int filesize (int fd);
 static int read (int fd, void *buffer, unsigned size);
-static int write (int fd,  void *buffer, unsigned size);
+static int write (int fd, const void *buffer, unsigned size);
 static int seek (int fd, unsigned position);
 static int tell (int fd);
 static int close (int fd);
