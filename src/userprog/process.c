@@ -169,7 +169,12 @@ process_exit (void)
       free(c);
     }
   }
-  page_exit ();
+  
+  struct hash* h=thread_current()->pages;
+  if (h!=NULL)
+  {
+    hash_destroy(h,page_destructor);
+  }
   file_close (thread_current()->self);
 
   /* Destroy the current process's page directory and switch back
