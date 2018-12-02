@@ -335,7 +335,7 @@ static int mmap (int handle, void *addr)
   if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
     return -1;
 
-  m->handle = thread_current ()->fd_num++;
+  m->id = thread_current ()->fd_num++;
   lock_acquire (&file_lock);
   m->file = file_reopen (fd->file);
   lock_release (&file_lock);
@@ -366,7 +366,7 @@ static int mmap (int handle, void *addr)
       p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
       offset += p->rw_bytes;
       length -= p->rw_bytes;
-      m->page_cnt++;
+      m->num++;
     }
 
   return m->id;
