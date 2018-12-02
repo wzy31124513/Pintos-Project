@@ -40,8 +40,8 @@ static int create (const char *file, unsigned initial_size);
 static int remove (const char *file);
 static int open (const char *file);
 static int filesize (int fd);
-static int read (int fd, char *buffer, unsigned size);
-static int write (int fd, const void *buffer, unsigned size);
+static int read (int fd, void *buffer, unsigned size)
+static int write (int fd,  void *buffer, unsigned size);
 static int seek (int fd, unsigned position);
 static int tell (int fd);
 static int close (int fd);
@@ -136,8 +136,8 @@ char* strcpy_to_kernel(const char* str){
       if (!page_lock(addr,false))
         goto lock_error;
       for (; str<addr+PGSIZE;str++){
-        cp[length++] = *us;
-        if(*us=='\0')
+        cp[length++] = *str;
+        if(*str=='\0')
         {
           page_unlock (addr);
           return cp;
@@ -172,7 +172,7 @@ static int exec(const char *cmd_line)
   lock_acquire (&file_lock);
   ret = process_execute (fn_copy);
   lock_release (&file_lock);
-  palloc_free_page (kfile);
+  palloc_free_page (fn_copy);
   return ret;
 }
 
@@ -189,7 +189,7 @@ static int create (const char *file, unsigned initial_size)
   ret = filesys_create (fn_copy, initial_size);
   lock_release (&file_lock);
   palloc_free_page (fn_copy);
-  return ok;
+  return ret;
 }
 
 static int remove(const char *file)
@@ -346,7 +346,7 @@ static int seek (int fd, unsigned position){
   return 0;
 }
 
-static int sys_tell(int fd)
+static int tell(int fd)
 {
   struct fds* f=getfile(fd);
   off_t ret;
@@ -356,11 +356,11 @@ static int sys_tell(int fd)
   return ret;
 }
 
-static int sys_close (int fd)
+static int close (int fd)
 {
   struct fds *f=getfile(fd);
   lock_acquire(&file_lock);
-  file_close(fd->file);
+  file_close(f->file);
   lock_release(&file_lock);
   list_remove(&f->elem);
   free(f);
