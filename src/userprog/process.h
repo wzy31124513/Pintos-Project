@@ -12,5 +12,5 @@ struct exec_table{
 	struct semaphore load;
 	struct child_proc* child_proc;
 	bool loaded;
-}
+};
 #endif /* userprog/process.h */
