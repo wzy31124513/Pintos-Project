@@ -415,7 +415,7 @@ static int mmap (int handle, void *addr)
       p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
       offset += p->rw_bytes;
       length -= p->rw_bytes;
-      m->page_cnt++;
+      m->num++;
     }
 
   return m->id;
