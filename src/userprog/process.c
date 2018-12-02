@@ -274,7 +274,7 @@ struct Elf32_Phdr
 #define PF_X 1          /* Executable. */
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
-static bool setup_stack (const char *file_name, void **esp);
+static bool setup_stack (void **esp,const char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -545,7 +545,7 @@ static bool getarg(uint8_t* kaddr, uint8_t* uaddr, const char* file_name,void** 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (const char *file_name, void **esp) 
+setup_stack (void **esp,const char* file_name)
 {
   struct page* page=page_alloc(((uint8_t *)PHYS_BASE)-PGSIZE,false);
   if (page != NULL) 

@@ -15,6 +15,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 struct fds
 {
@@ -31,7 +32,7 @@ struct mapping
   struct list_elem elem;
 };
 static int halt (void);
-static int exit (int status);
+static int exit1 (int status);
 static int exec (const char *cmd_line);
 static int wait (int pid);
 static int create (const char *file, unsigned initial_size);
@@ -68,7 +69,7 @@ syscall_handler (struct intr_frame *f)
     };
   static const struct syscall syscall_table[]={
       {0,(syscall_function *)halt},
-      {1,(syscall_function *)exit},
+      {1,(syscall_function *)exit1},
       {1,(syscall_function *)exec},
       {1,(syscall_function *)wait},
       {2,(syscall_function *)create},
@@ -99,7 +100,7 @@ static int halt(void)
   shutdown_power_off ();
 }
 
-static int exit(int status)
+static int exit1(int status)
 {
   thread_current()->exitcode=status;
   thread_exit ();
@@ -112,8 +113,8 @@ static int exec(const char* cmd_line)
   lock_acquire(&file_lock);
   ret=process_execute(fn_copy);
   lock_release(&file_lock);
-  palloc_free_page (kfile);
-  return tid;
+  palloc_free_page (fn_copy);
+  return ret;
 }
 
 static int wait(int pid)
@@ -139,7 +140,7 @@ static int remove(const char* file)
   lock_acquire(&file_lock);
   ret=filesys_remove(fn_copy);
   lock_release(&file_lock);
-  palloc_free_page (kfile);
+  palloc_free_page (fn_copy);
   return ret;
 }
 
@@ -155,15 +156,15 @@ static int open(const char* file)
     f->file=filesys_open(fn_copy);
       if(f->file!=NULL)
       {
-        fd=f->fd=thread_current()->fd++;
-        list_push_front(&thread_current->file_list,&f->elem);
+        fd=f->fd=thread_current()->fd_num++;
+        list_push_front(&thread_current()->file_list,&f->elem);
       }
       else{
         free(f);
       }
       lock_release (&file_lock);
   }
-  palloc_free_page (kfile);
+  palloc_free_page (fn_copy);
   return fd;
 }
 
@@ -174,7 +175,7 @@ static int filesize(int fd)
   lock_acquire (&file_lock);
   ret=file_length(f->file);
   lock_release (&file_lock);
-  return size;
+  return ret;
 }
 
 static int read (int fd, char *buffer, unsigned size)
@@ -199,7 +200,7 @@ static int read (int fd, char *buffer, unsigned size)
         exit(-1);
       }
       lock_acquire(&file_lock);
-      ret=file_read(f->f,b,read_size);
+      ret=file_read(f->file,b,read_size);
       lock_release(&file_lock);
       page_unlock(b);
     }else{
@@ -263,7 +264,7 @@ static int write (int fd, const void *buffer, unsigned size){
       putbuf((char*)b,write_size);
       ret=write_size;
     }else{
-      ret=file_write(f->f,b,write_size);
+      ret=file_write(f->file,b,write_size);
     }
     lock_release(&file_lock);
     page_unlock(b);
@@ -289,7 +290,7 @@ static int write (int fd, const void *buffer, unsigned size){
 static int seek (int fd, unsigned position){
   lock_acquire (&file_lock); 
   struct fds* fds=getfile(fd);
-  file_seek(fds->f,position);
+  file_seek(fds->file,position);
   lock_release (&file_lock);
   return 0;
 }
@@ -302,7 +303,7 @@ static int tell (int fd)
   unsigned ret;
   if (fds!=NULL)
   {
-    ret = file_tell(fds->f);
+    ret = file_tell(fds->file);
   }else{
     ret = 1;
   }
@@ -314,73 +315,64 @@ static int close(int fd)
 {
   struct fds* f=getfile(fd);
   lock_acquire(&file_lock);
-  file_close(f->f);
+  file_close(f->file);
   lock_release(&file_lock);
   list_remove(&f->elem);
-  free(fd);
+  free(f);
   return 0;
 }
 
-static void
-copy_in (void *dst_, const void *usrc_, size_t size)
+static void argcpy(void* cp,const void* addr1,size_t size){
 {
-  uint8_t *dst = dst_;
-  const uint8_t *usrc = usrc_;
-
-  while (size > 0)
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (usrc);
-      if (chunk_size > size)
-        chunk_size = size;
-
-      if (!page_lock (usrc, false))
-        thread_exit ();
-      memcpy (dst, usrc, chunk_size);
-      page_unlock (usrc);
-
-      dst += chunk_size;
-      usrc += chunk_size;
-      size -= chunk_size;
+  uint8_t *dst=cp;
+  const uint8_t *addr=addr1;
+  while(size>0){
+    size_t chunk_size=PGSIZE-pg_ofs(usrc);
+    if(chunk_size>size){
+      chunk_size = size;
     }
+    if(!page_lock (addr, false)){
+      thread_exit();
+    }
+    memcpy(dst,addr,chunk_size);
+    page_unlock(addr);
+    dst+=chunk_size;
+    addr+=chunk_size;
+    size-=chunk_size;
+  }
 }
 
-static char *
-copy_in_string (const char *us)
-{
-  char *ks;
-  char *upage;
+char* strcpy_to_kernel(const char* str){
+  char* cp;
+  char* addr;
   size_t length;
-
-  ks = palloc_get_page (0);
-  if (ks == NULL)
+  cp=palloc_get_page(0);
+  if(cp==NULL){
     thread_exit ();
-
+  }
   length = 0;
-  for (;;)
-    {
-      upage = pg_round_down (us);
-      if (!page_lock (upage, false))
+  while(1){
+    addr=pg_round_down (str);
+    if(!page_lock(addr,false))
         goto lock_error;
-
-      for (; us < upage + PGSIZE; us++)
-        {
-          ks[length++] = *us;
-          if (*us == '\0')
-            {
-              page_unlock (upage);
-              return ks;
-            }
-          else if (length >= PGSIZE)
+    for (; str<addr+PGSIZE;us++)
+      {
+        cp[length++]=*str;
+        if (*str=='\0')
+          {
+            page_unlock(addr);
+            return cp;
+          }
+          else if (length>=PGSIZE)
             goto too_long_error;
         }
-
-      page_unlock (upage);
-    }
+    page_unlock (addr);
+  }
 
  too_long_error:
-  page_unlock (upage);
+  page_unlock (addr);
  lock_error:
-  palloc_free_page (ks);
+  palloc_free_page (cp);
   thread_exit ();
 }
 
@@ -391,9 +383,9 @@ static struct fds* getfile(int fd)
   struct fds* fds;
   for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
   {
-    fds=list_entry(e,struct fd,elem);
+    fds=list_entry(e,struct fds,elem);
       if(fds->fd == fd){
-        return fd;
+        return fds;
       }
   }
   thread_exit ();
@@ -426,15 +418,15 @@ static void unmap(struct mapping* m)
   }
   for (int i = 0; i < m->num; ++i)
   {
-    struct page* p=find_page(m->addr+PGSIZE * i);
-    if (p->f!=NULL)
+    struct page* p=findpage(m->addr+PGSIZE * i);
+    if (p->frame!=NULL)
     {
       lock_acquire(&p->f->lock);
       if (p->file && !p->mmap)
       {
         page_evict(p);
       }
-      free_frame(p->f);
+      frame_free(p->frame);
     }
     hash_delete(thread_current()->pages,&p->elem);
     free(p);
@@ -452,7 +444,7 @@ static int mmap(int fd, void *addr)
 
   m->id=thread_current()->fd_num++;
   lock_acquire(&file_lock);
-  m->file=file_reopen(f->f);
+  m->file=file_reopen(f->file);
   if (m->file==NULL)
   {
     free(m);
@@ -495,23 +487,20 @@ static int munmap (int mapping)
   return 0;
 }
 
-void exit1 (void)
+void exit2 (void)
 {
   struct list_elem *e;
-  for (e=list_begin(&thread_current()->fds);e!=list_end(&thread_current()->fds);e=list_next(e))
+  for (e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
     {
-      struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
-      next = list_next (e);
+      struct fds* fd=list_entry(e,struct fds,elem);
       lock_acquire (&file_lock);
-      file_close (fd->file);
-      lock_release (&file_lock);
-      free (fd);
+      file_close(fd->file);
+      lock_release(&file_lock);
+      free(fd);
     }
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
-       e = next)
+  for(e=list_begin(&thread_current()->mappings);e!=list_end(&thread_current()->mapping);e=list_next(e))
     {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      next = list_next (e);
-      unmap (m);
+      struct mapping* m=list_entry(e,struct mapping,elem);
+      unmap(m);
     }
 }
