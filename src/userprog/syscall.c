@@ -16,14 +16,13 @@
 #include "threads/vaddr.h"
 #include "vm/page.h"
 #include "vm/frame.h"
-
-
 struct fds
 {
     struct file *file;
     int fd;
     struct list_elem elem;
 };
+
 struct mapping
 {
   int id;
@@ -103,64 +102,6 @@ static int remove(const char* file)
   return ret;
 }
 
-void
-syscall_init (void)
-{
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&file_lock);
-}
-
-static void
-syscall_handler (struct intr_frame *f)
-{
-  typedef int syscall_function (int, int, int);
-
-  struct syscall
-    {
-      size_t arg_cnt;           /* Number of arguments. */
-      syscall_function *func;   /* Implementation. */
-    };
-
-  /* Table of system calls. */
-  static const struct syscall syscall_table[] =
-    {
-      {0, (syscall_function *)halt},
-      {1, (syscall_function *)exit1},
-      {1, (syscall_function *)exec},
-      {1, (syscall_function *)wait},
-      {2, (syscall_function *)create},
-      {1, (syscall_function *)remove},
-      {1, (syscall_function *)open},
-      {1, (syscall_function *)filesize},
-      {3, (syscall_function *)read},
-      {3, (syscall_function *)write},
-      {2, (syscall_function *)seek},
-      {1, (syscall_function *)tell},
-      {1, (syscall_function *)close},
-      {2, (syscall_function *)mmap},
-      {1, (syscall_function *)munmap},
-    };
-
-  const struct syscall *sc;
-  unsigned call_nr;
-  int args[3];
-
-  /* Get the system call. */
-  copy_in (&call_nr, f->esp, sizeof call_nr);
-  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
-    thread_exit ();
-  sc = syscall_table + call_nr;
-
-  /* Get the system call arguments. */
-  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
-  memset (args, 0, sizeof args);
-  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
-
-  /* Execute the system call,
-     and set the return value. */
-  f->eax = sc->func (args[0], args[1], args[2]);
-}
-
 static int open(const char* file)
 {
   char* fn_copy=copy_in_string(file);
@@ -185,8 +126,6 @@ static int open(const char* file)
   return fd;
 }
 
-
-
 static int filesize(int fd)
 {
   struct fds* f=getfile(fd);
@@ -196,7 +135,6 @@ static int filesize(int fd)
   lock_release (&file_lock);
   return ret;
 }
-
 
 static int read (int fd, void *buffer, unsigned size)
 {
@@ -254,7 +192,6 @@ static int read (int fd, void *buffer, unsigned size)
   }
   return read;
 }
-
 
 static int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
@@ -315,7 +252,6 @@ static int seek (int fd, unsigned position){
   return 0;
 }
 
-
 static int tell (int fd)
 {
   lock_acquire(&file_lock);
@@ -341,18 +277,62 @@ static int close(int fd)
   free(f);
   return 0;
 }
+void
+syscall_init (void)
+{
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&file_lock);
+}
 
-static struct fds* getfile(int fd){
-  struct list_elem *e;
-  struct fds* fds;
-  for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
-  {
-    fds=list_entry(e,struct fds,elem);
-      if(fds->fd == fd){
-        return fds;
-      }
-  }
-  thread_exit ();
+static void
+syscall_handler (struct intr_frame *f)
+{
+  typedef int syscall_function (int, int, int);
+
+  struct syscall
+    {
+      size_t arg_cnt;           /* Number of arguments. */
+      syscall_function *func;   /* Implementation. */
+    };
+
+  /* Table of system calls. */
+  static const struct syscall syscall_table[] =
+    {
+      {0, (syscall_function *)halt},
+      {1, (syscall_function *)exit1},
+      {1, (syscall_function *)exec},
+      {1, (syscall_function *)wait},
+      {2, (syscall_function *)create},
+      {1, (syscall_function *)remove},
+      {1, (syscall_function *)open},
+      {1, (syscall_function *)filesize},
+      {3, (syscall_function *)read},
+      {3, (syscall_function *)write},
+      {2, (syscall_function *)seek},
+      {1, (syscall_function *)tell},
+      {1, (syscall_function *)close},
+      {2, (syscall_function *)mmap},
+      {1, (syscall_function *)munmap},
+    };
+
+  const struct syscall *sc;
+  unsigned call_nr;
+  int args[3];
+
+  /* Get the system call. */
+  copy_in (&call_nr, f->esp, sizeof call_nr);
+  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
+    thread_exit ();
+  sc = syscall_table + call_nr;
+
+  /* Get the system call arguments. */
+  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
+  memset (args, 0, sizeof args);
+  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
+
+  /* Execute the system call,
+     and set the return value. */
+  f->eax = sc->func (args[0], args[1], args[2]);
 }
 
 static struct mapping *
@@ -502,7 +482,6 @@ copy_in (void *dst_, const void *usrc_, size_t size)
     }
 }
 
-
 static char * copy_in_string (const char *us)
 {
   char *ks;
@@ -539,5 +518,19 @@ static char * copy_in_string (const char *us)
   page_unlock (upage);
  lock_error:
   palloc_free_page (ks);
+  thread_exit ();
+}
+
+
+static struct fds* getfile(int fd){
+  struct list_elem *e;
+  struct fds* fds;
+  for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
+  {
+    fds=list_entry(e,struct fds,elem);
+      if(fds->fd == fd){
+        return fds;
+      }
+  }
   thread_exit ();
 }
