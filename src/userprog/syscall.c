@@ -33,7 +33,6 @@ struct mapping
 };
 
 static int halt (void);
-static int exit1 (int status);
 static int exec (const char *cmd_line);
 static int wait (int pid);
 static int create (const char *file, unsigned initial_size);
@@ -61,11 +60,6 @@ static int halt(void)
 static int exit1(int status)
 {
   thread_current()->exitcode=status;
-  thread_exit ();
-}
-
-void exit2 (void)
-{
   struct thread *cur = thread_current();
   struct list_elem *e;
   struct list_elem *next;
@@ -84,6 +78,7 @@ void exit2 (void)
     struct mapping *m=list_entry(e,struct mapping,elem);
     munmap(m->id);
   }
+  thread_exit ();
 }
 
 static int exec(const char* cmd_line)
@@ -177,7 +172,7 @@ static int read (int fd, void *buffer, unsigned size)
     {
       if (!page_lock(b,true))
       {
-        thread_exit();
+        exit1(-1);
       }
       lock_acquire(&file_lock);
       ret=file_read(f->file,b,read_size);
@@ -189,7 +184,7 @@ static int read (int fd, void *buffer, unsigned size)
         char c=input_getc();
         if (!page_lock(b,true))
         {
-          thread_exit();
+          exit1(-1);
         }
         b[i]=c;
         page_unlock(b);
@@ -235,7 +230,7 @@ static int write (int fd,  void *buffer, unsigned size){
     }
     if (!page_lock(b,false))
     {
-      thread_exit();   
+      exit1(-1);   
     }
     lock_acquire(&file_lock);
     if (fd==1)
@@ -381,7 +376,7 @@ syscall_handler (struct intr_frame *f)
   int args[3];
   argcpy(&func,f->esp,sizeof(func));
   if(func>=15){
-    thread_exit();
+    exit1(-1);
   }
   memset(args,0,sizeof(args));
   if (func==SYS_HALT)
@@ -455,7 +450,7 @@ static void argcpy(void* cp,const void* addr1,size_t size){
       s=size;
     }
     if(!page_lock(addr,false)){
-      thread_exit();
+      exit1(-1);
     }
     memcpy(dst,addr,s);
     page_unlock(addr);
@@ -472,14 +467,14 @@ static char * strcpy_to_kernel (const char *str)
   size_t length;
   cp=palloc_get_page(0);
   if(cp==NULL){
-    thread_exit ();
+    exit1(-1);
   }
   length=0;
   while(1){
     addr=pg_round_down (str);
     if(!page_lock(addr,false)){
       palloc_free_page (cp);
-      thread_exit ();
+      exit1(-1);
       return NULL;
     }
     while(str<addr+PGSIZE){
@@ -510,7 +505,7 @@ static struct fds* getfile(int fd){
         return fds;
       }
   }
-  thread_exit ();
+  exit1(-1);
 }
 
 static struct mapping* getmap (int fd)
@@ -523,5 +518,5 @@ static struct mapping* getmap (int fd)
       return m;
     }
   }
-  thread_exit ();
+  exit1(-1);
 }

@@ -3,5 +3,5 @@
 
 void syscall_init (void);
 void syscall_exit (void);
-void exit2 (void);
+static int exit1(int status);
 #endif /* userprog/syscall.h */

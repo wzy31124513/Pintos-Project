@@ -153,7 +153,7 @@ page_fault (struct intr_frame *f)
   {
     if (!load_fault(fault_addr))
     {
-      thread_exit();
+      exit1(-1);
     }
     return;
   }
