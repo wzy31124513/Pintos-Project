@@ -402,7 +402,7 @@ syscall_handler (struct intr_frame *f)
     f->eax=remove((const char*)args[0]);
   }else if (func==SYS_OPEN){
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=open(args[0]);
+    f->eax=open((const char*)args[0]);
   }
   else if (func==SYS_FILESIZE)
   {
