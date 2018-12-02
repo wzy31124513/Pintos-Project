@@ -50,6 +50,7 @@ char* strcpy_to_kernel(const char* str);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static struct fds* getfile(int fd);
+void exit2 (void);
 
 void
 syscall_init (void)
@@ -415,10 +416,10 @@ static void unmap(struct mapping* m)
   }
   for (int i = 0; i < m->num; ++i)
   {
-    struct page* p=findpage(m->addr+PGSIZE * i);
+    struct page* p=find_page(m->addr+PGSIZE * i);
     if (p->frame!=NULL)
     {
-      lock_acquire(&p->f->lock);
+      lock_acquire(&p->frame->lock);
       if (p->file && !p->mmap)
       {
         page_evict(p);
@@ -495,7 +496,7 @@ void exit2 (void)
       lock_release(&file_lock);
       free(fd);
     }
-  for(e=list_begin(&thread_current()->mappings);e!=list_end(&thread_current()->mapping);e=list_next(e))
+  for(e=list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=list_next(e))
     {
       struct mapping* m=list_entry(e,struct mapping,elem);
       unmap(m);
