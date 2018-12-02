@@ -364,8 +364,8 @@ static int mmap (int handle, void *addr)
       p->file = m->file;
       p->offset = offset;
       p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->file_bytes;
-      length -= p->file_bytes;
+      offset += p->rw_bytes;
+      length -= p->rw_bytes;
       m->page_cnt++;
     }
 
