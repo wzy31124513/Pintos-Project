@@ -295,12 +295,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   init_page(t->pages);
 
-  while (*file_name == ' ')
+  while(*file_name==' '){
     file_name++;
-  strlcpy (name, file_name, sizeof name);
-  p = strchr (name, ' ');
-  if (p != NULL)
-    *p = '\0';
+  }
+  strlcpy (name,file_name,sizeof(name));
+  strtok_r (name," ",&p);
   /* Open executable file. */
   file=filesys_open(name);
   t->self=file;
