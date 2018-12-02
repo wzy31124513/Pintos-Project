@@ -113,8 +113,8 @@ process_wait(tid_t child_tid)
   struct list_elem*e;
 
   for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children);e=list_next(e)){
-    struct child_proc*cs = list_entry(e,struct child_proc,elem);
-    if(cs->id == child_tid){
+    struct child_proc*c = list_entry(e,struct child_proc,elem);
+    if(c->id == child_tid){
       int ret=c->ret;
       list_remove(e);
       sema_down(&c->exit);
@@ -152,7 +152,7 @@ process_exit(void)
       lock_release(&c->lock);
       if(temp==0)
       {
-        free(cs);
+        free(c);
       }
     }
   for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->children);e=list_next(e)){
