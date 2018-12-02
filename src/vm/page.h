@@ -22,7 +22,6 @@ struct page
 };
 
 void init_page(struct hash* h);
-void page_destructor(struct hash_elem* e,void* aux UNUSED);
 struct page* page_alloc(void* addr, bool writable);
 bool load_fault(void* addr);
 bool load_page(struct page* p);
@@ -33,4 +32,6 @@ void page_exit (void);
 void page_deallocate (void *vaddr);
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool less (const struct hash_elem *a,const struct hash_elem *b,void *aux UNUSED);
+void page_destructor(struct hash_elem* e,void* aux UNUSED);
+
 #endif
