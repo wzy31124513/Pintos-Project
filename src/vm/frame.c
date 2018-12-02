@@ -96,6 +96,9 @@ void frame_lock(struct page* p){
     } 
   }
 }
+void frame_unlock(struct frame* f){
+  lock_release(&f->lock);
+}
 
 void frame_free(struct frame* f)
 {          

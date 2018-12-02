@@ -178,6 +178,13 @@ void page_unlock(const void *addr){
   frame_unlock (p->frame);
 }
 
+void page_exit (void){
+  struct hash* h=thread_current()->pages;
+  if (h!=NULL)
+  {
+    hash_destroy(h,page_destructor);
+  }
+}
 
 void page_destructor(struct hash_elem* e,void* aux UNUSED){
   struct page *p=hash_entry(e,struct page,elem);
