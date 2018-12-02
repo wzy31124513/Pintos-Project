@@ -413,16 +413,19 @@ exit2 (void)
 {
   struct thread *cur = thread_current();
   struct list_elem *e;
-  for (e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
+  struct list_elem *next;
+  for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
   {
     struct fds *fd=list_entry(e,struct fds,elem);
+    next=list_next(e);
     lock_acquire(&file_lock);
     file_close(fd->file);
     lock_release(&file_lock);
     free (fd);
   }
-  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=list_next(e))
+  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=next)
   {
+    next=list_next(e);
     struct mapping *m=list_entry(e,struct mapping,elem);
     munmap(m->id);
   }
