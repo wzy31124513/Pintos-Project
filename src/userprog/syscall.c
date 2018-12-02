@@ -58,7 +58,7 @@ static int halt(void)
   shutdown_power_off ();
 }
 
-void exit1(int status);
+void exit1(int status)
 {
   thread_current()->exitcode=status;
   thread_exit ();
