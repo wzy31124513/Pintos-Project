@@ -24,17 +24,6 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 
-/* Data structure shared between process_execute() in the
-   invoking thread and start_process() in the newly invoked
-   thread. */
-struct exec_info 
-  {
-    const char *file_name;              /* Program to load. */
-    struct semaphore load_done;         /* "Up"ed when loading complete. */
-    struct wait_status *wait_status;    /* Child process. */
-    bool success;                       /* Program successfully loaded? */
-  };
-
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -42,24 +31,22 @@ struct exec_info
 tid_t
 process_execute (const char *file_name) 
 {
-  struct exec_info exec;
-  char thread_name[16];
-  char *save_ptr;
+  struct exec_table exec;
+  char name[16];
+  char *p;
   tid_t tid;
-
-  /* Initialize exec_info. */
-  exec.file_name = file_name;
-  sema_init (&exec.load_done, 0);
+  exec.file_name=file_name;
+  sema_init (&exec.load_done,0);
 
   /* Create a new thread to execute FILE_NAME. */
-  strlcpy (thread_name, file_name, sizeof thread_name);
-  strtok_r (thread_name, " ", &save_ptr);
+  strlcpy (name,file_name,sizeof(name));
+  strtok_r (name," ",&[save_ptr]);
   tid = thread_create (thread_name, PRI_DEFAULT, start_process, &exec);
   if (tid != TID_ERROR)
     {
       sema_down (&exec.load_done);
       if (exec.success)
-        list_push_back (&thread_current ()->children, &exec.wait_status->elem);
+        list_push_back (&thread_current ()->children, &exec.child_proc->elem);
       else 
         tid = TID_ERROR;
     }
@@ -72,7 +59,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *exec_)
 {
-  struct exec_info *exec = exec_;
+  struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
 
@@ -83,21 +70,21 @@ start_process (void *exec_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
-  /* Allocate wait_status. */
+  /* Allocate child_proc. */
   if (success)
     {
-      exec->wait_status = thread_current ()->wait_status
-        = malloc (sizeof *exec->wait_status);
-      success = exec->wait_status != NULL; 
+      exec->child_proc = thread_current ()->child_proc
+        = malloc (sizeof *exec->child_proc);
+      success = exec->child_proc != NULL; 
     }
 
-  /* Initialize wait_status. */
+  /* Initialize child_proc. */
   if (success) 
     {
-      lock_init (&exec->wait_status->lock);
-      exec->wait_status->ref_cnt = 2;
-      exec->wait_status->tid = thread_current ()->tid;
-      sema_init (&exec->wait_status->dead, 0);
+      lock_init (&exec->child_proc->lock);
+      exec->child_proc->ref_cnt = 2;
+      exec->child_proc->tid = thread_current ()->tid;
+      sema_init (&exec->child_proc->dead, 0);
     }
   
   /* Notify parent thread and clean up. */
@@ -119,7 +106,7 @@ start_process (void *exec_)
 /* Releases one reference to CS and, if it is now unreferenced,
    frees it. */
 static void
-release_child (struct wait_status *cs) 
+release_child (struct child_proc *cs) 
 {
   int new_ref_cnt;
   
@@ -146,15 +133,15 @@ process_wait (tid_t child_tid)
   for (e = list_begin (&cur->children); e != list_end (&cur->children);
        e = list_next (e)) 
     {
-      struct wait_status *cs = list_entry (e, struct wait_status, elem);
+      struct child_proc *cs = list_entry (e, struct child_proc, elem);
       if (cs->tid == child_tid) 
         {
-          int exit_code;
+          int exitcode;
           list_remove (e);
           sema_down (&cs->dead);
-          exit_code = cs->exit_code;
+          exitcode = cs->exitcode;
           release_child (cs);
-          return exit_code;
+          return exitcode;
         }
     }
   return -1;
@@ -168,13 +155,13 @@ process_exit (void)
   struct list_elem *e, *next;
   uint32_t *pd;
 
-  printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
+  printf ("%s: exit(%d)\n", cur->name, cur->exitcode);
 
   /* Notify parent that we're dead. */
-  if (cur->wait_status != NULL) 
+  if (cur->child_proc != NULL) 
     {
-      struct wait_status *cs = cur->wait_status;
-      cs->exit_code = cur->exit_code;
+      struct child_proc *cs = cur->child_proc;
+      cs->exitcode = cur->exitcode;
       sema_up (&cs->dead);
       release_child (cs);
     }
@@ -183,7 +170,7 @@ process_exit (void)
   for (e = list_begin (&cur->children); e != list_end (&cur->children);
        e = next) 
     {
-      struct wait_status *cs = list_entry (e, struct wait_status, elem);
+      struct child_proc *cs = list_entry (e, struct child_proc, elem);
       next = list_remove (e);
       release_child (cs);
     }
@@ -291,7 +278,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (const char *cmd_line, void **esp);
+static bool setup_stack (void **esp,char* file_name)
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -323,7 +310,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   t->pages = malloc (sizeof *t->pages);
   if (t->pages == NULL)
     goto done;
-  hash_init (t->pages, page_hash, page_less, NULL);
+  hash_init (t->pages, page_hash_func, less, NULL);
 
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
@@ -603,7 +590,7 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
    top of user virtual memory.  Fills in the page using CMD_LINE
    and sets *ESP to the stack pointer. */
 static bool
-setup_stack (const char *cmd_line, void **esp) 
+setup_stack (void **esp,char* file_name)
 {
   struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
   if (page != NULL) 
