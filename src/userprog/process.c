@@ -31,10 +31,10 @@ static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  struct exec_table exec;
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
-  struct exec_table exec;
   exec.file_name=file_name;
   sema_init (&exec.load,0);
 
@@ -59,8 +59,9 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *exec_table)
+start_process (void *exec_)
 {
+  struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
   /* Initialize interrupt frame and load executable. */
@@ -68,18 +69,11 @@ start_process (void *exec_table)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  struct exec_table *exec = exec_table;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
   if(success){
-    thread_current ()->child_proc=malloc(sizeof(struct child_proc));
-    exec->child_proc=thread_current ()->child_proc;
-    if (exec->child_proc==NULL)
-    {
-      success=false;
-    }else{
-      success=true;
-    }
+    exec->child_proc=thread_current ()->child_proc=malloc(sizeof(struct child_proc));
+    success=exec->child_proc!=NULL; 
   }
   if (success) 
   {
@@ -91,7 +85,7 @@ start_process (void *exec_table)
   exec->loaded=success;
   sema_up (&exec->load);
   if (!success){
-    exit1(-1);
+    thread_exit ();
   }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -175,6 +169,7 @@ process_exit (void)
   {
     hash_destroy(h,page_destructor);
   }
+
   file_close (thread_current()->self);
 
   /* Destroy the current process's page directory and switch back
