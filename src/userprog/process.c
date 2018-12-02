@@ -122,13 +122,11 @@ for (e=list_begin(&thread_current()->children);e!=list_tail(&thread_current()->c
         list_remove(e);
         sema_down(&c->exit);
         lock_acquire(&c->lock);
-        c->status--;
-        if (c->status==0)
+        int temp=c->status--;
+        lock_release(&c->lock);
+        if (temp==0)
         {
-          lock_release(&c->lock);
           free(c);
-        }else{
-          lock_release(&c->lock);
         }
         return ret;
       }
@@ -151,13 +149,11 @@ process_exit (void)
     c->ret=thread_current()->exitcode;
     sema_up(&c->exit);
     lock_acquire(&c->lock);
-    c->status--;
-    if (c->status==0)
+    int temp=c->status--;
+    lock_release(&c->lock);
+    if (temp==0)
     {
-      lock_release(&c->lock);
       free(c);
-    }else{
-      lock_release(&c->lock);
     }
   }
 
@@ -166,13 +162,11 @@ process_exit (void)
     struct child_proc* c=list_entry(e,struct child_proc,elem);
     list_remove(e);
     lock_acquire(&c->lock);
-    c->status--;
-    if (c->status==0)
+    int temp=c->status--;
+    lock_release(&c->lock);
+    if (temp==0)
     {
-      lock_release(&c->lock);
       free(c);
-    }else{
-      lock_release(&c->lock);
     }
   }
   page_exit ();
@@ -527,12 +521,13 @@ static bool getarg(uint8_t* kaddr, uint8_t* uaddr, const char* file_name,void** 
       argc++;
     }
   argv=(char**)(uaddr+ofs);
+  char** kargv=(char**)(kaddr+ofs);
   while(argc>1){
-    char* temp=argv[0];
-    argv[0]=argv[argc-1];
-    argv[argc-1]=temp;
+    char* temp=kargv[0];
+    kargv[0]=kargv[argc-1];
+    kargv[argc-1]=temp;
     argc-=2;
-    argv++;
+    kargv++;
   }
   if (push(kaddr,&ofs,&argv,sizeof(argv))==NULL || push(kaddr,&ofs,&argc,sizeof(argc))==NULL|| push(kaddr,&ofs,&null,sizeof(null))==NULL)
   {
