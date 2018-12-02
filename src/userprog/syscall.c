@@ -40,7 +40,7 @@ static int create (const char *file, unsigned initial_size);
 static int remove (const char *file);
 static int open (const char *file);
 static int filesize (int fd);
-static int read (int fd, void *buffer, unsigned size)
+static int read (int fd, void *buffer, unsigned size);
 static int write (int fd,  void *buffer, unsigned size);
 static int seek (int fd, unsigned position);
 static int tell (int fd);
