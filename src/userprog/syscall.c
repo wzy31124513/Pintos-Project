@@ -380,39 +380,74 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  typedef int syscall_function (int,int,int);
-  struct syscall
-    {
-      size_t arg_num;
-      syscall_function *func;
-    };
-  static const struct syscall syscall_table[]={
-      {0,(syscall_function *)halt},
-      {1,(syscall_function *)exit1},
-      {1,(syscall_function *)exec},
-      {1,(syscall_function *)wait},
-      {2,(syscall_function *)create},
-      {1,(syscall_function *)remove},
-      {1,(syscall_function *)open},
-      {1,(syscall_function *)filesize},
-      {3,(syscall_function *)read},
-      {3,(syscall_function *)write},
-      {2,(syscall_function *)seek},
-      {1,(syscall_function *)tell},
-      {1,(syscall_function *)close},
-      {2,(syscall_function *)mmap},
-      {1,(syscall_function *)munmap},};
   const struct syscall *sc;
   unsigned func;
   int args[3];
   argcpy(&func,f->esp,sizeof(func));
-  if(func>=sizeof(syscall_table)/sizeof(*syscall_table)){
+  if(func>=15){
     thread_exit();
   }
-  sc=syscall_table+func;
   memset(args,0,sizeof(args));
-  argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
-  f->eax=sc->func(args[0],args[1],args[2]);
+  if (func==SYS_HALT)
+  {
+    f->eax=halt();
+  }else if (func==SYS_EXIT)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=exit1(args[0]);
+  }else if (func==SYS_EXEC)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=exec(args[0]);
+  }else if (func==SYS_WAIT)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=wait(args[0]);
+  }else if (func==SYS_CREATE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=create(args[0],args[1]);
+  }else if (func==SYS_REMOVE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=remove(args[0]);
+  }else if (func==SYS_OPEN){
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=open(args[0]);
+  }
+  else if (func==SYS_FILESIZE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=filesize(args[0]);
+  }else if (func==SYS_READ)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=read(args[0],args[1],args[2]);
+  }else if (func==SYS_WRITE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=write(args[0],args[1],args[2]);
+  }else if (func==SYS_SEEK)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=seek(args[0],args[1]);
+  }else if (func==SYS_TELL)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=tell(args[0]);
+  }else if (func==SYS_CLOSE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=close(args[0]);
+  }else if (func==SYS_MMAP)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=mmap(args[0],args[1]);
+  }else if (func==SYS_MUNMAP)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=munmap(args[0]);
+  }
 }
 
 static void argcpy(void* cp,const void* addr1,size_t size){
