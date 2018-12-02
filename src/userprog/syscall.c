@@ -59,8 +59,8 @@ void halt(void)
 
 void exit1(int status)
 {
-  thread_current()->exitcode=status;
   struct thread *cur = thread_current();
+  cur->exitcode=status;
   struct list_elem *e;
   struct list_elem *next;
   for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
@@ -122,23 +122,21 @@ bool remove(const char* file)
 int open(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
-  struct fds* f;
+  struct fds* f=malloc(sizeof(struct fds));
   int fd=-1;
-  f=malloc(sizeof(struct fds));
-  if(f!=NULL)
-  {
-    lock_acquire(&file_lock);
-    f->file=filesys_open(fn_copy);
-      if(f->file!=NULL)
-      {
-        fd=f->fd=thread_current()->fd_num++;
-        list_push_front(&thread_current()->file_list,&f->elem);
-      }
-      else{
-        free(f);
-      }
-      lock_release (&file_lock);
-  }
+  lock_acquire(&file_lock);
+  f->file=filesys_open(fn_copy);
+  if(f->file!=NULL)
+    {
+      thread_current()->fd_num++;
+      fd=thread_current()->fd_num;
+      f->fd=fd;
+      list_push_back(&thread_current()->file_list,&f->elem);
+    }
+    else{
+      free(f);
+    }
+    lock_release (&file_lock);
   palloc_free_page (fn_copy);
   return fd;
 }
