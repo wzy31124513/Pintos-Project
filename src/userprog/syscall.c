@@ -279,7 +279,7 @@ static int close(int fd)
   return 0;
 }
 
-/*static int mmap(int fd, void *addr)
+static int mmap(int fd, void *addr)
 {
   struct fds* f=getfile(fd);
   struct mapping* m = malloc(sizeof(struct mapping));
@@ -324,53 +324,8 @@ static int close(int fd)
 
   }
   return m->id;
-}*/
-static int mmap (int handle, void *addr)
-{
-  struct fds *fd = getfile (handle);
-  struct mapping *m = malloc (sizeof *m);
-  size_t offset;
-  off_t length;
-
-  if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
-    return -1;
-
-  m->id = thread_current ()->fd_num++;
-  lock_acquire (&file_lock);
-  m->file = file_reopen (fd->file);
-  lock_release (&file_lock);
-  if (m->file == NULL)
-    {
-      free (m);
-      return -1;
-    }
-  m->addr = addr;
-  m->num = 0;
-  list_push_front (&thread_current ()->mapping, &m->elem);
-
-  offset = 0;
-  lock_acquire (&file_lock);
-  length = file_length (m->file);
-  lock_release (&file_lock);
-  while (length > 0)
-    {
-      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
-      if (p == NULL)
-        {
-          unmap (m);
-          return -1;
-        }
-      p->mmap = false;
-      p->file = m->file;
-      p->offset = offset;
-      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->rw_bytes;
-      length -= p->rw_bytes;
-      m->num++;
-    }
-
-  return m->id;
 }
+
 
 static int munmap (int mapping)
 {
@@ -378,7 +333,7 @@ static int munmap (int mapping)
   unmap(map);
   return 0;
 }
-
+/*
 static void unmap(struct mapping* m)
 {
   list_remove(&m->elem);
@@ -394,6 +349,29 @@ static void unmap(struct mapping* m)
   for (int i = 0; i < m->num; ++i)
   {
     page_deallocate((void*)(m->addr+PGSIZE*i));
+  }
+}*/
+static void unmap (struct mapping *m)
+{
+  /* Remove this mapping from the list of mappings for this process. */
+  list_remove(&m->elem);
+
+  /* For each page in the memory mapped file... */
+  for(int i = 0; i < m->num; i++)
+  {
+    /* ...determine whether or not the page is dirty (modified). If so, write that page back out to disk. */
+    if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->addr) + (PGSIZE * i)))))
+    {
+      lock_acquire (&file_lock);
+      file_write_at(m->file, (const void *) (m->addr + (PGSIZE * i)), (PGSIZE*(m->num)), (PGSIZE * i));
+      lock_release (&file_lock);
+    }
+  }
+
+  /* Finally, deallocate all memory mapped pages (free up the process memory). */
+  for(int i = 0; i < m->num; i++)
+  {
+    page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
   }
 }
 
