@@ -32,26 +32,61 @@ static int tell (int fd);
 static int close (int fd);
 static int mmap (int fd, void *addr);
 static int munmap (int mapping);
-
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
 void exit2 (void);
-static struct lock fs_lock;
+
+static int halt(void)
+{
+  shutdown_power_off ();
+}
+
+static int exit1(int status)
+{
+  thread_current()->exitcode=status;
+  thread_exit ();
+}
+
+static int exec(const char* cmd_line)
+{
+  int ret;
+  char* fn_copy=strcpy_to_kernel(cmd_line);
+  lock_acquire(&file_lock);
+  ret=process_execute(fn_copy);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
+}
+
+static int wait(int pid)
+{
+  return process_wait(pid);
+}
+
+static int create(const char *file, unsigned initial_size)
+{
+  bool ret;
+  char* fn_copy=strcpy_to_kernel(file);
+  lock_acquire(&file_lock);
+  ret=filesys_create(fn_copy,initial_size);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
+}
+
 
 void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&fs_lock);
+  lock_init (&file_lock);
 }
 
-/* System call handler. */
 static void
 syscall_handler (struct intr_frame *f)
 {
   typedef int syscall_function (int, int, int);
 
-  /* A system call. */
   struct syscall
     {
       size_t arg_cnt;           /* Number of arguments. */
@@ -169,54 +204,7 @@ copy_in_string (const char *us)
   thread_exit ();
 }
 
-static int
-halt (void)
-{
-  shutdown_power_off ();
-}
 
-static int
-exit1 (int exitcode)
-{
-  thread_current ()->exitcode = exitcode;
-  thread_exit ();
-}
-
-static int
-exec (const char *ufile)
-{
-  tid_t tid;
-  char *kfile = copy_in_string (ufile);
-
-  lock_acquire (&fs_lock);
-  tid = process_execute (kfile);
-  lock_release (&fs_lock);
-
-  palloc_free_page (kfile);
-
-  return tid;
-}
-
-static int
-wait (tid_t child)
-{
-  return process_wait (child);
-}
-
-static int
-create (const char *ufile, unsigned initial_size)
-{
-  char *kfile = copy_in_string (ufile);
-  bool ok;
-
-  lock_acquire (&fs_lock);
-  ok = filesys_create (kfile, initial_size);
-  lock_release (&fs_lock);
-
-  palloc_free_page (kfile);
-
-  return ok;
-}
 
 static int
 remove (const char *ufile)
@@ -224,9 +212,9 @@ remove (const char *ufile)
   char *kfile = copy_in_string (ufile);
   bool ok;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   ok = filesys_remove (kfile);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   palloc_free_page (kfile);
 
@@ -250,7 +238,7 @@ open (const char *ufile)
   fd = malloc (sizeof *fd);
   if (fd != NULL)
     {
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       fd->file = filesys_open (kfile);
       if (fd->file != NULL)
         {
@@ -260,7 +248,7 @@ open (const char *ufile)
         }
       else
         free (fd);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
     }
 
   palloc_free_page (kfile);
@@ -291,9 +279,9 @@ filesize (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   int size;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   size = file_length (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return size;
 }
@@ -318,9 +306,9 @@ read (int handle, void *udst_, unsigned size)
         {
           if (!page_lock (udst, true))
             thread_exit ();
-          lock_acquire (&fs_lock);
+          lock_acquire (&file_lock);
           retval = file_read (fd->file, udst, read_amt);
-          lock_release (&fs_lock);
+          lock_release (&file_lock);
           page_unlock (udst);
         }
       else
@@ -381,7 +369,7 @@ write (int handle, void *usrc_, unsigned size)
       /* Write from page into file. */
       if (!page_lock (usrc, false))
         thread_exit ();
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       if (handle == STDOUT_FILENO)
         {
           putbuf ((char *) usrc, write_amt);
@@ -389,7 +377,7 @@ write (int handle, void *usrc_, unsigned size)
         }
       else
         retval = file_write (fd->file, usrc, write_amt);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
       page_unlock (usrc);
 
       /* Handle return value. */
@@ -418,10 +406,10 @@ seek (int handle, unsigned position)
 {
   struct file_descriptor *fd = lookup_fd (handle);
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   if ((off_t) position >= 0)
     file_seek (fd->file, position);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return 0;
 }
@@ -432,9 +420,9 @@ tell (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   unsigned position;
 
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   position = file_tell (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
 
   return position;
 }
@@ -443,9 +431,9 @@ static int
 close (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   file_close (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   list_remove (&fd->elem);
   free (fd);
   return 0;
@@ -491,9 +479,9 @@ unmap (struct mapping *m)
     /* ...determine whether or not the page is dirty (modified). If so, write that page back out to disk. */
     if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->base) + (PGSIZE * i)))))
     {
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       file_write_at(m->file, (const void *) (m->base + (PGSIZE * i)), (PGSIZE*(m->page_cnt)), (PGSIZE * i));
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
     }
   }
 
@@ -516,9 +504,9 @@ mmap (int handle, void *addr)
     return -1;
 
   m->handle = thread_current ()->fd_num++;
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   m->file = file_reopen (fd->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   if (m->file == NULL)
     {
       free (m);
@@ -529,9 +517,9 @@ mmap (int handle, void *addr)
   list_push_front (&thread_current ()->mapping, &m->elem);
 
   offset = 0;
-  lock_acquire (&fs_lock);
+  lock_acquire (&file_lock);
   length = file_length (m->file);
-  lock_release (&fs_lock);
+  lock_release (&file_lock);
   while (length > 0)
     {
       struct page *p = page_alloc ((uint8_t *) addr + offset, false);
@@ -569,9 +557,9 @@ exit2 (void)
     {
       struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
-      lock_acquire (&fs_lock);
+      lock_acquire (&file_lock);
       file_close (fd->file);
-      lock_release (&fs_lock);
+      lock_release (&file_lock);
       free (fd);
     }
 
