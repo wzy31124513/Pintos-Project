@@ -226,7 +226,7 @@ static int open (const char *file)
   }
   palloc_free_page(fn_copy);
   return ret;*/
-  char *fn_copy = copy_in_string (file);
+  char *fn_copy = strcpy_to_kernel (file);
   struct fds *fd;
   int handle = -1;
 
