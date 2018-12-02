@@ -95,9 +95,9 @@ start_process (void *exec_)
   if (success) 
     {
       lock_init (&exec->child_proc->lock);
-      exec->child_proc->ref_cnt = 2;
-      exec->child_proc->tid = thread_current ()->tid;
-      sema_init (&exec->child_proc->dead, 0);
+      exec->child_proc->status = 2;
+      exec->child_proc->id = thread_current ()->tid;
+      sema_init (&exec->child_proc->exit, 0);
     }
   
   /* Notify parent thread and clean up. */
@@ -124,7 +124,7 @@ release_child (struct child_proc *cs)
   int new_ref_cnt;
   
   lock_acquire (&cs->lock);
-  new_ref_cnt = --cs->ref_cnt;
+  new_ref_cnt = --cs->status;
   lock_release (&cs->lock);
 
   if (new_ref_cnt == 0)
@@ -147,12 +147,12 @@ process_wait (tid_t child_tid)
        e = list_next (e)) 
     {
       struct child_proc *cs = list_entry (e, struct child_proc, elem);
-      if (cs->tid == child_tid) 
+      if (cs->id == child_tid) 
         {
           int exitcode;
           list_remove (e);
-          sema_down (&cs->dead);
-          exitcode = cs->exitcode;
+          sema_down (&cs->exit);
+          exitcode = cs->ret;
           release_child (cs);
           return exitcode;
         }
@@ -175,7 +175,7 @@ process_exit (void)
     {
       struct child_proc *cs = cur->child_proc;
       cs->ret = cur->exitcode;
-      sema_up (&cs->dead);
+      sema_up (&cs->exit);
       release_child (cs);
     }
 
@@ -192,7 +192,7 @@ process_exit (void)
   page_exit ();
   
   /* Close executable (and allow writes). */
-  file_close (cur->bin_file);
+  file_close (cur->self);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -323,8 +323,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   t->pages = malloc (sizeof *t->pages);
   if (t->pages == NULL)
     goto done;
-  hash_init (t->pages, page_hash, page_less, NULL);
-
+  init_page(t->pages);
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
     cmd_line++;
@@ -334,13 +333,13 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     *cp = '\0';
 
   /* Open executable file. */
-  t->bin_file = file = filesys_open (file_name);
+  t->self = file = filesys_open (file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  file_deny_write (t->bin_file);
+  file_deny_write (t->self);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -501,14 +500,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     {
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-      struct page *p = page_allocate (upage, !writable);
+      struct page *p = page_alloc (upage, !writable);
       if (p == NULL)
         return false;
       if (page_read_bytes > 0) 
         {
           p->file = file;
-          p->file_offset = ofs;
-          p->file_bytes = page_read_bytes;
+          p->offset = ofs;
+          p->rw_bytes = page_read_bytes;
         }
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -605,16 +604,16 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
 static bool
 setup_stack (const char *cmd_line, void **esp) 
 {
-  struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
+  struct page *page = page_alloc (((uint8_t *) PHYS_BASE) - PGSIZE, false);
   if (page != NULL) 
     {
-      page->frame = frame_alloc_and_lock (page);
+      page->frame = frame_alloc (page);
       if (page->frame != NULL)
         {
           bool ok;
           page->read_only = false;
-          page->private = false;
-          ok = init_cmd_line (page->frame->base, page->addr, cmd_line, esp);
+          page->mmap = false;
+          ok = init_cmd_line (page->frame->addr, page->addr, cmd_line, esp);
           frame_unlock (page->frame);
           return ok;
         }
