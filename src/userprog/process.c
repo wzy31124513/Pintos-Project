@@ -31,7 +31,7 @@ struct exec_info
   {
     const char *file_name;              /* Program to load. */
     struct semaphore load_done;         /* "Up"ed when loading complete. */
-    struct wait_status *wait_status;    /* Child process. */
+    struct child_proc *child_proc;    /* Child process. */
     bool success;                       /* Program successfully loaded? */
   };
 
@@ -59,7 +59,7 @@ process_execute (const char *file_name)
     {
       sema_down (&exec.load_done);
       if (exec.success)
-        list_push_back (&thread_current ()->children, &exec.wait_status->elem);
+        list_push_back (&thread_current ()->children, &exec.child_proc->elem);
       else 
         tid = TID_ERROR;
     }
@@ -83,21 +83,21 @@ start_process (void *exec_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
-  /* Allocate wait_status. */
+  /* Allocate child_proc. */
   if (success)
     {
-      exec->wait_status = thread_current ()->wait_status
-        = malloc (sizeof *exec->wait_status);
-      success = exec->wait_status != NULL; 
+      exec->child_proc = thread_current ()->child_proc
+        = malloc (sizeof *exec->child_proc);
+      success = exec->child_proc != NULL; 
     }
 
-  /* Initialize wait_status. */
+  /* Initialize child_proc. */
   if (success) 
     {
-      lock_init (&exec->wait_status->lock);
-      exec->wait_status->ref_cnt = 2;
-      exec->wait_status->tid = thread_current ()->tid;
-      sema_init (&exec->wait_status->dead, 0);
+      lock_init (&exec->child_proc->lock);
+      exec->child_proc->ref_cnt = 2;
+      exec->child_proc->tid = thread_current ()->tid;
+      sema_init (&exec->child_proc->dead, 0);
     }
   
   /* Notify parent thread and clean up. */
@@ -119,7 +119,7 @@ start_process (void *exec_)
 /* Releases one reference to CS and, if it is now unreferenced,
    frees it. */
 static void
-release_child (struct wait_status *cs) 
+release_child (struct child_proc *cs) 
 {
   int new_ref_cnt;
   
@@ -146,15 +146,15 @@ process_wait (tid_t child_tid)
   for (e = list_begin (&cur->children); e != list_end (&cur->children);
        e = list_next (e)) 
     {
-      struct wait_status *cs = list_entry (e, struct wait_status, elem);
+      struct child_proc *cs = list_entry (e, struct child_proc, elem);
       if (cs->tid == child_tid) 
         {
-          int exit_code;
+          int exitcode;
           list_remove (e);
           sema_down (&cs->dead);
-          exit_code = cs->exit_code;
+          exitcode = cs->exitcode;
           release_child (cs);
-          return exit_code;
+          return exitcode;
         }
     }
   return -1;
@@ -168,13 +168,13 @@ process_exit (void)
   struct list_elem *e, *next;
   uint32_t *pd;
 
-  printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
+  printf ("%s: exit(%d)\n", cur->name, cur->exitcode);
 
   /* Notify parent that we're dead. */
-  if (cur->wait_status != NULL) 
+  if (cur->child_proc != NULL) 
     {
-      struct wait_status *cs = cur->wait_status;
-      cs->exit_code = cur->exit_code;
+      struct child_proc *cs = cur->child_proc;
+      cs->ret = cur->exitcode;
       sema_up (&cs->dead);
       release_child (cs);
     }
@@ -183,7 +183,7 @@ process_exit (void)
   for (e = list_begin (&cur->children); e != list_end (&cur->children);
        e = next) 
     {
-      struct wait_status *cs = list_entry (e, struct wait_status, elem);
+      struct child_proc *cs = list_entry (e, struct child_proc, elem);
       next = list_remove (e);
       release_child (cs);
     }
