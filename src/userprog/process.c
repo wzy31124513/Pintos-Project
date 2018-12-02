@@ -397,7 +397,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
-/* load() helpers. */
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */

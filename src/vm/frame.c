@@ -1,5 +1,4 @@
 #include "vm/frame.h"
-#include <stdio.h>
 #include "vm/page.h"
 #include "devices/timer.h"
 #include "threads/init.h"
@@ -75,14 +74,12 @@ static struct frame* try_frame_alloc (struct page *page){
 
 struct frame *frame_alloc(struct page* page){
   size_t i;
-  for (i = 0; i < 3; ++i) 
-  {
+  for(i=0;i<3;++i){
     struct frame* f =try_frame_alloc(page);
-    if (f != NULL) 
-      {
-        return f; 
-      }
-    timer_msleep (1000);
+    if (f != NULL) {
+      return f; 
+    }
+    timer_msleep(1000);
   }
   return NULL;
 }

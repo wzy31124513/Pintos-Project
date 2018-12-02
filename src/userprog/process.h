@@ -14,4 +14,4 @@ struct exec_table
 	struct child_proc* child_proc;
 	bool loaded;
 };
-#endif
+#endif /* userprog/process.h */

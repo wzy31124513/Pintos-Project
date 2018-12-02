@@ -72,7 +72,6 @@ bool load_page(struct page* p){
     int rw_bytes=file_read_at(p->file,p->frame->addr,p->rw_bytes,p->offset);
     int zero_bytes=PGSIZE-rw_bytes;
     memset(p->frame->addr+rw_bytes,0,zero_bytes);
-
   }else{
     memset(p->frame->addr,0,PGSIZE);
   }
@@ -112,7 +111,6 @@ bool page_evict(struct page* p){
   {
     ret=true;
   }
-
   if (p->file)
   {
     if (dirty)
