@@ -348,7 +348,7 @@ mmap (int fd, void *addr)
   }
   m->id=thread_current()->fd_num++;
   lock_acquire(&file_lock);
-  m->file=file_reopen(fd->file);
+  m->file=file_reopen(f->file);
   lock_release(&file_lock);
   if(m->file==NULL)
   {
