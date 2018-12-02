@@ -405,7 +405,7 @@ static struct mapping* getmap(int id){
 static void unmap(struct mapping* m)
 {
   list_remove(&m->elem);
-  for(int i = 0; i < m->num; ++i)
+  for(int i = 0; i<m->num; ++i)
   {
     if(pagedir_is_dirty(thread_current()->pagedir,(const void *)(m->addr+PGSIZE*i)))
     {
@@ -416,18 +416,7 @@ static void unmap(struct mapping* m)
   }
   for (int i = 0; i < m->num; ++i)
   {
-    struct page* p=find_page(m->addr+PGSIZE * i);
-    if (p->frame!=NULL)
-    {
-      lock_acquire(&p->frame->lock);
-      if (p->file && !p->mmap)
-      {
-        page_evict(p);
-      }
-      frame_free(p->frame);
-    }
-    hash_delete(thread_current()->pages,&p->elem);
-    free(p);
+    page_deallocate((void*)(m->addr+PGSIZE*i));
   }
 }
 
