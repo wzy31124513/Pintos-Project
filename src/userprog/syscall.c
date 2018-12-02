@@ -154,18 +154,18 @@ char* strcpy_to_kernel(const char* str){
   thread_exit ();
 }
 
-static int halt (void)
+static int sys_halt (void)
 {
   shutdown_power_off ();
 }
 
-static int exit (int status)
+static int sys_exit (int status)
 {
   thread_current ()->exitcode=status;
   thread_exit ();
 }
 
-static int exec(const char *cmd_line)
+static int sys_exec(const char *cmd_line)
 {
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
@@ -176,12 +176,12 @@ static int exec(const char *cmd_line)
   return ret;
 }
 
-static int wait(int pid)
+static int sys_wait(int pid)
 {
   return process_wait(pid);
 }
 
-static int create (const char *file, unsigned initial_size)
+static int sys_create (const char *file, unsigned initial_size)
 {
   char *fn_copy=strcpy_to_kernel(file);
   bool ret;
@@ -192,7 +192,7 @@ static int create (const char *file, unsigned initial_size)
   return ret;
 }
 
-static int remove(const char *file)
+static int sys_remove(const char *file)
 {
   char *fn_copy=strcpy_to_kernel(file);
   bool ok;
@@ -203,7 +203,7 @@ static int remove(const char *file)
   return ok;
 }
 
-static int open (const char *file)
+static int sys_open (const char *file)
 {
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* fd;
@@ -241,7 +241,7 @@ static struct fds* getfile(int fd)
   thread_exit ();
 }
 
-static int filesize(int fd)
+static int sys_filesize(int fd)
 {
   struct fds* f=getfile(fd);
   int ret;
@@ -297,7 +297,7 @@ static int read(int fd,void *buffer, unsigned size)
   return bytes_read;
 }
 
-static int write (int fd, void *buffer, unsigned size){
+static int sys_write (int fd, void *buffer, unsigned size){
   uint8_t *usrc=buffer;
   struct fds* f = NULL;
   int bytes_written = 0;
@@ -336,7 +336,7 @@ static int write (int fd, void *buffer, unsigned size){
   return bytes_written;
 }
 
-static int seek (int fd, unsigned position){
+static int sys_seek (int fd, unsigned position){
   struct fds *f=getfile(fd);
   lock_acquire (&file_lock);
   if ((int32_t)position>= 0){
@@ -346,7 +346,7 @@ static int seek (int fd, unsigned position){
   return 0;
 }
 
-static int tell(int fd)
+static int sys_tell(int fd)
 {
   struct fds* f=getfile(fd);
   off_t ret;
@@ -356,7 +356,7 @@ static int tell(int fd)
   return ret;
 }
 
-static int close (int fd)
+static int sys_close (int fd)
 {
   struct fds *f=getfile(fd);
   lock_acquire(&file_lock);
@@ -396,7 +396,7 @@ static void unmap(struct mapping *m)
     page_deallocate((void *)((m->addr)+(PGSIZE * i)));
   }
 }
-static int mmap (int fd, void *addr)
+static int sys_mmap (int fd, void *addr)
 {
   struct fds *f=getfile(fd);
   struct mapping *m = malloc (sizeof(struct mapping));
@@ -439,7 +439,7 @@ static int mmap (int fd, void *addr)
   return m->id;
 }
 
-static int munmap (int mapping)
+static int sys_munmap (int mapping)
 {
   struct mapping *map = getmap(mapping);
   unmap(map);
