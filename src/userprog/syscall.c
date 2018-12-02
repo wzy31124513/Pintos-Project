@@ -15,22 +15,22 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/page.h"
-
+#include "vm/frame.h"
 
 static int halt (void);
 static int exit1 (int status);
-static int exec (const char *ufile);
-static int wait (tid_t);
-static int create (const char *ufile, unsigned initial_size);
-static int remove (const char *ufile);
-static int open (const char *ufile);
-static int filesize (int handle);
-static int read (int handle, void *udst_, unsigned size);
-static int write (int handle, void *usrc_, unsigned size);
-static int seek (int handle, unsigned position);
-static int tell (int handle);
-static int close (int handle);
-static int mmap (int handle, void *addr);
+static int exec (const char *cmd_line);
+static int wait (int pid);
+static int create (const char *file, unsigned initial_size);
+static int remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, char *buffer, unsigned size);
+static int write (int fd, const void *buffer, unsigned size);
+static int seek (int fd, unsigned position);
+static int tell (int fd);
+static int close (int fd);
+static int mmap (int fd, void *addr);
 static int munmap (int mapping);
 
 static void syscall_handler (struct intr_frame *);
