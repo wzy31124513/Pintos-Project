@@ -48,8 +48,8 @@ static int close (int fd);
 static int mmap (int fd, void *addr);
 static int munmap (int mapping);
 static void syscall_handler (struct intr_frame *);
-static void copy_in (void *, const void *, size_t);
-static char * copy_in_string (const char *us);
+static void argcpy(void* cp,const void* addr1,size_t size);
+static char * strcpy_to_kernel (const char *us);
 static struct fds* getfile(int fd);
 static struct mapping* getmap (int fd);
 void exit2 (void);
@@ -68,7 +68,7 @@ static int exit1(int status)
 static int exec(const char* cmd_line)
 {
   int ret;
-  char* fn_copy=copy_in_string(cmd_line);
+  char* fn_copy=strcpy_to_kernel(cmd_line);
   lock_acquire(&file_lock);
   ret=process_execute(fn_copy);
   lock_release(&file_lock);
@@ -84,7 +84,7 @@ static int wait(int pid)
 static int create(const char *file, unsigned initial_size)
 {
   bool ret;
-  char* fn_copy=copy_in_string(file);
+  char* fn_copy=strcpy_to_kernel(file);
   lock_acquire(&file_lock);
   ret=filesys_create(fn_copy,initial_size);
   lock_release(&file_lock);
@@ -94,7 +94,7 @@ static int create(const char *file, unsigned initial_size)
 
 static int remove(const char* file)
 {
-  char* fn_copy=copy_in_string(file);
+  char* fn_copy=strcpy_to_kernel(file);
   bool ret;
   lock_acquire(&file_lock);
   ret=filesys_remove(fn_copy);
@@ -105,7 +105,7 @@ static int remove(const char* file)
 
 static int open(const char* file)
 {
-  char* fn_copy=copy_in_string(file);
+  char* fn_copy=strcpy_to_kernel(file);
   struct fds* f;
   int fd=-1;
   f=malloc(sizeof(struct fds));
@@ -327,66 +327,6 @@ static int mmap (int fd, void *addr)
   return m->id;
 }
 
-void
-syscall_init (void)
-{
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&file_lock);
-}
-
-static void
-syscall_handler (struct intr_frame *f)
-{
-  typedef int syscall_function (int, int, int);
-
-  struct syscall
-    {
-      size_t arg_cnt;           /* Number of arguments. */
-      syscall_function *func;   /* Implementation. */
-    };
-
-  /* Table of system calls. */
-  static const struct syscall syscall_table[] =
-    {
-      {0, (syscall_function *)halt},
-      {1, (syscall_function *)exit1},
-      {1, (syscall_function *)exec},
-      {1, (syscall_function *)wait},
-      {2, (syscall_function *)create},
-      {1, (syscall_function *)remove},
-      {1, (syscall_function *)open},
-      {1, (syscall_function *)filesize},
-      {3, (syscall_function *)read},
-      {3, (syscall_function *)write},
-      {2, (syscall_function *)seek},
-      {1, (syscall_function *)tell},
-      {1, (syscall_function *)close},
-      {2, (syscall_function *)mmap},
-      {1, (syscall_function *)munmap},
-    };
-
-  const struct syscall *sc;
-  unsigned call_nr;
-  int args[3];
-
-  /* Get the system call. */
-  copy_in (&call_nr, f->esp, sizeof call_nr);
-  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
-    thread_exit ();
-  sc = syscall_table + call_nr;
-
-  /* Get the system call arguments. */
-  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
-  memset (args, 0, sizeof args);
-  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
-
-  /* Execute the system call,
-     and set the return value. */
-  f->eax = sc->func (args[0], args[1], args[2]);
-}
-
-
-
 static int
 munmap (int mapping)
 {
@@ -406,6 +346,51 @@ munmap (int mapping)
     page_deallocate((void *)(m->addr+PGSIZE * i));
   }
   return 0;
+}
+
+void
+syscall_init (void)
+{
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&file_lock);
+}
+
+static void
+syscall_handler (struct intr_frame *f)
+{
+  typedef int syscall_function (int,int,int);
+  struct syscall
+    {
+      size_t arg_num;
+      syscall_function *func;
+    };
+  static const struct syscall syscall_table[]={
+      {0,(syscall_function *)halt},
+      {1,(syscall_function *)exit1},
+      {1,(syscall_function *)exec},
+      {1,(syscall_function *)wait},
+      {2,(syscall_function *)create},
+      {1,(syscall_function *)remove},
+      {1,(syscall_function *)open},
+      {1,(syscall_function *)filesize},
+      {3,(syscall_function *)read},
+      {3,(syscall_function *)write},
+      {2,(syscall_function *)seek},
+      {1,(syscall_function *)tell},
+      {1,(syscall_function *)close},
+      {2,(syscall_function *)mmap},
+      {1,(syscall_function *)munmap},};
+  const struct syscall *sc;
+  unsigned func;
+  int args[3];
+  argcpy(&func,f->esp,sizeof(func));
+  if(func>=sizeof(syscall_table)/sizeof(*syscall_table)){
+    thread_exit();
+  }
+  sc=syscall_table+func;
+  memset(args,0,sizeof(args));
+  argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*sc->arg_num);
+  f->eax=sc->func(args[0],args[1],args[2]);
 }
 
 void
@@ -432,66 +417,58 @@ exit2 (void)
 }
 
 
-static void
-copy_in (void *dst_, const void *usrc_, size_t size)
-{
-  uint8_t *dst = dst_;
-  const uint8_t *usrc = usrc_;
 
-  while (size > 0)
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (usrc);
-      if (chunk_size > size)
-        chunk_size = size;
-
-      if (!page_lock (usrc, false))
-        thread_exit ();
-      memcpy (dst, usrc, chunk_size);
-      page_unlock (usrc);
-
-      dst += chunk_size;
-      usrc += chunk_size;
-      size -= chunk_size;
+static void argcpy(void* cp,const void* addr1,size_t size){
+  uint8_t *dst=cp;
+  const uint8_t *addr=addr1;
+  while(size>0){
+    size_t s=PGSIZE-pg_ofs(addr);
+    if(s>size){
+      s=size;
     }
+    if(!page_lock (addr, false)){
+      thread_exit();
+    }
+    memcpy(dst,addr,s);
+    page_unlock(addr);
+    dst+=s;
+    addr+=s;
+    size-=s;
+  }
 }
 
-static char * copy_in_string (const char *us)
+static char * strcpy_to_kernel (const char *str)
 {
-  char *ks;
-  char *upage;
+  char* cp;
+  char* addr;
   size_t length;
-
-  ks = palloc_get_page (0);
-  if (ks == NULL)
+  cp=palloc_get_page(0);
+  if(cp==NULL){
     thread_exit ();
-
-  length = 0;
-  for (;;)
-    {
-      upage = pg_round_down (us);
-      if (!page_lock (upage, false))
-        goto lock_error;
-
-      for (; us < upage + PGSIZE; us++)
-        {
-          ks[length++] = *us;
-          if (*us == '\0')
-            {
-              page_unlock (upage);
-              return ks;
-            }
-          else if (length >= PGSIZE)
-            goto too_long_error;
-        }
-
-      page_unlock (upage);
+  }
+  length=0;
+  while(1){
+    addr=pg_round_down (str);
+    if(!page_lock(addr,false)){
+      page_unlock (addr);
+      return NULL;
     }
-
- too_long_error:
-  page_unlock (upage);
- lock_error:
-  palloc_free_page (ks);
-  thread_exit ();
+    while(str<addr+PGSIZE){
+      cp[length++]=*str;
+      if (*str=='\0')
+        {
+          page_unlock(addr);
+          return cp;
+        }
+        else if (length>=PGSIZE){
+          palloc_free_page (cp);
+          thread_exit ();
+          return NULL;
+        }
+      str++;
+    }
+    page_unlock (addr);
+  }
 }
 
 
