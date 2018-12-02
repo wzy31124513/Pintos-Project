@@ -50,7 +50,7 @@ static int exit1(int status)
 static int exec(const char* cmd_line)
 {
   int ret;
-  char* fn_copy=strcpy_to_kernel(cmd_line);
+  char* fn_copy=copy_in_string(cmd_line);
   lock_acquire(&file_lock);
   ret=process_execute(fn_copy);
   lock_release(&file_lock);
@@ -66,9 +66,20 @@ static int wait(int pid)
 static int create(const char *file, unsigned initial_size)
 {
   bool ret;
-  char* fn_copy=strcpy_to_kernel(file);
+  char* fn_copy=copy_in_string(file);
   lock_acquire(&file_lock);
   ret=filesys_create(fn_copy,initial_size);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
+}
+
+static int remove(const char* file)
+{
+  char* fn_copy=copy_in_string(file);
+  bool ret;
+  lock_acquire(&file_lock);
+  ret=filesys_remove(fn_copy);
   lock_release(&file_lock);
   palloc_free_page (fn_copy);
   return ret;
@@ -206,20 +217,6 @@ copy_in_string (const char *us)
 
 
 
-static int
-remove (const char *ufile)
-{
-  char *kfile = copy_in_string (ufile);
-  bool ok;
-
-  lock_acquire (&file_lock);
-  ok = filesys_remove (kfile);
-  lock_release (&file_lock);
-
-  palloc_free_page (kfile);
-
-  return ok;
-}
 
 struct file_descriptor
   {
