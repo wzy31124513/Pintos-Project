@@ -325,8 +325,7 @@ static int close(int fd)
   }
   return m->id;
 }*/
-static int
-sys_mmap (int handle, void *addr)
+static int mmap (int handle, void *addr)
 {
   struct fds *fd = getfile (handle);
   struct mapping *m = malloc (sizeof *m);
