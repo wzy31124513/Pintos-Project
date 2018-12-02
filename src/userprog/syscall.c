@@ -450,7 +450,7 @@ static char * strcpy_to_kernel (const char *str)
   while(1){
     addr=pg_round_down (str);
     if(!page_lock(addr,false)){
-      page_unlock (addr);
+      page_unlock(addr);
       return NULL;
     }
     while(str<addr+PGSIZE){
@@ -463,12 +463,13 @@ static char * strcpy_to_kernel (const char *str)
         else if (length>=PGSIZE){
           palloc_free_page (cp);
           thread_exit ();
-          return NULL;
+          return NULL
         }
       str++;
     }
     page_unlock (addr);
   }
+
 }
 
 
