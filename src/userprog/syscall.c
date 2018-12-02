@@ -279,7 +279,7 @@ static int close(int fd)
   return 0;
 }
 
-static int mmap(int fd, void *addr)
+/*static int mmap(int fd, void *addr)
 {
   struct fds* f=getfile(fd);
   struct mapping* m = malloc(sizeof(struct mapping));
@@ -324,7 +324,7 @@ static int mmap(int fd, void *addr)
 
   }
   return m->id;
-}
+}*/
 
 
 static int munmap (int mapping)
@@ -374,7 +374,52 @@ static void unmap (struct mapping *m)
     page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
   }
 }
+static int mmap (int handle, void *addr)
+{
+  struct fds *fd = lookup_fd (handle);
+  struct mapping *m = malloc (sizeof *m);
+  size_t offset;
+  off_t length;
 
+  if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
+    return -1;
+
+  m->id = thread_current ()->fd_num++;
+  lock_acquire (&file_lock);
+  m->file = file_reopen (fd->file);
+  lock_release (&file_lock);
+  if (m->file == NULL)
+    {
+      free (m);
+      return -1;
+    }
+  m->addr = addr;
+  m->num = 0;
+  list_push_front (&thread_current ()->mapping, &m->elem);
+
+  offset = 0;
+  lock_acquire (&file_lock);
+  length = file_length (m->file);
+  lock_release (&file_lock);
+  while (length > 0)
+    {
+      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
+      if (p == NULL)
+        {
+          unmap (m);
+          return -1;
+        }
+      p->mmap = false;
+      p->file = m->file;
+      p->offset = offset;
+      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
+      offset += p->rw_bytes;
+      length -= p->rw_bytes;
+      m->page_cnt++;
+    }
+
+  return m->id;
+}
 void exit2 (void)
 {
   struct list_elem *e;
