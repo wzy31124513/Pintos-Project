@@ -51,6 +51,7 @@ static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
 static char * copy_in_string (const char *us);
 static struct fds* getfile(int fd);
+static struct mapping* getmap (int fd);
 void exit2 (void);
 
 static int halt(void)
@@ -335,8 +336,7 @@ syscall_handler (struct intr_frame *f)
   f->eax = sc->func (args[0], args[1], args[2]);
 }
 
-static struct mapping *
-lookup_mapping (int fd)
+static struct mapping * getmap (int fd)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
@@ -350,32 +350,6 @@ lookup_mapping (int fd)
     }
 
   thread_exit ();
-}
-
-
-static void
-unmap (struct mapping *m)
-{
-  /* Remove this mapping from the list of mapping for this process. */
-  list_remove(&m->elem);
-
-  /* For each page in the memory mapped file... */
-  for(int i = 0; i < m->num; i++)
-  {
-    /* ...determine whether or not the page is dirty (modified). If so, write that page back out to disk. */
-    if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->addr) + (PGSIZE * i)))))
-    {
-      lock_acquire (&file_lock);
-      file_write_at(m->file, (const void *) (m->addr + (PGSIZE * i)), (PGSIZE*(m->num)), (PGSIZE * i));
-      lock_release (&file_lock);
-    }
-  }
-
-  /* Finally, deallocate all memory mapped pages (free up the process memory). */
-  for(int i = 0; i < m->num; i++)
-  {
-    page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
-  }
 }
 
 static int
@@ -429,10 +403,24 @@ mmap (int handle, void *addr)
 static int
 munmap (int mapping)
 {
-  struct mapping *map = lookup_mapping(mapping);
-  unmap(map);
+  struct mapping *m = getmap(mapping);
+  list_remove(&m->elem);
+  for(int i = 0; i < m->num; i++)
+  {
+    if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->addr) + (PGSIZE * i)))))
+    {
+      lock_acquire (&file_lock);
+      file_write_at(m->file, (const void *) (m->addr + (PGSIZE * i)), (PGSIZE*(m->num)), (PGSIZE * i));
+      lock_release (&file_lock);
+    }
+  }
+  for(int i = 0; i < m->num; i++)
+  {
+    page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
+  }
   return 0;
 }
+
 void
 exit2 (void)
 {
