@@ -283,7 +283,7 @@ unsigned tell (int fd)
   return ret;
 }
 
-static int close(int fd)
+void close(int fd)
 {
   struct fds* f=getfile(fd);
   lock_acquire(&file_lock);
@@ -294,7 +294,7 @@ static int close(int fd)
   return 0;
 }
 
-static int mmap (int fd, void *addr)
+int mmap (int fd, void *addr)
 {
   struct fds* f=getfile(fd);
   struct mapping* m=malloc(sizeof(struct mapping));
@@ -342,7 +342,7 @@ static int mmap (int fd, void *addr)
   return m->id;
 }
 
-static int munmap (int mapping)
+void munmap (int mapping)
 {
   struct mapping *m = getmap(mapping);
   list_remove(&m->elem);
@@ -380,7 +380,7 @@ syscall_handler (struct intr_frame *f)
   memset(args,0,sizeof(args));
   if (func==SYS_HALT)
   {
-    f->eax=halt();
+    halt();
   }else if (func==SYS_EXIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -420,7 +420,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_SEEK)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=seek(args[0],args[1]);
+    seek(args[0],args[1]);
   }else if (func==SYS_TELL)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -428,7 +428,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_CLOSE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=close(args[0]);
+    close(args[0]);
   }else if (func==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
@@ -436,7 +436,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_MUNMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=munmap(args[0]);
+    munmap(args[0]);
   }
 }
 
