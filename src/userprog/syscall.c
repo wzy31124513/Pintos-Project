@@ -385,7 +385,7 @@ mmap (int handle, void *addr)
       struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
-          unmap (m);
+          munmap (m->id);
           return -1;
         }
       p->mmap = false;
