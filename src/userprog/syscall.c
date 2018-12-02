@@ -46,11 +46,13 @@ static int tell (int fd);
 static int close (int fd);
 static int mmap (int fd, void *addr);
 static int munmap (int mapping);
+static void unmap(struct mapping* m);
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
 static char * copy_in_string (const char *us);
 static struct fds* getfile(int fd);
 void exit2 (void);
+static struct mapping* getmap(int id);
 
 static int halt(void)
 {
