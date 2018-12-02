@@ -18,7 +18,7 @@
 
 
 static int halt (void);
-static int exit (int status);
+static int exit1 (int status);
 static int exec (const char *ufile);
 static int wait (tid_t);
 static int create (const char *ufile, unsigned initial_size);
@@ -62,7 +62,7 @@ syscall_handler (struct intr_frame *f)
   static const struct syscall syscall_table[] =
     {
       {0, (syscall_function *)halt},
-      {1, (syscall_function *)exit},
+      {1, (syscall_function *)exit1},
       {1, (syscall_function *)exec},
       {1, (syscall_function *)wait},
       {2, (syscall_function *)create},
@@ -176,11 +176,10 @@ halt (void)
 }
 
 static int
-exit (int exitcode)
+exit1 (int exitcode)
 {
   thread_current ()->exitcode = exitcode;
   thread_exit ();
-  NOT_REACHED ();
 }
 
 static int
@@ -545,8 +544,8 @@ mmap (int handle, void *addr)
       p->file = m->file;
       p->offset = offset;
       p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->file_bytes;
-      length -= p->file_bytes;
+      offset += p->rw_bytes;
+      length -= p->rw_bytes;
       m->page_cnt++;
     }
 
