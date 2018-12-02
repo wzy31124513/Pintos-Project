@@ -374,13 +374,11 @@ void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&file_lock);
 }
 
 static void
 syscall_handler (struct intr_frame *f)
 {
-  const struct syscall *sc;
   unsigned func;
   int args[3];
   argcpy(&func,f->esp,sizeof(func));
