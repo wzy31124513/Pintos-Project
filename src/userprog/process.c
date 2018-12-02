@@ -31,6 +31,7 @@ static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  char *fn_copy;
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
