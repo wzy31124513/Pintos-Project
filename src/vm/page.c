@@ -39,8 +39,7 @@ struct page * page_alloc(void* addr, bool read_only){
   return p;
 }
 
-static struct page *
-struct page * find_page(const void* addr){
+static struct page * find_page(const void* addr){
   if (addr<PHYS_BASE)
   {
     struct page page;
@@ -70,12 +69,12 @@ bool load_page(struct page* p){
   {
     swap_in(p);
   }else if(p->file!=NULL){
-    int rw_bytes=file_read_at(p->file,p->f->addr,p->rw_bytes,p->offset);
+    int rw_bytes=file_read_at(p->file,p->frame->addr,p->rw_bytes,p->offset);
     int zero_bytes=PGSIZE-rw_bytes;
-    memset(p->f->addr+rw_bytes,0,zero_bytes);
+    memset(p->frame->addr+rw_bytes,0,zero_bytes);
 
   }else{
-    memset(p->f->addr,0,PGSIZE);
+    memset(p->frame->addr,0,PGSIZE);
   }
   return true;
 }
@@ -92,15 +91,15 @@ bool load_fault(void* addr){
     return false;
   }
   frame_lock (p);
-  if (p->f==NULL)
+  if (p->frame==NULL)
   {
     if (!load_page(p))
     {
       return false;
     }
   }
-  bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->f->addr,p->writable);
-  lock_release(&p->f->lock);
+  bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->frame->addr,p->writable);
+  lock_release(&p->frame->lock);
   return ret;
 }
 
@@ -122,7 +121,7 @@ bool page_evict(struct page* p){
       {
         ret=swap_out(p);
       }else{
-        ret=file_write_at(p->file,p->f->addr,p->rw_bytes,p->offset);
+        ret=file_write_at(p->file,p->frame->addr,p->rw_bytes,p->offset);
       }
     } 
   }else{
@@ -130,7 +129,7 @@ bool page_evict(struct page* p){
   }
   if (ret)
   {
-    p->f=NULL;
+    p->frame=NULL;
   }
   return ret;
 }
@@ -151,7 +150,7 @@ void page_deallocate(void *addr){
   if (p->frame)
   {
     struct frame *f = p->frame;
-    if (p->file && !p->private){
+    if (p->file && !p->mmap){
       page_evict(p);
     }
     frame_free(f);
