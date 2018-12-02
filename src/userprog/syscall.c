@@ -51,6 +51,7 @@ static int munmap (int mapping);
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
 static char * copy_in_string (const char *us);
+static struct fds* getfile(int fd);
 void exit2 (void);
 
 static int halt(void)
@@ -197,7 +198,7 @@ static int filesize(int fd)
 }
 
 
-static int read (int fd, char *buffer, unsigned size)
+static int read (int fd, void *buffer, unsigned size)
 {
   int read=0;
   struct fds* f=getfile(fd);
@@ -255,7 +256,7 @@ static int read (int fd, char *buffer, unsigned size)
 }
 
 
-static int write (int fd, const void *buffer, unsigned size){
+static int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
   struct fds* f;
   int write=0;
@@ -355,7 +356,7 @@ static struct fds* getfile(int fd){
 }
 
 static struct mapping *
-lookup_mapping (int handle)
+lookup_mapping (int fd)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
@@ -364,7 +365,7 @@ lookup_mapping (int handle)
        e = list_next (e))
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
-      if (m->id == id)
+      if (m->id == fd)
         return m;
     }
 
@@ -391,7 +392,7 @@ unmap (struct mapping *m)
   }
 
   /* Finally, deallocate all memory mapped pages (free up the process memory). */
-  for(int i = 0; i < m->page_cnt; i++)
+  for(int i = 0; i < m->num; i++)
   {
     page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
   }
@@ -400,7 +401,7 @@ unmap (struct mapping *m)
 static int
 mmap (int handle, void *addr)
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = lookup_fd (handle);
   struct mapping *m = malloc (sizeof *m);
   size_t offset;
   off_t length;
@@ -460,7 +461,7 @@ exit2 (void)
 
   for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list); e = next)
     {
-      struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
+      struct fds *fd = list_entry (e, struct fds, elem);
       next = list_next (e);
       lock_acquire (&file_lock);
       file_close (fd->file);
