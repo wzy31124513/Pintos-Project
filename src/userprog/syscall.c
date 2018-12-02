@@ -34,6 +34,7 @@ static int mmap (int fd, void *addr);
 static int munmap (int mapping);
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
+static char * copy_in_string (const char *us);
 void exit2 (void);
 
 static int halt(void)
@@ -170,13 +171,8 @@ copy_in (void *dst_, const void *usrc_, size_t size)
     }
 }
 
-/* Creates a copy of user string US in kernel memory
-   and returns it as a page that must be freed with
-   palloc_free_page().
-   Truncates the string at PGSIZE bytes in size.
-   Call thread_exit() if any of the user accesses are invalid. */
-static char *
-copy_in_string (const char *us)
+
+static char * copy_in_string (const char *us)
 {
   char *ks;
   char *upage;
