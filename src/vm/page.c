@@ -98,7 +98,7 @@ bool load_fault(void* addr){
       return false;
     }
   }
-  bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->frame->addr,p->writable);
+  bool ret=pagedir_set_page(thread_current()->pagedir,p->addr,p->frame->addr,!p->read_only);
   lock_release(&p->frame->lock);
   return ret;
 }
