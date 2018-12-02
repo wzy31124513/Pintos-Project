@@ -38,7 +38,7 @@ process_execute (const char *file_name)
   char *p;
   tid_t tid;
   exec.file_name = file_name;
-  sema_init (&exec.load_done, 0);
+  sema_init (&exec.load, 0);
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name, file_name, sizeof name);
@@ -47,7 +47,7 @@ process_execute (const char *file_name)
   if (tid != TID_ERROR)
     {
       sema_down (&exec.load);
-      if (exec.success)
+      if (exec.loaded)
         list_push_back (&thread_current ()->children, &exec.child_proc->elem);
       else 
         tid = TID_ERROR;
@@ -61,7 +61,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *exec_)
 {
-  struct exec_info *exec = exec_;
+  struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
 
