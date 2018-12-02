@@ -395,7 +395,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* We arrive here whether the load is successful or not. */
   return success;
 }
-
+
 /* load() helpers. */
 
 /* Checks whether PHDR describes a valid, loadable segment in
@@ -486,85 +486,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
-/* Reverse the order of the ARGC pointers to char in ARGV. */
-static void
-reverse (int argc, char **argv) 
-{
-  for (; argc > 1; argc -= 2, argv++) 
-    {
-      char *tmp = argv[0];
-      argv[0] = argv[argc - 1];
-      argv[argc - 1] = tmp;
-    }
-}
- 
-/* Pushes the SIZE bytes in BUF onto the stack in KPAGE, whose
-   page-relative stack pointer is *OFS, and then adjusts *OFS
-   appropriately.  The bytes pushed are rounded to a 32-bit
-   boundary.
 
-   If successful, returns a pointer to the newly pushed object.
-   On failure, returns a null pointer. */
-static void *
-push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
+static bool getargs(uint8_t* kaddr, uint8_t* uaddr,const char* file_name,void **esp);
+static void * push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size);
+ 
+static void * push(uint8_t *kaddr, size_t *ofs, const void *buf, size_t size) 
 {
   size_t padsize = ROUND_UP (size, sizeof (uint32_t));
-  if (*ofs < padsize)
+  if (*ofs < padsize){
     return NULL;
-
-  *ofs -= padsize;
-  memcpy (kpage + *ofs + (padsize - size), buf, size);
-  return kpage + *ofs + (padsize - size);
-}
-
-/* Sets up command line arguments in KPAGE, which will be mapped
-   to UPAGE in user space.  The command line arguments are taken
-   from CMD_LINE, separated by spaces.  Sets *ESP to the initial
-   stack pointer for the process. */
-static bool
-init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
-               void **esp) 
-{
-  size_t ofs = PGSIZE;
-  char *const null = NULL;
-  char *cmd_line_copy;
-  char *karg, *saveptr;
-  int argc;
-  char **argv;
-
-  /* Push command line string. */
-  cmd_line_copy = push (kpage, &ofs, cmd_line, strlen (cmd_line) + 1);
-  if (cmd_line_copy == NULL)
-    return false;
-
-  if (push (kpage, &ofs, &null, sizeof null) == NULL)
-    return false;
-
-  /* Parse command line into arguments
-     and push them in reverse order. */
-  argc = 0;
-  for (karg = strtok_r (cmd_line_copy, " ", &saveptr); karg != NULL;
-       karg = strtok_r (NULL, " ", &saveptr))
-    {
-      void *uarg = upage + (karg - (char *) kpage);
-      if (push (kpage, &ofs, &uarg, sizeof uarg) == NULL)
-        return false;
-      argc++;
-    }
-
-  /* Reverse the order of the command line arguments. */
-  argv = (char **) (upage + ofs);
-  reverse (argc, (char **) (kpage + ofs));
-
-  /* Push argv, argc, "return address". */
-  if (push (kpage, &ofs, &argv, sizeof argv) == NULL
-      || push (kpage, &ofs, &argc, sizeof argc) == NULL
-      || push (kpage, &ofs, &null, sizeof null) == NULL)
-    return false;
-
-  /* Set initial stack pointer. */
-  *esp = upage + ofs;
-  return true;
+  }
+  *ofs-=padsize;
+  memcpy (kaddr+*ofs+(padsize-size),buf,size);
+  return kaddr+*ofs+(padsize-size);
 }
 
 /* Create a minimal stack for T by mapping a page at the
@@ -582,10 +516,50 @@ setup_stack (void **esp,char* file_name)
           bool ok;
           page->read_only = false;
           page->mmap = false;
-          ok = init_cmd_line (page->frame->addr, page->addr, file_name, esp);
+          ok = getargs (page->frame->addr, page->addr, file_name, esp);
           frame_unlock (page->frame);
           return ok;
         }
     }
   return false;
+}
+
+
+static bool getargs(uint8_t* kaddr, uint8_t* uaddr,const char* file_name,void **esp){
+  size_t ofs=PGSIZE;
+  char* const null=NULL;
+  char *cmd_line;
+  char *karg,*p;
+  int argc;
+  char **argv;
+  cmd_line=push(kaddr,&ofs,file_name,strlen(file_name)+1);
+  if (cmd_line==NULL){
+    return false;
+  }
+  if(push(kaddr,&ofs,&null,sizeof(null))==NULL){
+    return false;
+  }
+  argc = 0;
+  for (karg=strtok_r(cmd_line_copy, " ", &saveptr);karg != NULL;karg = strtok_r (NULL, " ", &saveptr)){
+    void *uarg=uaddr+karg-(char*)kaddr;
+    if(push(kaddr,&ofs,&uarg,sizeof(uarg))==NULL){
+      return false;
+    }
+    argc++;
+  }
+  argv=(char**)(uaddr + ofs);
+  char** kargv=(char**)(kaddr+ofs);
+  while(argc>1){
+    char* temp=kargv[0];
+    kargv[0]=kargv[argc-1];
+    kargv[argc-1]=temp;
+    argc-=2;
+    kargv++;
+
+  }
+  if(push(kaddr,&ofs,&argv,sizeof(argv))==NULL || push(kaddr,&ofs,&argc,sizeof(argc))==NULL || push(kaddr,&ofs,&null,sizeof(null))==NULL){
+    return false;
+  }
+  *esp = uaddr + ofs;
+  return true;
 }
