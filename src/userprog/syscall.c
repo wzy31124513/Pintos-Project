@@ -336,8 +336,7 @@ syscall_handler (struct intr_frame *f)
   f->eax = sc->func (args[0], args[1], args[2]);
 }
 
-static int
-mmap (int fd, void *addr)
+static int mmap (int fd, void *addr)
 {
   struct fds* f=getfile(fd);
   struct mapping* m=malloc(sizeof(struct mapping));
@@ -372,12 +371,16 @@ mmap (int fd, void *addr)
     p->mmap=false;
     p->file=m->file;
     p->offset=offset;
-    p->rw_bytes=length >= PGSIZE ? PGSIZE : length;
+    if (length>=PGSIZE)
+    {
+      p->rw_bytes=PGSIZE
+    }else{
+      p->rw_bytes=length;
+    }
     offset+=p->rw_bytes;
     length-=p->rw_bytes;
     m->num++;
   }
-
   return m->id;
 }
 
