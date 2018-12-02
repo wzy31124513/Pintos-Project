@@ -78,7 +78,7 @@ start_process (void *exec_)
   {
     lock_init(&exec->child_proc->lock);
     exec->child_proc->status=2;
-    exec->child_proc->id=hread_current()->tid;
+    exec->child_proc->id=thread_current()->tid;
     sema_init (&exec->child_proc->exit,0);
   }
   exec->loaded=success;
@@ -114,10 +114,9 @@ process_wait (tid_t child_tid)
     struct child_proc* c=list_entry(e,struct child_proc,elem);
     if (c->id == child_tid) 
       {
-        int ret;
         list_remove (e);
-        sema_down (&c->dead);
-        ret = c->exitcode;
+        sema_down (&c->exit);
+        int ret = c->ret;
         lock_acquire (&c->lock);
         int temp=--c->status;
         lock_release (&c->lock);
@@ -263,7 +262,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp,char* file_name)
+static bool setup_stack (void **esp,char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
