@@ -65,6 +65,29 @@ static int exit1(int status)
   thread_exit ();
 }
 
+void
+exit2 (void)
+{
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+  struct list_elem *next;
+  for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
+  {
+    struct fds *fd=list_entry(e,struct fds,elem);
+    next=list_next(e);
+    lock_acquire(&file_lock);
+    file_close(fd->file);
+    lock_release(&file_lock);
+    free (fd);
+  }
+  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=next)
+  {
+    next=list_next(e);
+    struct mapping *m=list_entry(e,struct mapping,elem);
+    munmap(m->id);
+  }
+}
+
 static int exec(const char* cmd_line)
 {
   int ret;
@@ -327,8 +350,7 @@ static int mmap (int fd, void *addr)
   return m->id;
 }
 
-static int
-munmap (int mapping)
+static int munmap (int mapping)
 {
   struct mapping *m = getmap(mapping);
   list_remove(&m->elem);
@@ -393,31 +415,6 @@ syscall_handler (struct intr_frame *f)
   f->eax=sc->func(args[0],args[1],args[2]);
 }
 
-void
-exit2 (void)
-{
-  struct thread *cur = thread_current();
-  struct list_elem *e;
-  struct list_elem *next;
-  for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
-  {
-    struct fds *fd=list_entry(e,struct fds,elem);
-    next=list_next(e);
-    lock_acquire(&file_lock);
-    file_close(fd->file);
-    lock_release(&file_lock);
-    free (fd);
-  }
-  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=next)
-  {
-    next=list_next(e);
-    struct mapping *m=list_entry(e,struct mapping,elem);
-    munmap(m->id);
-  }
-}
-
-
-
 static void argcpy(void* cp,const void* addr1,size_t size){
   uint8_t *dst=cp;
   const uint8_t *addr=addr1;
@@ -450,7 +447,8 @@ static char * strcpy_to_kernel (const char *str)
   while(1){
     addr=pg_round_down (str);
     if(!page_lock(addr,false)){
-      page_unlock(addr);
+      palloc_free_page (cp);
+      thread_exit ();
       return NULL;
     }
     while(str<addr+PGSIZE){
@@ -461,15 +459,13 @@ static char * strcpy_to_kernel (const char *str)
           return cp;
         }
         else if (length>=PGSIZE){
-          palloc_free_page (cp);
-          thread_exit ();
+          page_unlock(addr);
           return NULL;
         }
       str++;
     }
     page_unlock (addr);
   }
-
 }
 
 
