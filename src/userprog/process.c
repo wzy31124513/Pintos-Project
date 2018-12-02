@@ -489,7 +489,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static void * push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size); 
 static bool setup_stack (void** esp,char* file_name);
 static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void** esp);
-
+static void reverse (int argc, char **argv);
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool setup_stack (void** esp,char* file_name)
@@ -543,9 +543,7 @@ static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void**
   return true;
 }
 
-static void
-reverse (int argc, char **argv) 
-{
+static void reverse (int argc, char **argv){
   while(argc>1){
     char *temp=argv[0];
     argv[0]=argv[argc-1];
@@ -555,8 +553,7 @@ reverse (int argc, char **argv)
   }
 }
 
-static void *push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
-{
+static void *push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size){
   size_t padsize=ROUND_UP(size,sizeof(uint32_t));
   if(*ofs < padsize){
     return NULL;
