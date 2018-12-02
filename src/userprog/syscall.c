@@ -32,21 +32,21 @@ struct mapping
   struct list_elem elem;
 };
 
-static int halt (void);
-static int exit (int status);
-static int exec (const char *cmd_line);
-static int wait (int pid);
-static int create (const char *file, unsigned initial_size);
-static int remove (const char *file);
-static int open (const char *file);
-static int filesize (int fd);
-static int read (int fd, void *buffer, unsigned size);
-static int write (int fd, const void *buffer, unsigned size);
-static int seek (int fd, unsigned position);
-static int tell (int fd);
-static int close (int fd);
-static int mmap (int fd, void *addr);
-static int munmap (int mapping);
+static int sys_halt (void);
+static int sys_exit (int status);
+static int sys_exec (const char *cmd_line);
+static int sys_wait (int pid);
+static int sys_create (const char *file, unsigned initial_size);
+static int sys_remove (const char *file);
+static int sys_open (const char *file);
+static int sys_filesize (int fd);
+static int sys_read (int fd, void *buffer, unsigned size);
+static int sys_write (int fd, void *buffer, unsigned size);
+static int sys_seek (int fd, unsigned position);
+static int sys_tell (int fd);
+static int sys_close (int fd);
+static int sys_mmap (int fd, void *addr);
+static int sys_munmap (int mapping);
 char* strcpy_to_kernel(const char* str);
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
@@ -73,21 +73,21 @@ syscall_handler (struct intr_frame *f)
 
   static const struct syscall syscall_table[] =
     {
-      {0,(syscall_function *)halt},
-      {1,(syscall_function *)exit},
-      {1,(syscall_function *)exec},
-      {1,(syscall_function *)wait},
-      {2,(syscall_function *)create},
-      {1,(syscall_function *)remove},
-      {1,(syscall_function *)open},
-      {1,(syscall_function *)filesize},
-      {3,(syscall_function *)read},
-      {3,(syscall_function *)write},
-      {2,(syscall_function *)seek},
-      {1,(syscall_function *)tell},
-      {1,(syscall_function *)close},
-      {2,(syscall_function *)mmap},
-      {1,(syscall_function *)munmap},
+      {0, (syscall_function *) sys_halt},
+      {1, (syscall_function *) sys_exit},
+      {1, (syscall_function *) sys_exec},
+      {1, (syscall_function *) sys_wait},
+      {2, (syscall_function *) sys_create},
+      {1, (syscall_function *) sys_remove},
+      {1, (syscall_function *) sys_open},
+      {1, (syscall_function *) sys_filesize},
+      {3, (syscall_function *) sys_read},
+      {3, (syscall_function *) sys_write},
+      {2, (syscall_function *) sys_seek},
+      {1, (syscall_function *) sys_tell},
+      {1, (syscall_function *) sys_close},
+      {2, (syscall_function *) sys_mmap},
+      {1, (syscall_function *) sys_munmap},
     };
   unsigned call_nr;
   int args[3];
@@ -297,7 +297,7 @@ static int read(int fd,void *buffer, unsigned size)
   return bytes_read;
 }
 
-static int write (int fd, const void *buffer, unsigned size){
+static int write (int fd, void *buffer, unsigned size){
   uint8_t *usrc=buffer;
   struct fds* f = NULL;
   int bytes_written = 0;
