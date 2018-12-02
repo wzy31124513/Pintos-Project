@@ -336,66 +336,47 @@ syscall_handler (struct intr_frame *f)
   f->eax = sc->func (args[0], args[1], args[2]);
 }
 
-static struct mapping * getmap (int fd)
-{
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-
-  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
-       e = list_next (e))
-    {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      if (m->id == fd)
-        return m;
-    }
-
-  thread_exit ();
-}
-
 static int
-mmap (int handle, void *addr)
+mmap (int fd, void *addr)
 {
-  struct fds *fd = getfile (handle);
-  struct mapping *m = malloc (sizeof *m);
+  struct fds* f=getfile(fd);
+  struct mapping* m=malloc(sizeof(struct mapping));
   size_t offset;
   off_t length;
-
-  if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
+  if (m==NULL || addr==NULL || pg_ofs(addr)!=0){
     return -1;
+  }
+  m->id=thread_current()->fd_num++;
+  lock_acquire(&file_lock);
+  m->file=file_reopen(fd->file);
+  lock_release(&file_lock);
+  if(m->file==NULL)
+  {
+    free (m);
+    return -1;
+  }
+  m->addr=addr;
+  m->num=0;
+  list_push_front(&thread_current()->mapping,&m->elem);
 
-  m->id = thread_current ()->fd_num++;
-  lock_acquire (&file_lock);
-  m->file = file_reopen (fd->file);
-  lock_release (&file_lock);
-  if (m->file == NULL)
-    {
-      free (m);
+  offset=0;
+  lock_acquire(&file_lock);
+  length=file_length(m->file);
+  lock_release(&file_lock);
+  while(length>0){
+    struct page* p=page_alloc((uint8_t*)addr+offset,false);
+    if(p==NULL){
+      munmap(m->id);
       return -1;
     }
-  m->addr = addr;
-  m->num = 0;
-  list_push_front (&thread_current ()->mapping, &m->elem);
-
-  offset = 0;
-  lock_acquire (&file_lock);
-  length = file_length (m->file);
-  lock_release (&file_lock);
-  while (length > 0)
-    {
-      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
-      if (p == NULL)
-        {
-          munmap (m->id);
-          return -1;
-        }
-      p->mmap = false;
-      p->file = m->file;
-      p->offset = offset;
-      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->rw_bytes;
-      length -= p->rw_bytes;
-      m->num++;
-    }
+    p->mmap=false;
+    p->file=m->file;
+    p->offset=offset;
+    p->rw_bytes=length >= PGSIZE ? PGSIZE : length;
+    offset+=p->rw_bytes;
+    length-=p->rw_bytes;
+    m->num++;
+  }
 
   return m->id;
 }
@@ -519,6 +500,19 @@ static struct fds* getfile(int fd){
       if(fds->fd == fd){
         return fds;
       }
+  }
+  thread_exit ();
+}
+
+static struct mapping* getmap (int fd)
+{
+  struct list_elem *e;
+  for (e = list_begin (&thread_current()->mapping); e != list_end (&thread_current()->mapping);e = list_next (e))
+  {
+    struct mapping* m=list_entry(e,struct mapping,elem);
+    if(m->id==fd){
+      return m;
+    }
   }
   thread_exit ();
 }
