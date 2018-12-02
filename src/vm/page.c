@@ -1,6 +1,4 @@
 #include "vm/page.h"
-#include <stdio.h>
-#include <string.h>
 #include "vm/frame.h"
 #include "vm/swap.h"
 #include "filesys/file.h"

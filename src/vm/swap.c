@@ -1,7 +1,5 @@
 #include "vm/swap.h"
 #include <bitmap.h>
-#include <debug.h>
-#include <stdio.h>
 #include "vm/frame.h"
 #include "vm/page.h"
 #include "threads/synch.h"

@@ -34,20 +34,20 @@ process_execute (const char *file_name)
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
-  struct exec_table* exec=malloc(sizeof(struct exec_table));
-  exec->file_name=file_name;
-  sema_init (&exec->load,0);
+  struct exec_table exec;
+  exec.file_name=file_name;
+  sema_init (&exec.load,0);
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
-  tid = thread_create (name, PRI_DEFAULT, start_process,exec);
+  tid = thread_create (name, PRI_DEFAULT, start_process,&exec);
   free(name);
   if (tid != TID_ERROR)
     {
-      sema_down(&exec->load);
-      if(exec->loaded){
-        list_push_back(&thread_current()->children,&exec->child_proc->elem);
+      sema_down(&exec.load);
+      if(exec.loaded){
+        list_push_back(&thread_current()->children,&exec.child_proc->elem);
       }
       else{
         tid=TID_ERROR;

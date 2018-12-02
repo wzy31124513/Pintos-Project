@@ -98,7 +98,6 @@ struct thread
     uint32_t *pagedir;
     #endif 
     int exitcode; 
-    struct thread* parent;
     struct child_proc* child_proc;
     struct list children;
     int fd_num;
@@ -108,10 +107,6 @@ struct thread
     struct hash* pages;
     struct list mapping;
     void* esp;
-    
-    struct semaphore load;
-    bool loaded;
-
     unsigned magic;                     /* Detects stack overflow. */
   };
 
