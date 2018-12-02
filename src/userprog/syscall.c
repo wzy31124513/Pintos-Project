@@ -328,7 +328,7 @@ int mmap (int fd, void *addr)
     p->mmap=false;
     p->file=m->file;
     p->offset=offset;
-    if (length>=PGSIZE)
+    if (read_bytes>=PGSIZE)
     {
       p->rw_bytes=PGSIZE;
     }else{
