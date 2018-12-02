@@ -35,7 +35,7 @@ static int munmap (int mapping);
 
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
-
+void exit2 (void);
 static struct lock fs_lock;
 
 void
@@ -176,9 +176,9 @@ halt (void)
 }
 
 static int
-exit (int exit_code)
+exit (int exitcode)
 {
-  thread_current ()->exit_code = exit_code;
+  thread_current ()->exitcode = exitcode;
   thread_exit ();
   NOT_REACHED ();
 }
@@ -256,8 +256,8 @@ open (const char *ufile)
       if (fd->file != NULL)
         {
           struct thread *cur = thread_current ();
-          handle = fd->handle = cur->next_handle++;
-          list_push_front (&cur->fds, &fd->elem);
+          handle = fd->handle = cur->fd_num++;
+          list_push_front (&cur->file_list, &fd->elem);
         }
       else
         free (fd);
@@ -274,7 +274,7 @@ lookup_fd (int handle)
   struct thread *cur = thread_current ();
   struct list_elem *e;
 
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds);
+  for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list);
        e = list_next (e))
     {
       struct file_descriptor *fd;
@@ -468,7 +468,7 @@ lookup_mapping (int handle)
   struct thread *cur = thread_current ();
   struct list_elem *e;
 
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
+  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
        e = list_next (e))
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
@@ -483,7 +483,7 @@ lookup_mapping (int handle)
 static void
 unmap (struct mapping *m)
 {
-  /* Remove this mapping from the list of mappings for this process. */
+  /* Remove this mapping from the list of mapping for this process. */
   list_remove(&m->elem);
 
   /* For each page in the memory mapped file... */
@@ -516,7 +516,7 @@ mmap (int handle, void *addr)
   if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
     return -1;
 
-  m->handle = thread_current ()->next_handle++;
+  m->handle = thread_current ()->fd_num++;
   lock_acquire (&fs_lock);
   m->file = file_reopen (fd->file);
   lock_release (&fs_lock);
@@ -527,7 +527,7 @@ mmap (int handle, void *addr)
     }
   m->base = addr;
   m->page_cnt = 0;
-  list_push_front (&thread_current ()->mappings, &m->elem);
+  list_push_front (&thread_current ()->mapping, &m->elem);
 
   offset = 0;
   lock_acquire (&fs_lock);
@@ -535,16 +535,16 @@ mmap (int handle, void *addr)
   lock_release (&fs_lock);
   while (length > 0)
     {
-      struct page *p = page_allocate ((uint8_t *) addr + offset, false);
+      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
           unmap (m);
           return -1;
         }
-      p->private = false;
+      p->mmap = false;
       p->file = m->file;
-      p->file_offset = offset;
-      p->file_bytes = length >= PGSIZE ? PGSIZE : length;
+      p->offset = offset;
+      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
       offset += p->file_bytes;
       length -= p->file_bytes;
       m->page_cnt++;
@@ -566,7 +566,7 @@ exit2 (void)
   struct thread *cur = thread_current ();
   struct list_elem *e, *next;
 
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds); e = next)
+  for (e = list_begin (&cur->file_list); e != list_end (&cur->file_list); e = next)
     {
       struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
@@ -576,7 +576,7 @@ exit2 (void)
       free (fd);
     }
 
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
+  for (e = list_begin (&cur->mapping); e != list_end (&cur->mapping);
        e = next)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
