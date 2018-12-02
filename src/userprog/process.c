@@ -36,21 +36,22 @@ process_execute (const char *file_name)
   char *p;
   tid_t tid;
   exec.file_name=file_name;
-  sema_init (&exec.load_done,0);
+  sema_init (&exec.load,0);
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name,file_name,sizeof(name));
-  strtok_r (name," ",&[save_ptr]);
-  tid = thread_create (thread_name, PRI_DEFAULT, start_process, &exec);
+  strtok_r (name," ",&p);
+  tid = thread_create (name, PRI_DEFAULT, start_process, &exec);
   if (tid != TID_ERROR)
     {
-      sema_down (&exec.load_done);
-      if (exec.success)
+      sema_down (&exec.load);
+      if (exec.loaded){
         list_push_back (&thread_current ()->children, &exec.child_proc->elem);
-      else 
+      }
+      else{
         tid = TID_ERROR;
+      }
     }
-
   return tid;
 }
 
@@ -62,7 +63,6 @@ start_process (void *exec_)
   struct exec_table *exec = exec_;
   struct intr_frame if_;
   bool success;
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -70,29 +70,22 @@ start_process (void *exec_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
-  /* Allocate child_proc. */
-  if (success)
-    {
-      exec->child_proc = thread_current ()->child_proc
-        = malloc (sizeof *exec->child_proc);
-      success = exec->child_proc != NULL; 
-    }
-
-  /* Initialize child_proc. */
+  if(success){
+    exec->child_proc=thread_current ()->child_proc=malloc(sizeof(struct child_proc));
+    success=exec->child_proc!=NULL; 
+  }
   if (success) 
-    {
-      lock_init (&exec->child_proc->lock);
-      exec->child_proc->ref_cnt = 2;
-      exec->child_proc->tid = thread_current ()->tid;
-      sema_init (&exec->child_proc->dead, 0);
-    }
-  
-  /* Notify parent thread and clean up. */
-  exec->success = success;
-  sema_up (&exec->load_done);
-  if (!success) 
+  {
+    lock_init(&exec->child_proc->lock);
+    exec->child_proc->status=2;
+    exec->child_proc->id=hread_current()->tid;
+    sema_init (&exec->child_proc->exit,0);
+  }
+  exec->loaded=success;
+  sema_up (&exec->load);
+  if (!success){
     thread_exit ();
-
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -103,47 +96,38 @@ start_process (void *exec_)
   NOT_REACHED ();
 }
 
-/* Releases one reference to CS and, if it is now unreferenced,
-   frees it. */
-static void
-release_child (struct child_proc *cs) 
-{
-  int new_ref_cnt;
-  
-  lock_acquire (&cs->lock);
-  new_ref_cnt = --cs->ref_cnt;
-  lock_release (&cs->lock);
-
-  if (new_ref_cnt == 0)
-    free (cs);
-}
-
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
-   immediately, without waiting. */
+   immediately, without waiting.
+
+   This function will be implemented in problem 2-2.  For now, it
+   does nothing. */
 int
 process_wait (tid_t child_tid) 
 {
-  struct thread *cur = thread_current ();
   struct list_elem *e;
-
-  for (e = list_begin (&cur->children); e != list_end (&cur->children);
-       e = list_next (e)) 
-    {
-      struct child_proc *cs = list_entry (e, struct child_proc, elem);
-      if (cs->tid == child_tid) 
+  for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=list_next(e))
+  {
+    struct child_proc* c=list_entry(e,struct child_proc,elem);
+    if (c->id == child_tid) 
+      {
+        int ret;
+        list_remove (e);
+        sema_down (&c->dead);
+        ret = c->exitcode;
+        lock_acquire (&c->lock);
+        int temp=--c->status;
+        lock_release (&c->lock);
+        if (temp==0)
         {
-          int exitcode;
-          list_remove (e);
-          sema_down (&cs->dead);
-          exitcode = cs->exitcode;
-          release_child (cs);
-          return exitcode;
+          free(c);
         }
-    }
+        return ret;
+      }
+  }
   return -1;
 }
 
@@ -156,30 +140,31 @@ process_exit (void)
   uint32_t *pd;
 
   printf ("%s: exit(%d)\n", cur->name, cur->exitcode);
-
-  /* Notify parent that we're dead. */
-  if (cur->child_proc != NULL) 
+  if (cur->child_proc != NULL) {
+    struct child_proc *c = cur->child_proc;
+    c->ret = cur->exitcode;
+    sema_up (&c->exit);
+    lock_acquire (&c->lock);
+    int temp=--c->status;
+    lock_release (&c->lock);
+    if (temp==0)
     {
-      struct child_proc *cs = cur->child_proc;
-      cs->exitcode = cur->exitcode;
-      sema_up (&cs->dead);
-      release_child (cs);
+      free(c);
     }
-
-  /* Free entries of children list. */
-  for (e = list_begin (&cur->children); e != list_end (&cur->children);
-       e = next) 
+  }
+  for (e = list_begin(&thread_current()->children); e != list_tail(&thread_current()->children); e=next){
+    struct child_proc *c = list_entry (e, struct child_proc, elem);
+    next = list_remove (e);
+    lock_acquire (&c->lock);
+    int temp=--c->status;
+    lock_release (&c->lock);
+    if (temp==0)
     {
-      struct child_proc *cs = list_entry (e, struct child_proc, elem);
-      next = list_remove (e);
-      release_child (cs);
+      free(c);
     }
-
-  /* Destroy the page hash table. */
+  }
   page_exit ();
-  
-  /* Close executable (and allow writes). */
-  file_close (cur->bin_file);
+  file_close (thread_current()->self);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
