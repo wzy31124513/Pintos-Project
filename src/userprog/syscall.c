@@ -401,7 +401,7 @@ unmap (struct mapping *m)
 static int
 mmap (int handle, void *addr)
 {
-  struct fds *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   struct mapping *m = malloc (sizeof *m);
   size_t offset;
   off_t length;
