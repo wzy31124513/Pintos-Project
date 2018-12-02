@@ -290,7 +290,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  char name=malloc(strlen(file_name)+1);
+  char* name=malloc(strlen(file_name)+1);
   char *p;
   int i;
 
