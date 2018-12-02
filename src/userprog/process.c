@@ -78,7 +78,7 @@ start_process (void *exec_table)
       success=false;
     }
   }
-  if (success) 
+  if(success) 
   {
     lock_init(&exec->child_proc->lock);
     exec->child_proc->status=2;
@@ -520,31 +520,31 @@ static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void**
   size_t ofs = PGSIZE;
   char *const null = NULL;
   char *copy;
-  char *karg, *p;
+  char *karg,*p;
   int argc;
   char **argv;
   copy=push(kpage,&ofs,cmd_line,strlen(cmd_line)+1);
-  if (copy == NULL){
+  if (copy==NULL){
     return false;
   }
   if (push(kpage,&ofs,&null,sizeof(null))==NULL){
     return false;
   }
-  argc = 0;
-  for (karg=strtok_r(copy," ",&p);karg!=NULL;karg=strtok_r(NULL," ",&p))
-    {
-      void *uarg=upage+(karg-(char*)kpage);
-      if(push(kpage,&ofs,&uarg,sizeof(uarg))==NULL){
-        return false;
-      }
-      argc++;
+  argc=0;
+  for(karg=strtok_r(copy," ",&p);karg!=NULL;karg=strtok_r(NULL," ",&p))
+  {
+    void *uarg=upage+(karg-(char*)kpage);
+    if(push(kpage,&ofs,&uarg,sizeof(uarg))==NULL){
+      return false;
     }
-  argv =(char **)(upage+ofs);
+    argc++;
+  }
+  argv=(char**)(upage+ofs);
   reverse(argc,(char**)(kpage + ofs));
-  if(push(kpage, &ofs, &argv, sizeof(argv))==NULL || push(kpage,&ofs,&argc,sizeof(argc))==NULL|| push(kpage,&ofs,&null,sizeof(null))==NULL){
+  if(push(kpage,&ofs,&argv,sizeof(argv))==NULL || push(kpage,&ofs,&argc,sizeof(argc))==NULL|| push(kpage,&ofs,&null,sizeof(null))==NULL){
     return false;
   }
-  *esp=upage +ofs;
+  *esp=upage+ofs;
   return true;
 }
 
@@ -560,10 +560,10 @@ static void reverse (int argc, char **argv){
 
 static void *push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size){
   size_t padsize=ROUND_UP(size,sizeof(uint32_t));
-  if(*ofs < padsize){
+  if(*ofs<padsize){
     return NULL;
   }
   *ofs-=padsize;
-  memcpy(kpage + *ofs + (padsize - size), buf, size);
-  return kpage + *ofs + (padsize - size);
+  memcpy(kpage+*ofs+padsize-size,buf,size);
+  return kpage+*ofs+padsize-size;
 }
