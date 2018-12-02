@@ -486,80 +486,82 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+static void * push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size); 
+static bool setup_stack (void** esp,char* file_name);
+static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void** esp);
 
-static bool getargs(uint8_t* kaddr, uint8_t* uaddr,const char* file_name,void **esp);
-static void * push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size);
- 
-static void * push(uint8_t *kaddr, size_t *ofs, const void *buf, size_t size) 
+/* Create a minimal stack by mapping a zeroed page at the top of
+   user virtual memory. */
+static bool setup_stack (void** esp,char* file_name)
 {
-  size_t padsize = ROUND_UP (size, sizeof (uint32_t));
-  if (*ofs < padsize){
-    return NULL;
-  }
-  *ofs-=padsize;
-  memcpy (kaddr+*ofs+(padsize-size),buf,size);
-  return kaddr+*ofs+(padsize-size);
-}
-
-/* Create a minimal stack for T by mapping a page at the
-   top of user virtual memory.  Fills in the page using CMD_LINE
-   and sets *ESP to the stack pointer. */
-static bool
-setup_stack (void **esp,char* file_name)
-{
-  struct page *page=page_alloc(((uint8_t *) PHYS_BASE) - PGSIZE, false);
-  if (page != NULL) 
+  struct page *page=page_alloc(((uint8_t *)PHYS_BASE)-PGSIZE,false);
+  if (page!=NULL) 
     {
       page->frame=frame_alloc(page);
       if (page->frame!=NULL)
-        {
-          bool ok;
-          page->read_only = false;
-          page->mmap = false;
-          ok = getargs (page->frame->addr, page->addr, file_name, esp);
-          frame_unlock (page->frame);
-          return ok;
-        }
+      {
+        bool ok;
+        page->read_only = false;
+        page->mmap = false;
+        ok = getargs (page->frame->addr, page->addr, file_name, esp);
+        frame_unlock (page->frame);
+        return ok;
+      }
     }
   return false;
 }
 
-
-static bool getargs(uint8_t* kaddr, uint8_t* uaddr,const char* file_name,void **esp){
-  size_t ofs=PGSIZE;
-  char* const null=NULL;
-  char *cmd_line;
-  char *karg,*p;
+static bool getargs(uint8_t* kpage, uint8_t* upage, const char* cmd_line, void** esp){
+  size_t ofs = PGSIZE;
+  char *const null = NULL;
+  char *copy;
+  char *karg, *p;
   int argc;
   char **argv;
-  cmd_line=push(kaddr,&ofs,file_name,strlen(file_name)+1);
-  if (cmd_line==NULL){
+  copy=push(kpage,&ofs,cmd_line,strlen(cmd_line)+1);
+  if (copy == NULL){
     return false;
   }
-  if(push(kaddr,&ofs,&null,sizeof(null))==NULL){
+  if (push(kpage,&ofs,&null,sizeof(null))==NULL){
     return false;
   }
   argc = 0;
-  for (karg=strtok_r(cmd_line," ",&p);karg!=NULL;karg=strtok_r(NULL," ",&p)){
-    void* uarg=uaddr+(karg-(char*)kaddr);
-    if(push(kaddr,&ofs,&uarg,sizeof(uarg))==NULL){
-      return false;
+  for (karg=strtok_r(copy," ",&p);karg!=NULL;karg=strtok_r(NULL," ",&p))
+    {
+      void *uarg=upage+(karg-(char*)kpage);
+      if(push(kpage,&ofs,&uarg,sizeof(uarg))==NULL){
+        return false;
+      }
+      argc++;
     }
-    argc++;
-  }
-  argv=(char**)(uaddr + ofs);
-  char** kargv=(char**)(kaddr+ofs);
-  while(argc>1){
-    char* temp=kargv[0];
-    kargv[0]=kargv[argc-1];
-    kargv[argc-1]=temp;
-    argc-=2;
-    kargv++;
-
-  }
-  if(push(kaddr,&ofs,&argv,sizeof(argv))==NULL || push(kaddr,&ofs,&argc,sizeof(argc))==NULL || push(kaddr,&ofs,&null,sizeof(null))==NULL){
+  argv =(char **)(upage+ofs);
+  reverse(argc,(char**)(kpage + ofs));
+  if(push(kpage, &ofs, &argv, sizeof(argv))==NULL || push(kpage,&ofs,&argc,sizeof(argc))==NULL|| push(kpage,&ofs,&null,sizeof(null))==NULL){
     return false;
   }
-  *esp = uaddr + ofs;
+  *esp=upage +ofs;
   return true;
+}
+
+static void
+reverse (int argc, char **argv) 
+{
+  while(argc>1){
+    char *temp=argv[0];
+    argv[0]=argv[argc-1];
+    argv[argc-1]=temp;
+    argc-=2;
+    argv++;
+  }
+}
+
+static void *push(uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
+{
+  size_t padsize=ROUND_UP(size,sizeof(uint32_t));
+  if(*ofs < padsize){
+    return NULL;
+  }
+  *ofs-=padsize;
+  memcpy(kpage + *ofs + (padsize - size), buf, size);
+  return kpage + *ofs + (padsize - size);
 }
