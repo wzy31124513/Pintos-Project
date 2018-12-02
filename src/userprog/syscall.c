@@ -373,7 +373,7 @@ static int mmap (int fd, void *addr)
     p->offset=offset;
     if (length>=PGSIZE)
     {
-      p->rw_bytes=PGSIZE
+      p->rw_bytes=PGSIZE;
     }else{
       p->rw_bytes=length;
     }
