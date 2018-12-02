@@ -197,7 +197,7 @@ static int read (int fd, char *buffer, unsigned size)
     {
       if (!page_lock(b,true))
       {
-        exit(-1);
+        thread_exit();
       }
       lock_acquire(&file_lock);
       ret=file_read(f->file,b,read_size);
@@ -209,7 +209,7 @@ static int read (int fd, char *buffer, unsigned size)
         char c=input_getc();
         if (!page_lock(b,true))
         {
-          exit(-1);
+          thread_exit();
         }
         b[i]=c;
         page_unlock(b);
@@ -256,7 +256,7 @@ static int write (int fd, const void *buffer, unsigned size){
     }
     if (!page_lock(b,false))
     {
-      exit(-1);   
+      thread_exit();   
     }
     lock_acquire(&file_lock);
     if (fd==1)
@@ -323,11 +323,10 @@ static int close(int fd)
 }
 
 static void argcpy(void* cp,const void* addr1,size_t size){
-{
   uint8_t *dst=cp;
   const uint8_t *addr=addr1;
   while(size>0){
-    size_t chunk_size=PGSIZE-pg_ofs(usrc);
+    size_t chunk_size=PGSIZE-pg_ofs(addr);
     if(chunk_size>size){
       chunk_size = size;
     }
@@ -355,7 +354,7 @@ char* strcpy_to_kernel(const char* str){
     addr=pg_round_down (str);
     if(!page_lock(addr,false))
         goto lock_error;
-    for (; str<addr+PGSIZE;us++)
+    for (; str<addr+PGSIZE;str++)
       {
         cp[length++]=*str;
         if (*str=='\0')
@@ -376,9 +375,7 @@ char* strcpy_to_kernel(const char* str){
   thread_exit ();
 }
 
-
-static struct fds* getfile(int fd)
-{
+static struct fds* getfile(int fd){
   struct list_elem *e;
   struct fds* fds;
   for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
