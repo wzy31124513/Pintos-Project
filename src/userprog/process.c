@@ -31,29 +31,23 @@ static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
-
-
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  struct exec_table* exec=malloc(sizeof(struct exec_table));
+  exec->file_name=file_name;
+  sema_init (&exec->load,0);
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
-  tid = thread_create (name, PRI_DEFAULT, start_process,fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process,exec);
   free(name);
   if (tid != TID_ERROR)
     {
-      sema_down(&thread_current()->load);
-      if(thread_current()->loaded){
-        list_push_back(&thread_current()->children,&thread_current()->child_proc->elem);
+      sema_down(&exec->load);
+      if(exec->loaded){
+        list_push_back(&thread_current()->children,&exec->child_proc->elem);
       }
       else{
         tid=TID_ERROR;
@@ -65,9 +59,8 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *exec_table)
 {
-  char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
   /* Initialize interrupt frame and load executable. */
@@ -75,15 +68,22 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load ((char*)file_name, &if_.eip, &if_.esp);
+  struct exec_table *exec = exec_table;
+  success = load (exec->file_name, &if_.eip, &if_.esp);
+
   if(success){
-    thread_current()->child_proc=malloc(sizeof(struct child_proc));
-    lock_init(&thread_current()->child_proc->lock);
-    thread_current()->child_proc->status=2;
-    thread_current()->child_proc->id=thread_current()->tid;
+    exec->child_proc=thread_current ()->child_proc=malloc(sizeof(struct child_proc));
+    success=exec->child_proc!=NULL; 
   }
-  thread_current()->loaded=success;
-  sema_up (&thread_current()->load);
+  if (success) 
+  {
+    lock_init(&exec->child_proc->lock);
+    exec->child_proc->status=2;
+    exec->child_proc->id=thread_current()->tid;
+    sema_init (&exec->child_proc->exit,0);
+  }
+  exec->loaded=success;
+  sema_up (&exec->load);
   if (!success){
     exit1(-1);
   }
