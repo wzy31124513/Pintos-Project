@@ -540,8 +540,8 @@ static bool getargs(uint8_t* kaddr, uint8_t* uaddr,const char* file_name,void **
     return false;
   }
   argc = 0;
-  for (karg=strtok_r(cmd_line_copy, " ", &saveptr);karg != NULL;karg = strtok_r (NULL, " ", &saveptr)){
-    void *uarg=uaddr+karg-(char*)kaddr;
+  for (karg=strtok_r(cmd_line," ",&p);karg!=NULL;karg=strtok_r(NULL," ",&p)){
+    void* uarg=uaddr+(karg-(char*)kaddr);
     if(push(kaddr,&ofs,&uarg,sizeof(uarg))==NULL){
       return false;
     }
