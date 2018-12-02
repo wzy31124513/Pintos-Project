@@ -169,25 +169,22 @@ copy_in_string (const char *us)
   thread_exit ();
 }
 
-/* Halt system call. */
 static int
-sys_halt (void)
+halt (void)
 {
   shutdown_power_off ();
 }
 
-/* Exit system call. */
 static int
-sys_exit (int exit_code)
+exit (int exit_code)
 {
   thread_current ()->exit_code = exit_code;
   thread_exit ();
   NOT_REACHED ();
 }
 
-/* Exec system call. */
 static int
-sys_exec (const char *ufile)
+exec (const char *ufile)
 {
   tid_t tid;
   char *kfile = copy_in_string (ufile);
@@ -201,16 +198,14 @@ sys_exec (const char *ufile)
   return tid;
 }
 
-/* Wait system call. */
 static int
-sys_wait (tid_t child)
+wait (tid_t child)
 {
   return process_wait (child);
 }
 
-/* Create system call. */
 static int
-sys_create (const char *ufile, unsigned initial_size)
+create (const char *ufile, unsigned initial_size)
 {
   char *kfile = copy_in_string (ufile);
   bool ok;
@@ -224,9 +219,8 @@ sys_create (const char *ufile, unsigned initial_size)
   return ok;
 }
 
-/* Remove system call. */
 static int
-sys_remove (const char *ufile)
+remove (const char *ufile)
 {
   char *kfile = copy_in_string (ufile);
   bool ok;
@@ -239,8 +233,7 @@ sys_remove (const char *ufile)
 
   return ok;
 }
-
-/* A file descriptor, for binding a file handle to a file. */
+
 struct file_descriptor
   {
     struct list_elem elem;      /* List element. */
@@ -248,9 +241,8 @@ struct file_descriptor
     int handle;                 /* File handle. */
   };
 
-/* Open system call. */
 static int
-sys_open (const char *ufile)
+open (const char *ufile)
 {
   char *kfile = copy_in_string (ufile);
   struct file_descriptor *fd;
@@ -276,9 +268,6 @@ sys_open (const char *ufile)
   return handle;
 }
 
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open file. */
 static struct file_descriptor *
 lookup_fd (int handle)
 {
@@ -297,9 +286,8 @@ lookup_fd (int handle)
   thread_exit ();
 }
 
-/* Filesize system call. */
 static int
-sys_filesize (int handle)
+filesize (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   int size;
@@ -311,9 +299,8 @@ sys_filesize (int handle)
   return size;
 }
 
-/* Read system call. */
 static int
-sys_read (int handle, void *udst_, unsigned size)
+read (int handle, void *udst_, unsigned size)
 {
   uint8_t *udst = udst_;
   struct file_descriptor *fd;
@@ -374,9 +361,8 @@ sys_read (int handle, void *udst_, unsigned size)
   return bytes_read;
 }
 
-/* Write system call. */
 static int
-sys_write (int handle, void *usrc_, unsigned size)
+write (int handle, void *usrc_, unsigned size)
 {
   uint8_t *usrc = usrc_;
   struct file_descriptor *fd = NULL;
@@ -428,9 +414,8 @@ sys_write (int handle, void *usrc_, unsigned size)
   return bytes_written;
 }
 
-/* Seek system call. */
 static int
-sys_seek (int handle, unsigned position)
+seek (int handle, unsigned position)
 {
   struct file_descriptor *fd = lookup_fd (handle);
 
@@ -442,9 +427,8 @@ sys_seek (int handle, unsigned position)
   return 0;
 }
 
-/* Tell system call. */
 static int
-sys_tell (int handle)
+tell (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   unsigned position;
@@ -456,9 +440,8 @@ sys_tell (int handle)
   return position;
 }
 
-/* Close system call. */
 static int
-sys_close (int handle)
+close (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   lock_acquire (&fs_lock);
@@ -468,20 +451,17 @@ sys_close (int handle)
   free (fd);
   return 0;
 }
-
-/* Binds a mapping id to a region of memory and a file. */
+
 struct mapping
   {
-    struct list_elem elem;      /* List element. */
-    int handle;                 /* Mapping id. */
-    struct file *file;          /* File. */
-    uint8_t *base;              /* Start of memory mapping. */
-    size_t page_cnt;            /* Number of pages mapped. */
+    struct list_elem elem;
+    int handle;
+    struct file *file;      
+    uint8_t *base;    
+    size_t page_cnt;
   };
 
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with a
-   memory mapping. */
+
 static struct mapping *
 lookup_mapping (int handle)
 {
@@ -499,8 +479,7 @@ lookup_mapping (int handle)
   thread_exit ();
 }
 
-/* Remove mapping M from the virtual address space,
-   writing back any pages that have changed. */
+
 static void
 unmap (struct mapping *m)
 {
@@ -526,9 +505,8 @@ unmap (struct mapping *m)
   }
 }
 
-/* Mmap system call. */
 static int
-sys_mmap (int handle, void *addr)
+mmap (int handle, void *addr)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   struct mapping *m = malloc (sizeof *m);
@@ -575,19 +553,15 @@ sys_mmap (int handle, void *addr)
   return m->handle;
 }
 
-/* Munmap system call. */
 static int
-sys_munmap (int mapping)
+munmap (int mapping)
 {
-  /* Get the map corresponding to the given map id, and attempt to unmap. */
   struct mapping *map = lookup_mapping(mapping);
   unmap(map);
   return 0;
 }
-
-/* On thread exit, close all open files and unmap all mappings. */
 void
-syscall_exit (void)
+exit2 (void)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e, *next;
