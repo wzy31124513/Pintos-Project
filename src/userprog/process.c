@@ -36,7 +36,7 @@ process_execute (const char *file_name)
   char *p;
   tid_t tid;
 
-  sema_init (&thread_current()->load,0);
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -75,13 +75,12 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load ((char*)file_name, &if_.eip, &if_.esp);
   if(success){
     thread_current()->child_proc=malloc(sizeof(struct child_proc));
     lock_init(&thread_current()->child_proc->lock);
     thread_current()->child_proc->status=2;
     thread_current()->child_proc->id=thread_current()->tid;
-    sema_init (&thread_current()->child_proc->exit,0);
   }
   thread_current()->loaded=success;
   sema_up (&thread_current()->load);

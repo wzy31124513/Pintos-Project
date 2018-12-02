@@ -108,6 +108,7 @@ struct thread
     struct hash* pages;
     struct list mapping;
     void* esp;
+    
     struct semaphore load;
     bool loaded;
 
