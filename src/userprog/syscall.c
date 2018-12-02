@@ -278,6 +278,55 @@ static int close(int fd)
   free(f);
   return 0;
 }
+
+static int mmap (int fd, void *addr)
+{
+  struct fds* f=getfile(fd);
+  struct mapping* m=malloc(sizeof(struct mapping));
+  size_t offset;
+  off_t length;
+  if (m==NULL || addr==NULL || pg_ofs(addr)!=0){
+    return -1;
+  }
+  m->id=thread_current()->fd_num++;
+  lock_acquire(&file_lock);
+  m->file=file_reopen(f->file);
+  lock_release(&file_lock);
+  if(m->file==NULL)
+  {
+    free (m);
+    return -1;
+  }
+  m->addr=addr;
+  m->num=0;
+  list_push_front(&thread_current()->mapping,&m->elem);
+
+  offset=0;
+  lock_acquire(&file_lock);
+  length=file_length(m->file);
+  lock_release(&file_lock);
+  while(length>0){
+    struct page* p=page_alloc((uint8_t*)addr+offset,false);
+    if(p==NULL){
+      munmap(m->id);
+      return -1;
+    }
+    p->mmap=false;
+    p->file=m->file;
+    p->offset=offset;
+    if (length>=PGSIZE)
+    {
+      p->rw_bytes=PGSIZE;
+    }else{
+      p->rw_bytes=length;
+    }
+    offset+=p->rw_bytes;
+    length-=p->rw_bytes;
+    m->num++;
+  }
+  return m->id;
+}
+
 void
 syscall_init (void)
 {
@@ -336,71 +385,25 @@ syscall_handler (struct intr_frame *f)
   f->eax = sc->func (args[0], args[1], args[2]);
 }
 
-static int mmap (int fd, void *addr)
-{
-  struct fds* f=getfile(fd);
-  struct mapping* m=malloc(sizeof(struct mapping));
-  size_t offset;
-  off_t length;
-  if (m==NULL || addr==NULL || pg_ofs(addr)!=0){
-    return -1;
-  }
-  m->id=thread_current()->fd_num++;
-  lock_acquire(&file_lock);
-  m->file=file_reopen(f->file);
-  lock_release(&file_lock);
-  if(m->file==NULL)
-  {
-    free (m);
-    return -1;
-  }
-  m->addr=addr;
-  m->num=0;
-  list_push_front(&thread_current()->mapping,&m->elem);
 
-  offset=0;
-  lock_acquire(&file_lock);
-  length=file_length(m->file);
-  lock_release(&file_lock);
-  while(length>0){
-    struct page* p=page_alloc((uint8_t*)addr+offset,false);
-    if(p==NULL){
-      munmap(m->id);
-      return -1;
-    }
-    p->mmap=false;
-    p->file=m->file;
-    p->offset=offset;
-    if (length>=PGSIZE)
-    {
-      p->rw_bytes=PGSIZE;
-    }else{
-      p->rw_bytes=length;
-    }
-    offset+=p->rw_bytes;
-    length-=p->rw_bytes;
-    m->num++;
-  }
-  return m->id;
-}
 
 static int
 munmap (int mapping)
 {
   struct mapping *m = getmap(mapping);
   list_remove(&m->elem);
-  for(int i = 0; i < m->num; i++)
+  for(int i=0;i<m->num;i++)
   {
-    if (pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->addr) + (PGSIZE * i)))))
+    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
     {
       lock_acquire (&file_lock);
-      file_write_at(m->file, (const void *) (m->addr + (PGSIZE * i)), (PGSIZE*(m->num)), (PGSIZE * i));
+      file_write_at(m->file,(const void *)(m->addr+PGSIZE * i),PGSIZE*(m->num),PGSIZE*i);
       lock_release (&file_lock);
     }
   }
-  for(int i = 0; i < m->num; i++)
+  for(int i=0;i<m->num;i++)
   {
-    page_deallocate((void *) ((m->addr) + (PGSIZE * i)));
+    page_deallocate((void *)(m->addr+PGSIZE * i));
   }
   return 0;
 }
