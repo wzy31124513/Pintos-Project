@@ -52,7 +52,6 @@ static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static struct fds* getfile(int fd);
 static struct mapping* getmap (int fd);
-void exit2 (void);
 
 static int halt(void)
 {
@@ -65,8 +64,7 @@ static int exit1(int status)
   thread_exit ();
 }
 
-void
-exit2 (void)
+void exit2 (void)
 {
   struct thread *cur = thread_current();
   struct list_elem *e;
