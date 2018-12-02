@@ -72,8 +72,14 @@ start_process (void *exec_table)
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
   if(success){
-    exec->child_proc=thread_current ()->child_proc=malloc(sizeof(struct child_proc));
-    success=exec->child_proc!=NULL; 
+    thread_current ()->child_proc=malloc(sizeof(struct child_proc));
+    exec->child_proc=thread_current ()->child_proc;
+    if (exec->child_proc==NULL)
+    {
+      success=false;
+    }else{
+      success=true;
+    }
   }
   if (success) 
   {

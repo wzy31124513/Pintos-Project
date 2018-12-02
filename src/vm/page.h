@@ -26,7 +26,6 @@ bool load_page(struct page* p);
 bool recently_used(struct page* p);
 bool page_lock(const void* addr,bool writable);
 void page_unlock(const void* addr);
-void page_exit (void);
 void page_deallocate (void *vaddr);
 bool page_evict(struct page* p);
 void page_destructor(struct hash_elem* e,void* aux);
