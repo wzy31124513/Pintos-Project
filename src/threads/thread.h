@@ -2,12 +2,9 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
-#include <hash.h>
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
-#include "userprog/syscall.h"
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -92,21 +89,26 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    struct list_elem elem;
+
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
+
     /* Owned by userprog/process.c. */
     #ifdef USERPROG
     uint32_t *pagedir;
-    #endif 
-    int exitcode; 
-    struct child_proc* child_proc;
+    #endif                  /* Page directory. */
+    int exitcode; /*return status*/
+    struct thread* parent;
+    struct semaphore wait_for_child;
     struct list children;
     int fd_num;
     struct list file_list;
+    int wait;
     struct file* self;
+    bool child_load;
     /* Owned by thread.c. */
-    struct hash* pages;
-    struct list mapping;
-    void* esp;
+
     unsigned magic;                     /* Detects stack overflow. */
   };
 
@@ -114,9 +116,7 @@ struct thread
   {
     tid_t id;
     int ret;
-    struct lock lock;
-    int status;
-    struct semaphore exit;
+    bool waited;
     struct list_elem elem;
   };
 
