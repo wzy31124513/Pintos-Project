@@ -479,6 +479,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->ticks=0;
   sema_init(&t->wait_for_child,0);
   t->parent=running_thread();
   t->child_load=false;
