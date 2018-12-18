@@ -134,6 +134,17 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+   struct list_elem* a=list_begin(&all_list);          
+   for(a=list_begin(&all_list);a!=list_end(&all_list);a=list_next(a)){
+     struct thread* t=list_entry(a,struct thread,allelem);
+      if(t->ticks>0){
+      t->ticks=t->ticks-1;
+      if(t->ticks==0){
+        thread_unblock(t);
+      }
+    }
+   }
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
