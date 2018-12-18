@@ -1,0 +1,386 @@
+		     +--------------------------+
+       	     |		    CS 140          |
+		     | PROJECT 2: USER PROGRAMS	|
+		     | 	   DESIGN DOCUMENT     	|
+		     +--------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Kefei Wu <wukf@shanghaitech.edu.cn>
+Ziyang Wang <wangzy4@shanghaitech.edu.cn>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			   ARGUMENT PASSING
+			   ================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct thread
+  {
+	...
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+    int exitcode;                       /*return status*/
+    struct thread* parent;              /*location of parents */
+    int child_load;                     /*record if it been loaded successfully */
+    struct lock wait_for_child;         /*lock structure to avoid collision in wait, start and excute part */ 
+    struct condition wait_cond;         /* condition struct to contain waiting conditions */
+    struct list children;				/* when exit to keep the order should use children */
+    int fd_num;							/* the number of files added */
+    struct list file_list;				/* help search in the thread for file */
+	...
+  };
+
+struct child_proc
+  {
+    tid_t id;							/* record the id */
+    int ret;							/* record the return status */
+    struct list_elem elem;				/* elem that child process has */
+  };
+
+*The added elems in struct thread identifies the necessary properties 
+thread should have to show the operation status and pass, and child_load and 
+wait_for_child make syscall implemention easier.
+
+*The struct child_proc record necessary information of process's child's
+information, mainly used in exec, wait, and exit to judge the current status. 
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?
+
+According to the requiement of the documents, we parse the argument in the 
+order of right to left with their positions in stack from top to the bottom,
+by recursively use the given function strtok_r(), with the whitespace as 
+the seperate symbol to seperate and store the arguments. By the tmp in while loop,
+if and only if we read a NULL from the returned value from strtok_r(), all the 
+arguments are done, in the loop we add argc every time to count the total number
+of the arguments.
+
+Address	Name	             Data	  Type
+0xbffffffc	argv[3][...]	bar\0	char[4]
+0xbffffff8	argv[2][...]	foo\0	char[4]
+0xbffffff5	argv[1][...]	-l\0	char[3]
+0xbfffffed	argv[0][...]	/bin/ls\0	char[8]
+0xbfffffec	word-align	    0	    uint8_t
+0xbfffffe8	argv[4]	        0	    char *
+0xbfffffe4	argv[3]         0xbffffffc	    char *
+0xbfffffe0	argv[2]	        0xbffffff8	    char *
+0xbfffffdc	argv[1]	        0xbffffff5	    char *  
+0xbfffffd8	argv[0]	        0xbfffffed	    char *
+0xbfffffd4	argv	        0xbfffffd8	    char **
+0xbfffffd0	argc	        4	     int
+0xbfffffcc	return address	0	void (*) ()
+
+As the most important and difficult part in the program, setting up the stack
+and reread it bring a lot of troubles. Except for the order requeired from right
+to left, in which project the given strtok reading from left to right, to keep the 
+right order of arguments in argv, we use while loop to read until return NULL to keep
+the right order from the final address, which means we use the function we have to
+read the given arguments set from left to right, but in the second step, we record the 
+concrete address of the value in lower stack, which means by conversing the order in
+the final part of the stack, the arguments can be read easier by us, while we always 
+keep the right order in the lowest address part of the stack, it will not affect the 
+following syscall calling.
+
+By allocate the fixed length of space for each arguments and the whole argv and final check
+in setup and the syscall to avoid this, as referred in the document, 'There is an unrelated 
+limit of 128 bytes on command-line arguments that the pintos utility can pass to the kernel.'
+We can set the argu's size at first to char* argv[128].
+
+
+---- RATIONALE ----
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+Their differences are the order they take to read the arguments and the way saving the 
+pointer for the next call, which can be called thread-safe or re-entrant, to avoid the 
+preempt -- when multiple thread arquire the buffer, the save_pointer will make the arguments 
+parsing still working.
+
+>> A4: In Pintos, the kernel separates commands into a executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+
+1.The kernel part can be more simple not to do the separation part to focus on kernel's work
+and leave the separation to the shell, user's part, in another way it may make kernel's code 
+more acceptable.
+
+2.When doing the part in the kernel, when facing the racing situation, there may be more difficulty
+to switch directly and when switching, triggering more potential bugs, even the handling part
+may create a new hacked chance. After all the separation done in user's part will be safer for
+the kernel's part.
+
+3.After the check in user part, no bad arguments like NULL pointer will be parsed to the kernel,
+arguments passing may be safer and faster at the same time.
+
+
+			     SYSTEM CALLS
+			     ============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct fds
+{
+    int fd;					/* unique fd of each file */
+    struct file *f;         /* the fd's corresponding file */
+    struct list_elem elem;  /* all the elem of it */
+};
+
+fds contains all the necessary elems to implement the search and read write function.
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+
+When we open the file, we will calloc for the struct fds and use filesys_open()
+to arrange the file information of fd firstly, then by detecting the validation
+of the file we determine the status and the fd number of the file, push into the 
+list and give the id.
+
+For the thread call the open() function to open a corresponding file, it 
+should be unique in the single process, with the list containing all
+the file fd that it has refered to, deleted if removed. 
+
+---- ALGORITHMS ----
+
+>> B3: Describe your code for reading and writing user data from the
+>> kernel.
+
+In read() firstly we check the pointer validation if it's NULL or out of range of
+base or bound it requirs with the function is_valid_vaddr(), if pointer invalid 
+function will call a exit(-1) and return 0, after the check we seperate the situations 
+according to the document. Firstly if fd==0 we call input_getc() to read from 
+keyboard and return the size. If not we lock the file and use file_read() to read and
+use ret to record the result of the reading, if failed return -1, if success return 
+the size of the file we read.
+
+In write() firstly we have similar check procedure that we have to make sure
+the context we're about to write and the destination are legal, then same situation
+seperate handling with fd==1 to call function putbuf() and return the size of the 
+input ( acqurie the lock before write operation and release in the end ) or we can
+use file_write() for the default write in.
+
+In the write and read and so many other syscalls, we can also use pagedir_get_page()
+to detect the page fault automatically.
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  What is the least
+>> and the greatest possible number of inspections of the page table
+>> (e.g. calls to pagedir_get_page()) that might result?  What about
+>> for a system call that only copies 2 bytes of data?  Is there room
+>> for improvement in these numbers, and how much?
+
+The least possible number of inspections should be 1, for all the data have been
+stored in a single page with pagedir_get_page() get the ordered data that only the 
+first page header pointer should be checked
+
+The Greatest possible number of inspections should be 4096, for every byte should 
+be read and check to ensure the validation of the address until every byte has been
+checked, for 4096 times with pagedir_get_page() called.
+
+If only copy for 2 bytes of the data will cause the same result like above 
+1-byte type, for we can't pass the step to check the validation of the pointer so 
+the total time will not change much and there may be no more room for improvement.
+
+But when passing from the user, tring to combine 2 file into 1 page without overflowing 
+the page size could save unnecessary part of allocated space full of 0s, but i dont see
+the improvement in the executing times.
+
+>> B5: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+
+  struct child_proc
+  {
+    tid_t id;
+    int ret;					
+    struct list_elem elem;
+  };
+
+  As we set struct child_proc in thread.c to record all child process made by one father,
+  when we're about to implenment wait function, we will use the thread property to transvel
+  all the child process until we find the one meeting the requirments. If no child found or
+  the found child is NULL pointer, we will return -1 as status directly. Or it goes to 
+  acquire the lock and keep it waiting until the pointer change into NULL, which means
+  is dead from running and so we can keep on to release the lock and return the ret, which is 
+  accessed in the first search as its status return value finally.
+
+
+>> B6: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> paragraphs, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+
+In syscall_handler() in syscall.c we check the validation of commands firstly,
+then for different commands we will check the specific position of argv addresss 
+and its context NULL or over the bound  or whether have other invalid behaviour.
+
+And in some specific func like write read and open we will double check every pointer's 
+validation and their context one more time to ensure the arguments clean really. With help
+of pagedir_get_page() we can detect most of pointer invalidation problem at the beginning.
+
+Refering to error-situation resources free, we do it in two parts.
+	1. In exit() of syscall.c we set the thread's exitcode when facing the exit issue 
+firstly and prepare to exit, after we ensure the parent and all children it has we have 
+the list to handle, and choose whose id equals to the tid current thread has to change 
+their returning value to the user mode , and during the change the lock should be acquire
+to avoid the race which may trigger the status collision.
+	2. After setting all the ret to the status demanded we could exit the entire current 
+thread using given and slightly changed function thread_exit() in thread. which will call
+process_exit() firstly in process.c to remove and free all elems in its children properties,
+before which the lock should be added to the file in case other changes happens simutaneously.
+And finally we could destroy the current process's page directory and switch back to the 
+kernel-only page directory. Until where resources in every process.
+	3. Finally remove the thread form the thread list and change its status and schedule it to
+the next one.
+
+For example, if we determine to write something into the system, we first check if things we 
+going to write in is NULL: "is_valid_vaddr(esp+7); is_valid_vaddr((void*)*(esp+6));"
+Then in write function we divide it into two situations , to check is EVERY part  in the buffer 
+is valid and if not exit(-1) including above bound situations, and then all resources will
+be freed in exit function like the steps said above.
+
+---- SYNCHRONIZATION ----
+
+>> B7: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+
+Firstly we have a elem in thread struct named child_load with type int to record the
+current thread's load status. In execution, we will firstly change the load status to
+0 before we execute, and call the given function process_exec to execute a process 
+with the input file name and use ret to record its result.
+
+Then we could start to consider the child's part. Firstly add the lock to avoid 
+possible race situations and run in a while loop until all child _process run and exit
+properly and the load status will be changed, whose initial value has been defined
+in start_process() in process.c. Here we use cond_wait to traverse all the waiting 
+child process until done. Finally if thread_current()->child_load==-1, something fails 
+in the process of exec, which will be returned finally rather than tid returned by 
+process_start() to indicate if it success or not. 
+
+By details in cond_wait() given in synch.c it uses semaphore waiter in the list to control
+and guaranteen the order to exec in case something go wrong. In the function the lock will 
+be released after signals been made, and lock reset before end.
+
+>> B8: Consider parent process P with child process C.  How do you
+>> ensure proper synchronization and avoid race conditions when P
+>> calls wait(C) before C exits?  After C exits?  How do you ensure
+>> that all resources are freed in each case?  How about when P
+>> terminates without waiting, before C exits?  After C exits?  Are
+>> there any special cases?
+
+If P calls wait(C) before C exits, P will be kept blocked until C's exit() works,
+C's thread will released by the kernel and P will free C's data and get the rt_status generated
+by the exit(C) and until that the P will be unblocked again.
+
+If P calls wait(C) after C exits, by transveling the child_list it will find that the 
+C has been exited which means its resouces and threads has been released which means no more 
+locks should be added to P, and so on it can get the status directly.
+
+If P terminates without waiting C exits, it will at least try to release all resources it has 
+including the page directory and its child list, which means the C's parent's pointer may be 
+assigned to a empty space, and C could be a orphane that it can't be found, but if C's ret is 
+set to the exit mode when it executes, it will still release its source.
+
+If P terminates after waiting C exits, everything will do fine. When P try to exit it will release
+all resources it has one by one by commanding on his child and also including the C's status.
+
+
+---- RATIONALE ----
+
+>> B9: Why did you choose to implement access to user memory from the
+>> kernel in the way that you did?
+
+After considerations, we choose the first method, which is easier for us to 
+understand, with the stack structure given in the document.
+'The first method is to verify the validity of a user-provided pointer, 
+then dereference it. If you choose this route, you'll want to look at 
+the functions in userprog/pagedir.c and in threads/vaddr.h. This is the 
+simplest way to handle user memory access.' After reading the above paragragh 
+in the document, we implenment a check function and call it frequently in 
+syscall_handler(). And by reading argv's address to check if valid to read in
+kernel or user area and by dereferring it to check its context we implement
+fundemental access to user memory from the kernel.
+
+>> B10: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+
+Advantage:
+	For the current usage of the file descriptors, the structure is simple and 
+necessary for essetial call,which means the space demand for fd and thread is 
+minimal, also easy to understand.
+
+Disadvantage:
+	Every time if we want to search for some file by using the fd, we 
+should travel through the whole thread list, which consumes quantity of time
+with the time complexity O(n). But if we can store the corresponding address 
+in a list, whose index is the fd number, the time complexity will be reduced to
+O(1) in a constant time to read the address directly. But it will also consume 
+large space, in which most of it is empty, which means the store way is inefficient. 
+
+>> B11: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+
+No. But if changed, which means the information in the pid can identity
+some properties of the process in numbers, using the way similar to hash
+or mod. In the same way we can identity the threads in the same process 
+without seraching for the concrete information in the list, by reading and
+seperate the number part like strtok(). In a word, we can figure out a way 
+to store more information in a sequence of number and avoid collision.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+   They're all quite hard and took us a lot of time.
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+   Stack setup & passing arguments.
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+   It's much better to tell us which functions that we might want to modify.
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+   No.
+>> Any other comments?
+   No.
