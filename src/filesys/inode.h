@@ -19,7 +19,7 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
-static void inode_deallocate (block_sector_t sector, int level);
+void inode_deallocate (block_sector_t sector, int level);
 bool is_directory(const struct inode *);
 struct inode* file_create(block_sector_t sector, off_t length);
 #endif /* filesys/inode.h */

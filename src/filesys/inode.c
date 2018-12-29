@@ -214,7 +214,7 @@ inode_close (struct inode *inode)
     }
 }
 
-static void inode_deallocate (block_sector_t sector, int level) {
+void inode_deallocate (block_sector_t sector, int level) {
   if (level>0)
   {
     struct cache_entry* c=cache_lock(sector);
