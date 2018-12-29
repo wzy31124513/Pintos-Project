@@ -24,9 +24,27 @@ struct dir_entry
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (block_sector_t sector, size_t entry_cnt)
+dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  struct node inode_create (sector,true);
+  if (inode!=NULL)
+  {
+    struct dir_entry entries[2];
+    memset(entries,0,sizeof(entries));
+    entries[0].inode_sector=sector;
+    strlcpy(entries[0].name,".",sizeof(entries[0].name));
+    entries[0].in_use=true;
+    entries[1].inode_sector=parent_sector;
+    strlcpy(entries[1].name,".",sizeof(entries[1].name));
+    entries[1].in_use=true;
+    if (inode_write_at(inode,entries,sizeof(entries),0)!=sizeof(entries))
+    {
+      inode_remove(inode);
+      inode_close(inode);
+      inode=NULL;
+    }
+  }
+  return inode;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -35,7 +53,7 @@ struct dir *
 dir_open (struct inode *inode) 
 {
   struct dir *dir = calloc (1, sizeof *dir);
-  if (inode != NULL && dir != NULL)
+  if (inode != NULL && dir != NULL && is_directory(inode)==true)
     {
       dir->inode = inode;
       dir->pos = 0;
@@ -121,13 +139,20 @@ dir_lookup (const struct dir *dir, const char *name,
 {
   struct dir_entry e;
 
+  bool ok;
+
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  if (lookup (dir, name, &e, NULL))
-    *inode = inode_open (e.inode_sector);
-  else
-    *inode = NULL;
+  lock_acquire(&dir->inode->lock);
+  ok=lookup(dir,name,&e,NULL);
+  lock_release(&dir->inode->lock);
+  if (ok)
+  {
+    *inode=inode_open(e.inode_sector);
+  }else{
+    *inode=NULL;
+  }
 
   return *inode != NULL;
 }
@@ -149,10 +174,11 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   ASSERT (name != NULL);
 
   /* Check NAME for validity. */
-  if (*name == '\0' || strlen (name) > NAME_MAX)
+  if (*name == '\0' || strlen (name) > NAME_MAX || strchr (name, '/'))
     return false;
 
   /* Check that NAME is not in use. */
+  lock_acquire(&dir->inode->lock);
   if (lookup (dir, name, NULL, NULL))
     goto done;
 
@@ -175,6 +201,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
+  lock_release(&dir->inode->lock);
   return success;
 }
 
@@ -193,6 +220,12 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (name != NULL);
 
   /* Find directory entry. */
+
+  if (strcmp(name,".")==0||strcmp(name,"..")==0)
+  {
+    return false;
+  }
+  lock_acquire(&dir->inode->lock);
   if (!lookup (dir, name, &e, &ofs))
     goto done;
 
@@ -200,6 +233,34 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
+
+
+  if (is_directory(inode)==true)
+  {
+    lock_acquire(&open_inodes_lock);
+    int open_cnt=inode->open_cnt;
+    lock_release(&open_inodes_lock);
+
+    if (open_cnt>1)
+    {
+      goto done;
+    }
+
+    struct dir_entry scan;
+    off_t scan_ofs;
+    int in_ust_cnt=0;
+    while(inode_read_at(inode,&scan,sizeof(scan),scan_ofs)==sizeof(scan)){
+      if (scan.in_use)
+      {
+        in_ust_cnt++;
+      }
+      scan_ofs+=sizeof(scan);
+    }
+    if (in_ust_cnt>2)
+    {
+      goto done;
+    }
+  }
 
   /* Erase directory entry. */
   e.in_use = false;
@@ -211,6 +272,7 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
  done:
+  lock_release(&dir->inode->lock);
   inode_close (inode);
   return success;
 }
@@ -222,7 +284,7 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-
+  lock_acquire(&dir->inode->lock);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
@@ -232,5 +294,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
           return true;
         } 
     }
+  lock_release(&dir->inode->lock);
   return false;
 }

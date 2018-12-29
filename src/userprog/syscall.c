@@ -28,18 +28,23 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char *name);
+bool isdir (int fd);
+int inumber (int fd);
 
 
 
 
 void* is_valid_vaddr(const void* esp){
 	if(!is_user_vaddr(esp)){
-		exit(-1);
+		exit1(-1);
 		return 0;
 	}
 	if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
 	{
-		exit(-1);
+		exit1(-1);
 		return 0;
 	}
 	return pagedir_get_page(thread_current()->pagedir,esp);
@@ -49,45 +54,27 @@ void halt (void){
 	shutdown_power_off();
 }
 
-void exit (int status){
-	
+void exit1 (int status){
+	struct thread *cur = thread_current();
 	struct list_elem* e;
-	for (e=list_begin(&thread_current()->parent->children);e!=list_tail(&thread_current()->parent->children); e=list_next(e))
-	{
-		if (list_entry(e,struct child_proc,elem)->id==thread_current()->tid)
-		{
-			list_entry(e,struct child_proc,elem)->ret=status;
-			list_entry(e,struct child_proc,elem)->waited=false;
-		}
-	}
-
-    thread_current()->exitcode=status;
-
-	if (thread_current()->parent->wait==thread_current()->tid)
-	{
-		sema_up(&thread_current()->parent->wait_for_child);
-	}
-	thread_exit();
+	struct list_elem *next;
+  	for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
+  	{
+  	  struct fds *fd=list_entry(e,struct fds,elem);
+  	  next=list_next(e);
+  	  lock_acquire(&file_lock);
+  	  file_close(fd->file);
+  	  dir_close(fd->dir);
+  	  lock_release(&file_lock);
+  	  free (fd);
+  	}
+  	dir_close(cur->directory);
+  	cur->exitcode=status;
+  	thread_exit ();
 }
 
 int exec (const char *cmd_line){
-	char* fn_copy=calloc(1,strlen(cmd_line)+1);
-	strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
-	char* p;
-	fn_copy=strtok_r(fn_copy," ",&p);
-	int ret;
-	lock_acquire(&file_lock);
-	struct file* f=filesys_open(fn_copy);
-	if (f==NULL)
-	{
-		ret=-1;
-		lock_release(&file_lock);
-	}else{
-		file_close(f);
-		lock_release(&file_lock);
-		ret=process_execute(cmd_line);
-	}
-	free(fn_copy);
+	int ret=process_execute(cmd_line);
 	return ret;
 }
 
@@ -98,7 +85,7 @@ int wait (int pid){
 bool create (const char *file, unsigned initial_size){
 	bool ret;
 	lock_acquire(&file_lock);
-	ret= filesys_create(file,initial_size);
+	ret= filesys_create(file,initial_size,false);
 	lock_release(&file_lock);
 	return ret;
 }
@@ -114,14 +101,26 @@ bool remove (const char *file){
 int open (const char *file){
 	lock_acquire (&file_lock);
 	struct fds* fd=calloc(1,sizeof(struct fds)); 
-	fd->f=filesys_open(file);
-	if (fd->f==NULL)
+	struct inode* inode=filesys_open(file);
+	if (inode==NULL)
 	{
 		fd->fd=-1;
 	}else{
-		thread_current()->fd_num=thread_current()->fd_num+1;
-		fd->fd=thread_current()->fd_num;
-		list_push_back(&thread_current()->file_list,&fd->elem);
+		if (is_directory(inode)==true)
+		{
+			fd->dir=dir_open(inode);
+		}else{
+			fd->f=file_open(inode);
+		}
+		if (fd->f!=NULL || fd->dir!=NULL)
+		{
+			thread_current()->fd_num=thread_current()->fd_num+1;
+			fd->fd=thread_current()->fd_num;
+			list_push_back(&thread_current()->file_list,&fd->elem);
+		}else{
+			free(fd);
+			inode_close(inode);
+		}
 	}
 	lock_release (&file_lock);
 	return fd->fd;
@@ -133,6 +132,10 @@ int filesize (int fd){
 	struct fds* fds=getfile(fd);
 	if (fds!=NULL)
 	{
+		if (fds->f==NULL)
+		{
+			exit1(-1);
+		}
 		ret = file_length(fds->f);
 	}else{
 		ret = -1;
@@ -149,11 +152,11 @@ int read (int fd, char *buffer, unsigned size){
 	{
 		if (!is_user_vaddr(check) || check==NULL)
 		{
-			exit(-1);
+			exit1(-1);
 		}
 		if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
 		{
-			exit(-1);
+			exit1(-1);
 		}
 		check=check+1;
 	}
@@ -172,6 +175,10 @@ int read (int fd, char *buffer, unsigned size){
 		{
 			ret = -1;
 		}else{
+			if (fds->f==NULL)
+			{
+				exit1(-1);
+			}
 			ret = file_read(fds->f,buffer,size);
 		}
 	}
@@ -197,6 +204,10 @@ int write (int fd, const void *buffer, unsigned size){
 		{
 			ret= -1;
 		}else{
+			if (fds->f==NULL)
+			{
+				exit1(-1);
+			}
 			lock_acquire(&file_lock);
 			ret= file_write(fds->f,buffer,size);
 			lock_release(&file_lock);
@@ -209,6 +220,10 @@ int write (int fd, const void *buffer, unsigned size){
 void seek (int fd, unsigned position){
 	lock_acquire (&file_lock); 
 	struct fds* fds=getfile(fd);
+	if (fds->f==NULL)
+	{
+		exit1(-1);
+	}
 	file_seek(fds->f,position);
 	lock_release (&file_lock);
 }
@@ -219,6 +234,10 @@ unsigned tell (int fd){
 	unsigned ret;
 	if (fds!=NULL)
 	{
+		if (fds->f==NULL)
+		{
+			exit1(-1);
+		}
 		ret = file_tell(fds->f);
 	}else{
 		ret = 1;
@@ -237,6 +256,7 @@ void close (int fd){
 		if (f->fd==fd)
 		{
 			file_close(f->f);
+			dir_close(f->dir)
 			list_remove(e);
 			free(f);
 			break;
@@ -245,6 +265,51 @@ void close (int fd){
 	lock_release(&file_lock);
 }
 
+bool chdir (const char *dir){
+	struct dir* d=dir_open(filesys_open(dir));
+	if (d!=NULL)
+	{
+		dir_close(thread_current()->directory);
+		thread_current()->directory=d;
+		return true;
+	}
+	return false;
+}
+bool mkdir (const char *dir){
+	return filesys_create(dir,0,true);
+}
+bool readdir (int fd, char *name){
+	struct fds* fd=getfile(fd);
+	if (fd->dir==NULL)
+	{
+		exit1(-1);
+	}
+	char name[15];
+	return dir_readdir(fd->dir,name);
+
+}
+bool isdir (int fd){
+	return getfile(fd)->dir!=NULL;
+}
+int inumber (int fd){
+	struct fds* fd=getfild(fd);
+	if (isdir(fd))
+	{
+		if (fd->dir==NULL)
+		{
+			exit1(-1);
+		}
+		struct inode* inode=dir_get_inode(fd->dir);
+		return inode_get_inumber(inode);
+	}else{
+		if (fd->f==NULL)
+		{
+			exit1(-1);
+		}
+		struct inode*inode=file_get_inode(fd->f);
+		return inode_get_inumber(inode);
+	}
+}
 
 
 
@@ -266,7 +331,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_EXIT)
 	{
 		is_valid_vaddr(esp+1);
-		exit(*(esp+1));
+		exit1(*(esp+1));
 	}else if (*esp==SYS_EXEC)
 	{
 		is_valid_vaddr(esp+1);
@@ -317,6 +382,26 @@ syscall_handler (struct intr_frame *f UNUSED)
 	{
 		is_valid_vaddr(esp+1);
 		close(*(esp+1));
+	}else if (*esp==SYS_CHDIR)
+	{
+		is_valid_vaddr(esp+1);
+		chdir(*(esp+1));
+	}else if (*esp==SYS_MKDIR)
+	{
+		is_valid_vaddr(esp+1);
+		mkdir(*(esp+1));
+	}else if (*esp==SYS_READDIR)
+	{
+		is_valid_vaddr(esp+5);
+		readdir(*(esp+4),*(esp+5));
+	}else if (*esp==SYS_ISDIR)
+	{
+		is_valid_vaddr(esp+1);
+		isdir(*(esp+1));
+	}else if (*esp==SYS_INUMBER)
+	{
+		is_valid_vaddr(esp+1);
+		inumber(*(esp+1));
 	}
 }
 

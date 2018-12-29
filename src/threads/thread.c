@@ -308,12 +308,6 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-  
-  while(!list_empty(&thread_current()->children)){
-    struct child_proc* c=list_entry(list_pop_front(&thread_current()->children),struct child_proc,elem);
-    free(c);
-  }
-
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
@@ -490,16 +484,16 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
   t->ticks=0;
-  sema_init(&t->wait_for_child,0);
-  t->parent=running_thread();
-  t->child_load=false;
+  t->child_proc=NULL;
   list_init(&t->children);
   list_init(&t->file_list);
   t->fd_num=1;
   t->exitcode=-1;
-  t->wait=0;
   t->self=NULL;
+  t->directory=NULL;
+  t->pagedir=NULL;
   list_push_back (&all_list, &t->allelem);
 }
 

@@ -7,7 +7,8 @@ struct fds
 {
     int fd;
     struct file *f;
+    struct dir* dir;
     struct list_elem elem;
 };
-void exit (int status);
+void exit1 (int status);
 #endif /* userprog/syscall.h */
