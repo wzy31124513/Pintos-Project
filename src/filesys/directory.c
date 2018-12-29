@@ -144,10 +144,11 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  struct inode* i=dir->inode;
-  lock_acquire(&i->lock);
+  struct inode *i=dir->inode;
+  struct lock=i->lock;
+  lock_acquire(&lock);
   ok=lookup(dir,name,&e,NULL);
-  lock_release(&i->lock);
+  lock_release(&lock);
   if (ok)
   {
     *inode=inode_open(e.inode_sector);
