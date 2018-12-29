@@ -72,7 +72,7 @@ inode_create (block_sector_t sector, bool directory)
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
   memset(cache->data,0,BLOCK_SECTOR_SIZE);
   cache->correct=true;
-  disk_inode=cache->data;
+  disk_inode=(struct inode_disk*)cache->data;
   disk_inode->directory=directory;
   disk_inode->length=0;
   disk_inode->magic=INODE_MAGIC;
@@ -213,7 +213,7 @@ void inode_deallocate (block_sector_t sector, int level) {
     }
     cache_unlock(c);
   }
-  lock_acquire(&cache_lock);
+  lock_acquire(&search_lock);
   for (int i = 0; i < 64; ++i)
   {
     struct cache_entry* c=&cache[i];
@@ -229,7 +229,7 @@ void inode_deallocate (block_sector_t sector, int level) {
     }
     lock_release(&c->lock);
   }
-  lock_release(&cache_lock);
+  lock_release(&search_lock);
   free_map_release(sector);
 }
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -418,17 +418,20 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       offset += chunk_size;
       bytes_written += chunk_size;
     }
+
   if (offset>inode_length(inode))
   {
     struct cache_entry* inode_block=cache_lock(inode->sector);
     struct inode_disk* disk=cache_read(inode_block);
-    if (length>disk->length)
+    if (offset>disk->length)
     {
-      disk->length=length;
+      disk->length=offset;
       inode_block->dirty=true;
     }
     cache_unlock(inode_block);
   }
+
+  
   lock_acquire(&inode->deny_write);
   inode->writer_cnt-=1;
   if (inode->writer_cnt==0)
