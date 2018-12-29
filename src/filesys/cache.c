@@ -63,22 +63,22 @@ static void cache_writebehind(void* aux UNUSED){
 
 static void cache_readahead(void* aux UNUSED){
 	while(1){
-		struct readahead_entry* r=malloc(sizeof(struct readahead));
+		struct readahead_entry* r=malloc(sizeof(struct readahead_block));
 		lock_acquire(&readahead_lock);
 		while(list_empty(&readahead_list)){
 			cond_wait(&readahead_list_nonempty,&readahead_lock);
 		}
-		r=list_entry(list_pop_front(&readahead_list),struct readahead_entry,elem);
+		r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
 		lock_release(&readahead_lock);
 		struct cache_entry* c;
-		c=cache_alloc(sector);
+		c=cache_alloc(r->sector);
 		cache_read(c);
 		cache_unlock(c);
 		free(r);
 	}
 }
 
-void* cache_read(struct* cache_entry c){
+void* cache_read(struct cache_entry* c){
 	lock_acquire(&c->data_lock);
 	if (!c->correct)
 	{
@@ -94,7 +94,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 {
 	struct cache_entry* c;
 	while(1){
-		lock_acquire(&search_lock)
+		lock_acquire(&search_lock);
 		for (int i = 0; i < 192; ++i)
 		{
 			if (i<64)
@@ -171,7 +171,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 	}
 }
 
-void cache_unlock(struct cache_block *c){
+void cache_unlock(struct cache_entry *c){
 	lock_acquire(&c->lock);
 	if (c->readers)
 	{
@@ -196,7 +196,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 {
 	struct cache_entry* c;
 	while(1){
-		lock_acquire(&search_lock)
+		lock_acquire(&search_lock);
 		for (int i = 0; i < 192; ++i)
 		{
 			if (i<64)
