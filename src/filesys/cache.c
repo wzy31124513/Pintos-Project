@@ -6,7 +6,7 @@
 #include "threads/synch.h"
 
 void cache_init(void){
-	lock_init(&cache_lock);
+	lock_init(&search_lock);
 	for (int i = 0; i < 64; ++i)
 	{
 		struct cache_entry* c=&cache[i];
@@ -91,7 +91,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 {
 	struct cache_entry* c;
 	while(1){
-		lock_acquire(&cache_lock)
+		lock_acquire(&search_lock)
 		for (int i = 0; i < 192; ++i)
 		{
 			if (i<64)
@@ -103,7 +103,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 					lock_release(&c->lock);
 					continue;
 				}
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				c->read_waiters++;
 				if (c->writers||c->write_waiters)
 				{
@@ -126,7 +126,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 					c->sector=sector;
 					c->correct=false;
 					c->readers=1;
-					lock_release(&cache_lock);
+					lock_release(&search_lock);
 					return c;
 				}
 				lock_release(&c->lock);
@@ -140,7 +140,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 					lock_release(&c->lock);
 					continue;
 				}
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				c->writers=1;
 				if (c->correct&c->dirty)
 				{
@@ -160,7 +160,7 @@ struct cache_entry * cache_alloc(block_sector_t sector)
 					}
 				}
 				lock_release(&c->lock);
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				break;
 			}
 		}
@@ -193,7 +193,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 {
 	struct cache_entry* c;
 	while(1){
-		lock_acquire(&cache_lock)
+		lock_acquire(&search_lock)
 		for (int i = 0; i < 192; ++i)
 		{
 			if (i<64)
@@ -205,7 +205,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 					lock_release(&c->lock);
 					continue;
 				}
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				c->write_waiters++;
 				if (c->readers||c->read_waiters||c->writers)
 				{
@@ -228,7 +228,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 					c->sector=sector;
 					c->correct=false;
 					c->writers=1;
-					lock_release(&cache_lock);
+					lock_release(&search_lock);
 					return c;
 				}
 				lock_release(&c->lock);
@@ -242,7 +242,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 					lock_release(&c->lock);
 					continue;
 				}
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				c->writers=1;
 				if (c->correct&c->dirty)
 				{
@@ -262,7 +262,7 @@ struct cache_entry * cache_lock(block_sector_t sector)
 					}
 				}
 				lock_release(&c->lock);
-				lock_release(&cache_lock);
+				lock_release(&search_lock);
 				break;
 			}
 		}

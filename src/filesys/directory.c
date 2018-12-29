@@ -5,7 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
-
+#include "threads/synch.h"
 /* A directory. */
 struct dir 
   {
@@ -26,7 +26,7 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct node inode_create (sector,true);
+  struct inode* inode= inode_create (sector,true);
   if (inode!=NULL)
   {
     struct dir_entry entries[2];
