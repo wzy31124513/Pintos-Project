@@ -35,8 +35,6 @@ size_t mark;
 
 void cache_init(void);
 void* cache_read(struct cache_entry* c);
-void cache_writebehind(void* aux UNUSED);
-void cache_readahead(void* aux UNUSED);
 struct cache_entry* cache_alloc(block_sector_t sector);
 void cache_unlock(struct cache_entry *c);
 struct cache_entry * cache_lock(block_sector_t sector);

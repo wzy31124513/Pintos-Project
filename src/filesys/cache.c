@@ -5,6 +5,9 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
+static void cache_writebehind(void* aux UNUSED);
+static void cache_readahead(void* aux UNUSED);
+
 void cache_init(void){
 	lock_init(&search_lock);
 	for (int i = 0; i < 64; ++i)
@@ -51,14 +54,14 @@ void cache_flush(void){
 }
 
 
-void cache_writebehind(void* aux UNUSED){
+static void cache_writebehind(void* aux UNUSED){
 	while(1){
 		timer_msleep(1000);
 		cache_flush();
 	}
 } 
 
-void cache_readahead(void* aux UNUSED){
+static void cache_readahead(void* aux UNUSED){
 	while(1){
 		struct readahead_entry* r=malloc(sizeof(struct readahead));
 		lock_acquire(&readahead_lock);
