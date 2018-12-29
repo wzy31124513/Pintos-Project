@@ -283,7 +283,7 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-  lock_acquire(&dir->inode->lock);
+  inode_lock(dir->inode);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
@@ -293,6 +293,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
           return true;
         } 
     }
-  lock_release(&dir->inode->lock);
+  inode_unlock(dir->inode);
   return false;
 }
