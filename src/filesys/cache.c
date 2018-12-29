@@ -63,7 +63,7 @@ static void cache_writebehind(void* aux UNUSED){
 
 static void cache_readahead(void* aux UNUSED){
 	while(1){
-		struct readahead_entry* r=malloc(sizeof(struct readahead_block));
+		struct readahead_block* r=malloc(sizeof(struct readahead_block));
 		lock_acquire(&readahead_lock);
 		while(list_empty(&readahead_list)){
 			cond_wait(&readahead_list_nonempty,&readahead_lock);
@@ -186,7 +186,7 @@ void cache_unlock(struct cache_entry *c){
 		{
 			cond_broadcast(&c->no_writers,&c->lock);
 		}else{
-			cond_signal(&c->no_readers,&c->ock);
+			cond_signal(&c->no_readers,&c->lock);
 		}
 	}
 	lock_release(&c->lock);
