@@ -12,6 +12,8 @@
 #include "filesys/file.h"
 #include "threads/malloc.h"
 #include "devices/input.h"
+#include "filesys/directory.h"
+
 static void syscall_handler (struct intr_frame *);
 
 struct fds* getfile(int fd);
@@ -63,7 +65,7 @@ void exit1 (int status){
   	  struct fds *fd=list_entry(e,struct fds,elem);
   	  next=list_next(e);
   	  lock_acquire(&file_lock);
-  	  file_close(fd->file);
+  	  file_close(fd->f);
   	  dir_close(fd->dir);
   	  lock_release(&file_lock);
   	  free (fd);
@@ -256,7 +258,7 @@ void close (int fd){
 		if (f->fd==fd)
 		{
 			file_close(f->f);
-			dir_close(f->dir)
+			dir_close(f->dir);
 			list_remove(e);
 			free(f);
 			break;
@@ -278,35 +280,36 @@ bool chdir (const char *dir){
 bool mkdir (const char *dir){
 	return filesys_create(dir,0,true);
 }
+
 bool readdir (int fd, char *name){
-	struct fds* fd=getfile(fd);
-	if (fd->dir==NULL)
+	struct fds* fds=getfile(fd);
+	if (fds->dir==NULL)
 	{
 		exit1(-1);
 	}
-	char name[15];
-	return dir_readdir(fd->dir,name);
+	return dir_readdir(fds->dir,name);
 
 }
+
 bool isdir (int fd){
 	return getfile(fd)->dir!=NULL;
 }
 int inumber (int fd){
-	struct fds* fd=getfild(fd);
+	struct fds* fds=getfild(fd);
 	if (isdir(fd))
 	{
-		if (fd->dir==NULL)
+		if (fds->dir==NULL)
 		{
 			exit1(-1);
 		}
-		struct inode* inode=dir_get_inode(fd->dir);
+		struct inode* inode=dir_get_inode(fds->dir);
 		return inode_get_inumber(inode);
 	}else{
-		if (fd->f==NULL)
+		if (fds->f==NULL)
 		{
 			exit1(-1);
 		}
-		struct inode*inode=file_get_inode(fd->f);
+		struct inode* inode=file_get_inode(fds->f);
 		return inode_get_inumber(inode);
 	}
 }
@@ -385,15 +388,15 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}else if (*esp==SYS_CHDIR)
 	{
 		is_valid_vaddr(esp+1);
-		chdir(*(esp+1));
+		chdir((const char *)*(esp+1));
 	}else if (*esp==SYS_MKDIR)
 	{
 		is_valid_vaddr(esp+1);
-		mkdir(*(esp+1));
+		mkdir((const char *)*(esp+1));
 	}else if (*esp==SYS_READDIR)
 	{
 		is_valid_vaddr(esp+5);
-		readdir(*(esp+4),*(esp+5));
+		readdir(*(esp+4),(char *)*(esp+5));
 	}else if (*esp==SYS_ISDIR)
 	{
 		is_valid_vaddr(esp+1);
