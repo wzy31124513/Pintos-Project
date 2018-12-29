@@ -518,7 +518,7 @@ void inode_unlock (struct inode *inode)
   lock_release (&inode->lock);
 }
 
-int open_cnt (struct inode *inode) 
+int inode_open_cnt (struct inode *inode) 
 {
   int open_cnt;
   lock_acquire (&open_inodes_lock);
