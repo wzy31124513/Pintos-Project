@@ -43,7 +43,7 @@ process_execute (const char *file_name)
   {
     wd=dir_reopen(wd);
   }else{
-    wd=dir_open_root()
+    wd=dir_open_root();
   }
   exec.wd=wd;
   if (exec.wd==NULL)
@@ -66,7 +66,7 @@ process_execute (const char *file_name)
         tid=TID_ERROR;
       }
     }else{
-      dir.close(exec.wd);
+      dir_close(exec.wd);
     }
   return tid;
 }
@@ -312,7 +312,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
-  file = filesys_open (name);
+  file = file_open(filesys_open (name));
   t->self=file;
   free(name);
   if (file == NULL)
