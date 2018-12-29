@@ -195,7 +195,7 @@ static int get_next_part (char *name, const char **srcp){
 bool
 filesys_remove (const char *name) 
 {
-  struct success=false;
+  bool success=false;
   struct dir* dir;
   char base_name[15];
   if (name2entry(name,&dir,base_name))

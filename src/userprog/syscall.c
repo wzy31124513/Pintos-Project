@@ -295,7 +295,7 @@ bool isdir (int fd){
 	return getfile(fd)->dir!=NULL;
 }
 int inumber (int fd){
-	struct fds* fds=getfild(fd);
+	struct fds* fds=getfile(fd);
 	if (isdir(fd))
 	{
 		if (fds->dir==NULL)

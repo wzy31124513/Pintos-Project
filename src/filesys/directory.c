@@ -23,7 +23,7 @@ struct dir_entry
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
-bool
+struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
   struct node inode_create (sector,true);
