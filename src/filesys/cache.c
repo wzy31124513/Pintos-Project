@@ -51,14 +51,14 @@ void cache_flush(void){
 }
 
 
-static void cache_writebehind(void* aux UNUSED){
+void cache_writebehind(void* aux UNUSED){
 	while(1){
 		timer_msleep(1000);
 		cache_flush();
 	}
 } 
 
-static void cache_readahead(void* aux UNUSED){
+void cache_readahead(void* aux UNUSED){
 	while(1){
 		struct readahead_entry* r=malloc(sizeof(struct readahead));
 		lock_acquire(&readahead_lock);
