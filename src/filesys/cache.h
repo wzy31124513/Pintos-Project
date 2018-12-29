@@ -28,10 +28,10 @@ struct readahead_block{
 
 struct cache_entry cache[64];
 struct lock search_lock;
-static struct lock readahead_lock;
-static struct condition readahead_list_nonempty;
-static struct list readahead_list;
-static size_t mark;
+struct lock readahead_lock;
+struct condition readahead_list_nonempty;
+struct list readahead_list;
+size_t mark;
 
 void cache_init(void);
 void* cache_read(struct cache_entry* c);

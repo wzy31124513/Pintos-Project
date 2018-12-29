@@ -6,7 +6,7 @@
 #include "devices/block.h"
 
 struct bitmap;
-static struct lock open_inodes_lock;
+struct lock open_inodes_lock;
 void inode_init (void);
 struct inode *inode_create (block_sector_t, off_t);
 struct inode *inode_open (block_sector_t);
