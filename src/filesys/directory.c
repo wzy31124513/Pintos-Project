@@ -238,9 +238,7 @@ dir_remove (struct dir *dir, const char *name)
 
   if (is_directory(inode)==true)
   {
-    lock_acquire(&open_inodes_lock);
-    int open_cnt=inode->open_cnt;
-    lock_release(&open_inodes_lock);
+    int open_cnt=open_cnt(inode);
 
     if (open_cnt>1)
     {

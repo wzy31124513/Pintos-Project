@@ -25,4 +25,5 @@ bool is_directory(const struct inode *);
 struct inode* file_create(block_sector_t sector, off_t length);
 void inode_lock (struct inode *inode);
 void inode_unlock (struct inode *inode);
+int open_cnt (struct inode *inode);
 #endif /* filesys/inode.h */

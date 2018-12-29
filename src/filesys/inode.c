@@ -517,3 +517,12 @@ void inode_unlock (struct inode *inode)
 {
   lock_release (&inode->lock);
 }
+
+int open_cnt (struct inode *inode) 
+{
+  int open_cnt;
+  lock_acquire (&open_inodes_lock);
+  open_cnt = inode->open_cnt;
+  lock_release (&open_inodes_lock);
+  return open_cnt;
+}
