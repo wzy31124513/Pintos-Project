@@ -145,7 +145,7 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (name != NULL);
 
   struct inode *i=dir->inode;
-  struct lock=i->lock;
+  struct lock lock=i->lock;
   lock_acquire(&lock);
   ok=lookup(dir,name,&e,NULL);
   lock_release(&lock);
