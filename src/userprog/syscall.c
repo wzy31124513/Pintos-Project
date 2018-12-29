@@ -658,7 +658,7 @@ sys_inumber (int handle)
   if(sys_isdir(handle))
   {
     struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
-    struct inode *inode = dir_get_inode(dir_descriptor);
+    struct inode *inode = dir_get_inode(dir_descriptor->dir);
     return inode_get_inumber(inode);
   }
 
