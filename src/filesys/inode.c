@@ -245,7 +245,7 @@ inode_remove (struct inode *inode)
 static bool
 get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_entry **d){
   size_t offsets[3];
-  size_t offset_cnt;
+  size_t offset_cnt=0;
   off_t sector_idx=offset/BLOCK_SECTOR_SIZE;
   if (sector_idx<123)
   {
@@ -263,6 +263,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
       offsets[0]=(124+sector_idx/((BLOCK_SECTOR_SIZE/sizeof(block_sector_t))*(BLOCK_SECTOR_SIZE/sizeof(block_sector_t))));
       offsets[1]=sector_idx/(BLOCK_SECTOR_SIZE/sizeof(block_sector_t));
       offsets[2]=sector_idx%(BLOCK_SECTOR_SIZE/sizeof(block_sector_t));
+      offset_cnt=3;
     }
   }
   size_t level=0;
@@ -431,7 +432,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     cache_unlock(inode_block);
   }
 
-  
+
   lock_acquire(&inode->deny_write);
   inode->writer_cnt-=1;
   if (inode->writer_cnt==0)
