@@ -29,6 +29,21 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
 
+/* In-memory inode. */
+struct inode 
+  {
+    struct list_elem elem;              /* Element in inode list. */
+    block_sector_t sector;              /* Sector number of disk location. */
+    int open_cnt;                       /* Number of openers. */
+    bool removed;                       /* True if deleted, false otherwise. */
+    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+    int writer_cnt;
+    struct lock lock;
+    struct lock deny_write;
+    struct condition no_writers;
+
+  };
+
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
@@ -491,4 +506,14 @@ struct inode * file_create(block_sector_t sector, off_t length) {
       inode=NULL;
     }
   return inode;
+}
+
+void inode_lock (struct inode *inode) 
+{
+  lock_acquire(&inode->lock);
+}
+
+void inode_unlock (struct inode *inode) 
+{
+  lock_release (&inode->lock);
 }
