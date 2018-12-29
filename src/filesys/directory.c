@@ -9,7 +9,7 @@
 /* A directory. */
 struct dir 
   {
-    struct inode *inode;                /* Backing store. */
+    struct inode* inode;                /* Backing store. */
     off_t pos;                          /* Current position. */
   };
 
