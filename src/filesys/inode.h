@@ -5,11 +5,12 @@
 #include "filesys/off_t.h"
 #include "devices/block.h"
 #include "threads/synch.h"
+#include "filesys/cache.h"
 
 struct bitmap;
 struct lock open_inodes_lock;
 void inode_init (void);
-struct inode *inode_create (block_sector_t, off_t);
+struct inode *inode_create (block_sector_t, bool);
 struct inode *inode_open (block_sector_t);
 struct inode *inode_reopen (struct inode *);
 block_sector_t inode_get_inumber (const struct inode *);

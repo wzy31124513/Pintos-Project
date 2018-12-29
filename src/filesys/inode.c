@@ -44,20 +44,6 @@ struct inode
 
   };
 
-/* Returns the block device sector that contains byte offset POS
-   within INODE.
-   Returns -1 if INODE does not contain data for a byte at offset
-   POS. */
-static block_sector_t
-byte_to_sector (const struct inode *inode, off_t pos) 
-{
-  ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  else
-    return -1;
-}
-
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
@@ -66,7 +52,7 @@ void
 inode_init (void) 
 {
   list_init (&open_inodes);
-  list_init (&open_inodes_lock);
+  lock_init (&open_inodes_lock);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -139,7 +125,7 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
   lock_init(&inode->lock);
-  lock_init(&inode->deny_write_cnt);
+  lock_init(&inode->deny_write);
   cond_init(&inode->no_writers);
 
   lock_release(&open_inodes_lock);
@@ -205,7 +191,7 @@ inode_close (struct inode *inode)
             }
           }
           cache_unlock(cache);
-          inode_deallocate(disk->sectors[i],0)
+          inode_deallocate(inode->sector,0);
         }
       free (inode); 
     }else{
@@ -218,7 +204,7 @@ void inode_deallocate (block_sector_t sector, int level) {
   {
     struct cache_entry* c=cache_lock(sector);
     block_sector_t* block=cache_read(c);
-    for (int i = 0; i < (BLOCK_SECTOR_SIZE/sizeof(block_sector_t)); ++i)
+    for (int i = 0; i < (off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)); ++i)
     {
       if (block[i])
       {
@@ -267,7 +253,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
     offset_cnt=1;
   }else{
     sector_idx-=123;
-    if (sector_idx<(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)))
+    if (sector_idx<(off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)))
     {
       offsets[0]=123+sector_idx/(BLOCK_SECTOR_SIZE/sizeof(block_sector_t));
       offsets[1]=sector_idx%(BLOCK_SECTOR_SIZE/sizeof(block_sector_t));
@@ -330,6 +316,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
       return false;
     }
     c->dirty=true;
+    struct cache_entry *next_cache;
     next_cache=cache_lock(data[offsets[level]]);
     next_cache->correct=true;
     next_cache->dirty=true;
@@ -351,7 +338,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  uint8_t *bounce = NULL;
 
   while (size > 0) 
     {
