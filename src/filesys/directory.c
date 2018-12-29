@@ -226,7 +226,7 @@ dir_remove (struct dir *dir, const char *name)
   {
     return false;
   }
-  lock_acquire(&dir->inode->lock);
+  inode_lock(dir->inode);
   if (!lookup (dir, name, &e, &ofs))
     goto done;
 
@@ -273,7 +273,7 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
  done:
-  lock_release(&dir->inode->lock);
+  inode_unlock(dir->inode);
   inode_close (inode);
   return success;
 }
