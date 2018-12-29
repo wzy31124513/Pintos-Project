@@ -144,9 +144,10 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  lock_acquire(&dir->inode->lock);
+  struct inode* inode=dir->inode;
+  lock_acquire(&inode->lock);
   ok=lookup(dir,name,&e,NULL);
-  lock_release(&dir->inode->lock);
+  lock_release(&inode->lock);
   if (ok)
   {
     *inode=inode_open(e.inode_sector);
@@ -178,7 +179,8 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
     return false;
 
   /* Check that NAME is not in use. */
-  lock_acquire(&dir->inode->lock);
+  struct inode* inode=dir->inode;
+  lock_acquire(&inode->lock);
   if (lookup (dir, name, NULL, NULL))
     goto done;
 
@@ -201,7 +203,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
-  lock_release(&dir->inode->lock);
+  lock_release(&inode->lock);
   return success;
 }
 
