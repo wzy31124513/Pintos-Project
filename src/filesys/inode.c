@@ -161,7 +161,7 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
-          struct cache_entry* cache=cache_lock(inode->sector);
+          struct cache_entry* cache=cache_lock(inode->sector,1);
           struct inode_disk* disk=cache_read(cache);
           for (int i = 0; i < 125; ++i)
           {
@@ -257,7 +257,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
   size_t level=0;
   block_sector_t sector=inode->sector;
   while(1){
-    struct cache_entry* c=cache_alloc(sector);
+    struct cache_entry* c=cache_lock(sector,0);
     uint32_t* data=cache_read(c);
     if (data[offsets[level]]!=0)
     {
@@ -279,7 +279,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
           }
         }
         cache_unlock(c);
-        *d=cache_alloc(sector);
+        *d=cache_lock(sector,0);
         return true;
       }
       cache_unlock(c);
@@ -291,7 +291,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
       *d=NULL;
       return true;
     }
-    c=cache_lock(sector);
+    c=cache_lock(sector,1);
     data=cache_read(c);
     if (data[offsets[level]]!=0)
     {
@@ -459,7 +459,7 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_entry* inode_block=cache_alloc(inode->sector);
+  struct cache_entry* inode_block=cache_lock(inode->sector,0);
   struct inode_disk* disk=cache_read(inode_block);
   cache_unlock(inode_block);
   return disk->length;
