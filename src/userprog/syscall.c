@@ -81,7 +81,10 @@ void exit1(int status){
 }
  
 int exec(const char* cmd_line){
-  int ret=process_execute(cmd_line);
+  char* fn_copy=malloc(strlen(cmd_line)+1);
+  strlcpy(fn_copy,cmd_line,strlen(cmd_line)+1);
+  int ret=process_execute(fn_copy);
+  free(fn_copy);
   return ret;
 }
  
