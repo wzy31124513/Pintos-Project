@@ -304,10 +304,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  t->pages = malloc (sizeof *t->pages);
-  if (t->pages == NULL)
-    goto done;
-
 
   strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
