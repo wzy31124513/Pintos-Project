@@ -30,7 +30,7 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct inode *inode = filesys_create (sector, 1);
+  struct inode *inode = inode_create (sector, 1);
   if (inode != NULL) 
     {
       struct dir_entry entries[2];
