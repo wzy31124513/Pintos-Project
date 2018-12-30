@@ -109,7 +109,7 @@ int open(const char* file){
     }
   }
   palloc_free_page (fn_copy);
-  return handle;
+  return fd;
 }
  
 
