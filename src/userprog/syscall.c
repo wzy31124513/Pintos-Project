@@ -64,8 +64,26 @@ void halt(void){
 }
  
 void exit1(int status){
-  thread_current ()->exit_code = status;
-  thread_exit ();
+  struct thread* cur=thread_current();
+  cur->exit_code=status;
+  struct list_elem* e;
+  struct list_elem* next;
+  for (e=list_begin(&cur->fds);e!=list_end(&cur->fds);e=next)
+  {
+    struct fds *fd=list_entry(e,struct fds,elem);
+    next=list_next(e);
+    file_close(fd->file);
+    dir_close(fd->dir);
+    free (fd);
+  }
+  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=next)
+  {
+    next=list_next(e);
+    struct mapping *m=list_entry(e,struct mapping,elem);
+    munmap(m->id);
+  }
+  dir_close(cur->wd);
+  thread_exit();
 }
  
 int exec(const char* cmd_line){
@@ -130,7 +148,7 @@ int filesize(int fd){
   struct fds* f=getfile(fd);
   if (f->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   int ret;
   ret=file_length(f->file);
@@ -142,7 +160,7 @@ int read (int fd, void *buffer, unsigned size){
   struct fds* f=getfile(fd);
   if (f->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   uint8_t* b=(uint8_t*)buffer;
   while(size>0){
@@ -159,7 +177,7 @@ int read (int fd, void *buffer, unsigned size){
     {
       if (!page_lock(b,true))
       {
-        thread_exit();
+        exit1(-1);
       }
       ret=file_read(f->file,b,read_size);
       page_unlock(b);
@@ -169,7 +187,7 @@ int read (int fd, void *buffer, unsigned size){
         char c=input_getc();
         if (!page_lock(b,true))
         {
-          thread_exit();
+          exit1(-1);
         }
         b[i]=c;
         page_unlock(b);
@@ -204,7 +222,7 @@ int write (int fd,void *buffer, unsigned size){
     f=getfile(fd);
     if (f->file==NULL)
     {
-      thread_exit();
+      exit1(-1);
     }
   }
   while(size>0){
@@ -219,7 +237,7 @@ int write (int fd,void *buffer, unsigned size){
     }
     if (!page_lock(b,false))
     {
-      thread_exit();   
+      exit1(-1);   
     }
     if (fd==1)
     {
@@ -252,7 +270,7 @@ void seek (int fd, unsigned position) {
   struct fds* fds=getfile(fd);
   if (fds->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   file_seek(fds->file, position);
 }
@@ -261,7 +279,7 @@ unsigned tell (int fd){
   struct fds* fds=getfile(fd);
   if (fds->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   return file_tell(fds->file);
 }
@@ -278,7 +296,7 @@ int mmap (int fd, void *addr){
   struct fds *f=getfile(fd);
   if (f->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   struct mapping *m= malloc (sizeof(struct mapping));
   size_t offset;
@@ -318,7 +336,7 @@ int mmap (int fd, void *addr){
 void munmap (int mapping){
   struct mapping *m=getmap (mapping);
   list_remove (&m->elem);
-  for(int i=0;i<m->num;i++)
+  for(int i=0;i<(int)m->num;i++)
   {
     if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
     {
@@ -349,7 +367,7 @@ bool mkdir (const char *dir){
 bool readdir (int fd, char *name){
   struct fds *f=getfile(fd);
   if (f->dir == NULL){
-    thread_exit ();
+    exit1(-1);
   }
   char cp[15];
   bool ret = dir_readdir(f->dir, cp);
@@ -371,7 +389,7 @@ int inumber (int fd)
   {
     struct fds *f=getfile(fd);
     if (f->dir==NULL){
-      thread_exit ();
+      exit1(-1);
     }
     struct inode *inode=dir_get_inode(f->dir);
     return inode_get_inumber(inode);
@@ -379,35 +397,10 @@ int inumber (int fd)
   struct fds *f=getfile(fd);
   if (f->file==NULL)
   {
-    thread_exit();
+    exit1(-1);
   }
   struct inode *inode=file_get_inode (f->file);
   return inode_get_inumber(inode);
-}
-
-void
-syscall_exit (void) {
-  struct thread *cur = thread_current ();
-  struct list_elem *e, *next;
-   
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds); e = next)
-    {
-      struct fds *fd = list_entry (e, struct fds, elem);
-      next = list_next (e);
-      file_close (fd->file);
-      dir_close (fd->dir);
-      free (fd);
-    }
-   
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
-       e = next)
-    {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      next = list_next (e);
-      munmap (m->id);
-    }
-
-  dir_close (cur->wd);
 }
 
 void
@@ -486,7 +479,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_CHDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=chdir(args[0]);
+    f->eax=chdir((const char *)args[0]);
   }else if (func==SYS_MKDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -494,17 +487,17 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_READDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=readdir(args[0],args[1]);
+    f->eax=readdir(args[0],(char*)args[1]);
   }else if (func==SYS_ISDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-   f->eax=isdir(args[0]);
+    f->eax=isdir(args[0]);
   }else if (func==SYS_INUMBER)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=inumber(args[0]);
   }else{
-    thread_exit();
+    exit1(-1);
   }
 }
 
@@ -519,7 +512,7 @@ static void argcpy(void* cp,const void* addr1,size_t size){
       s=size;
     }
     if(!page_lock(addr,false)){
-      thread_exit();
+      exit1(-1);
     }
     memcpy(dst,addr,s);
     page_unlock(addr);
@@ -538,7 +531,7 @@ static void copy_out (void *udst_, const void *src_, size_t size) {
       chunk_size = size;
     }
     if (!page_lock (udst, false)){
-      thread_exit ();
+      exit1(-1);
     }
     memcpy(udst, src, chunk_size);
     page_unlock (udst);
@@ -561,7 +554,7 @@ static char * strcpy_to_kernel (const char *str){
     addr=pg_round_down (str);
     if(!page_lock(addr,false)){
       palloc_free_page (cp);
-      thread_exit();
+      exit1(-1);
       return NULL;
     }
     while(str<addr+PGSIZE){
@@ -590,7 +583,7 @@ static struct fds * getfile (int fd){
       return f;
     }
   }
-  thread_exit ();
+  exit1(-1);
 }
 
 
@@ -603,5 +596,5 @@ static struct mapping * getmap (int handle) {
         return m;
       }
     }
-  thread_exit ();
+  exit1(-1);
 }

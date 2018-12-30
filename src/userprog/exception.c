@@ -5,7 +5,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "vm/page.h"
-
+#include "userprog/syscall.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -153,7 +153,7 @@ page_fault (struct intr_frame *f)
   if (user && not_present)
     {
       if (!load_fault (fault_addr))
-        thread_exit ();
+        exit1(-1);
       return;
     }
 
