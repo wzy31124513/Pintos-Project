@@ -312,7 +312,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
       return false;
     }
     c->dirty=true;
-    next_cache=cache_lock(data[offsets[level]],1);
+    struct cache_entry *next_cache=cache_lock(data[offsets[level]],1);
     memset(next_cache->data,0,BLOCK_SECTOR_SIZE);
     next_cache->correct = true;
     next_cache->dirty = true;
