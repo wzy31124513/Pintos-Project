@@ -170,67 +170,65 @@ inode_close (struct inode *inode)
  
       /* Deallocate blocks if removed. */
       if (inode->removed) 
-        deallocate_inode (inode);
-
+        {
+          struct cache_entry* cache=cache_lock(inode->sector);
+          struct inode_disk* disk=cache_read(cache);
+          for (int i = 0; i < 125; ++i)
+          {
+            if (disk->sectors[i])
+            {
+              if (i<123)
+              {
+                inode_deallocate(disk->sectors[i],0);
+              }else if (i==123)
+              {
+                inode_deallocate(disk->sectors[i],1);
+              }else{
+                inode_deallocate(disk->sectors[i],2);
+              }
+            }
+          }
+          cache_unlock(cache);
+          inode_deallocate(inode->sector,0);
+        }
       free (inode); 
+    }else{
+      lock_release (&open_inodes_lock);
     }
-  else
-    lock_release (&open_inodes_lock);
 }
 
-/* Deallocates SECTOR and anything it points to recursively.
-   LEVEL is 2 if SECTOR is doubly indirect,
-   or 1 if SECTOR is indirect,
-   or 0 if SECTOR is a data sector. */
-static void
-deallocate_recursive (block_sector_t sector, int level) 
-{
-  if (level > 0) 
+void inode_deallocate (block_sector_t sector, int level) {
+  if (level>0)
+  {
+    struct cache_entry* c=cache_lock(sector);
+    block_sector_t* block=cache_read(c);
+    for (int i = 0; i < (off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)); ++i)
     {
-      struct cache_entry *block = cache_lock (sector, 1);
-      block_sector_t *pointers = cache_read (block);
-      int i;
-      for (i = 0; i < PTRS_PER_SECTOR; i++)
-        if (pointers[i])
-          deallocate_recursive (sector, level - 1);
-      cache_unlock (block);
-    }
-    
-  lock_acquire (&search_lock);
-  for (int i = 0; i < 64; i++){
-    struct cache_entry *b = &cache[i];
-    lock_acquire (&b->lock);
-    if (b->sector == sector) {
-      lock_release (&search_lock);
-      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
-        b->sector = (block_sector_t)-1; 
-      }
-      lock_release (&b->lock);
-      free_map_release (sector);
-      return;
-    }
-    lock_release (&b->lock);
-  }
-  lock_release (&search_lock);
-
-  free_map_release (sector);
-}
-
-/* Deallocates the blocks allocated for INODE. */
-static void
-deallocate_inode (const struct inode *inode)
-{
-  struct cache_entry *block = cache_lock (inode->sector, 1);
-  struct inode_disk *disk_inode = cache_read (block);
-  int i;
-  for (i = 0; i < SECTOR_CNT; i++)
-    if (disk_inode->sectors[i]) 
+      if (block[i])
       {
-        int level = (i >= DIRECT_CNT) + (i >= DIRECT_CNT + INDIRECT_CNT);
-        deallocate_recursive (disk_inode->sectors[i], level); 
+        inode_deallocate(sector,level-1);
       }
-  cache_unlock (block);
-  deallocate_recursive (inode->sector, 0);
+    }
+    cache_unlock(c);
+  }
+  lock_acquire(&search_lock);
+  for (int i = 0; i < 64; ++i)
+  {
+    struct cache_entry* c=&cache[i];
+    lock_acquire(&c->lock);
+    if (c->sector==sector)
+    {
+      if (c->readers==0 && c->read_waiters==0 && c->writers==0 && c->write_waiters==0)
+      {
+        c->sector=(block_sector_t)-1;
+      }
+      lock_release(&c->lock);
+      break;
+    }
+    lock_release(&c->lock);
+  }
+  lock_release(&search_lock);
+  free_map_release(sector);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
