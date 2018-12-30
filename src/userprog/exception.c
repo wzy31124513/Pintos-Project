@@ -152,7 +152,7 @@ page_fault (struct intr_frame *f)
   /* Allow the pager to try to handle it. */
   if (user && not_present)
     {
-      if (!page_in (fault_addr))
+      if (!load_fault (fault_addr))
         thread_exit ();
       return;
     }

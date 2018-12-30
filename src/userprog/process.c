@@ -200,8 +200,11 @@ process_exit (void)
       release_child (cs);
     }
 
-  /* Destroy the page hash table. */
-  page_exit ();
+  struct hash* h=thread_current()->pages;
+  if (h!=NULL)
+  {
+    hash_destroy(h,page_destructor);
+  }
   
   /* Close executable (and allow writes). */
   file_close (cur->bin_file);
