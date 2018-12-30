@@ -21,6 +21,7 @@ struct fds
 {
     struct file *file;
     int fd;
+    struct dir* dir;
     struct list_elem elem;
 };
 
@@ -58,6 +59,32 @@ static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static struct fds* getfile(int fd);
 static struct mapping* getmap (int fd);
+
+
+static void
+copy_out (void *udst_, const void *src_, size_t size) 
+{
+  uint8_t *udst = udst_;
+  const uint8_t *src = src_;
+
+  while (size > 0) 
+    {
+      size_t chunk_size = PGSIZE - pg_ofs (udst);
+      if (chunk_size > size)
+        chunk_size = size;
+      
+      if (!page_lock (udst, false))
+        thread_exit ();
+      memcpy (udst, src, chunk_size);
+      page_unlock (udst);
+
+      udst += chunk_size;
+      src += chunk_size;
+      size -= chunk_size;
+    }
+}
+
+
 
 void halt(void)
 {
@@ -109,7 +136,7 @@ bool create(const char *file, unsigned initial_size)
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
   lock_acquire(&file_lock);
-  ret=filesys_create(fn_copy,initial_size);
+  ret=filesys_create(fn_copy,initial_size,FILE_INODE);
   lock_release(&file_lock);
   palloc_free_page (fn_copy);
   return ret;
@@ -132,18 +159,25 @@ int open(const char* file)
   struct fds* f=malloc(sizeof(struct fds));
   int fd=-1;
   lock_acquire(&file_lock);
-  f->file=filesys_open(fn_copy);
-  if(f->file!=NULL)
+  struct inode* inode=filesys_open(fn_copy);
+  if(inode!=NULL)
     {
-      thread_current()->fd_num++;
-      fd=thread_current()->fd_num;
-      f->fd=fd;
-      list_push_back(&thread_current()->file_list,&f->elem);
+      if (inode_get_type (inode) == FILE_INODE)
+        fd->file = file_open (inode);
+      else
+        fd->dir = dir_open (inode);
+      if (fd->file!=NULL || fd->dir!=NULL)
+      {
+        thread_current()->fd_num++;
+        fd=thread_current()->fd_num;
+        f->fd=fd;
+        list_push_back(&thread_current()->file_list,&f->elem);
+      }else{
+        free(f);
+        inode_close(inode);
+      }
     }
-    else{
-      free(f);
-    }
-    lock_release (&file_lock);
+  lock_release (&file_lock);
   palloc_free_page (fn_copy);
   return fd;
 }
@@ -152,6 +186,10 @@ int filesize(int fd)
 {
   struct fds* f=getfile(fd);
   int ret;
+  if (f->file==NULL)
+  {
+    exit1(-1);
+  }
   lock_acquire (&file_lock);
   ret=file_length(f->file);
   lock_release (&file_lock);
@@ -163,6 +201,15 @@ int read (int fd, void *buffer, unsigned size)
   int read=0;
   struct fds* f=getfile(fd);
   uint8_t* b=(uint8_t*)buffer;
+
+  if (fd!=0)
+  {
+    if (f->file==NULL)
+    {
+      exit1(-1);
+    }
+  }
+
   while(size>0){
     size_t page_left=PGSIZE-pg_ofs(b);
     int32_t ret=0;
@@ -219,10 +266,16 @@ int write (int fd,  void *buffer, unsigned size){
   uint8_t* b=(uint8_t*)buffer;
   struct fds* f;
   int write=0;
+
   if (fd!=1)
   {
     f=getfile(fd);
+    if (f->file==NULL)
+    {
+      exit1(-1);
+    }
   }
+
   while(size>0){
     size_t page_left=PGSIZE-pg_ofs(b);
     size_t write_size;
@@ -269,6 +322,10 @@ int write (int fd,  void *buffer, unsigned size){
 void seek (int fd, unsigned position){
   lock_acquire (&file_lock); 
   struct fds* fds=getfile(fd);
+  if (fds->file==NULL)
+  {
+    exit1(-1);
+  }
   file_seek(fds->file,position);
   lock_release (&file_lock);
 }
@@ -280,6 +337,10 @@ unsigned tell (int fd)
   unsigned ret;
   if (fds!=NULL)
   {
+    if (fds->file==NULL)
+    {
+      exit1(-1);
+    }
     ret = file_tell(fds->file);
   }else{
     ret = 1;
@@ -293,6 +354,7 @@ void close(int fd)
   struct fds* f=getfile(fd);
   lock_acquire(&file_lock);
   file_close(f->file);
+  dir_close(f->dir);
   lock_release(&file_lock);
   list_remove(&f->elem);
   free(f);
@@ -302,6 +364,10 @@ void close(int fd)
 int mmap (int fd, void *addr)
 {
   struct fds* f=getfile(fd);
+  if (f->file==NULL)
+  {
+    exit1(-1);
+  }
   struct mapping* m=malloc(sizeof(struct mapping));
   size_t offset;
   uint32_t read_bytes;
@@ -370,12 +436,16 @@ void munmap (int mapping)
 
 bool chdir (const char *dir){
   bool ok = false;
-  ok = filesys_chdir(udir);
+  char *copy = strcpy_to_kernel(dir);
+  ok = filesys_chdir(copy);
+  palloc_free_page(copy);
   return ok;
 }
 
 bool mkdir (const char *dir){
-  bool ok = filesys_create (udir, 0, DIR_INODE);
+  char *copy = strcpy_to_kernel(dir);
+  bool ok = filesys_create (copy, 0, DIR_INODE);
+  palloc_free_page(copy);
   return ok;
 }
 
@@ -385,7 +455,10 @@ bool readdir (int fd, char *name){
   {
     exit1(-1);
   }
-  bool ok = dir_readdir (fd->dir, uname);
+  char name1[15];
+  bool ok = dir_readdir (fd->dir, name1);
+  if (ok)
+    copy_out (name, name1, strlen (name1) + 1);
   return ok;
 }
 bool isdir (int fd){
