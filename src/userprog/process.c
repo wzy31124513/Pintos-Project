@@ -335,7 +335,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   t->pages = malloc (sizeof *t->pages);
   if (t->pages == NULL)
     goto done;
-  hash_init (t->pages, page_hash, page_less, NULL);
+  init_page(t->pages);
 
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
@@ -513,14 +513,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     {
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-      struct page *p = page_allocate (upage, !writable);
+      struct page *p = page_alloc (upage, !writable);
       if (p == NULL)
         return false;
       if (page_read_bytes > 0) 
         {
           p->file = file;
-          p->file_offset = ofs;
-          p->file_bytes = page_read_bytes;
+          p->offset = ofs;
+          p->rw_bytes = page_read_bytes;
         }
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -617,16 +617,16 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
 static bool
 setup_stack (const char *cmd_line, void **esp) 
 {
-  struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
+  struct page *page = page_alloc (((uint8_t *) PHYS_BASE) - PGSIZE, false);
   if (page != NULL) 
     {
-      page->frame = frame_alloc_and_lock (page);
+      page->frame = frame_alloc (page);
       if (page->frame != NULL)
         {
           bool ok;
           page->read_only = false;
-          page->private = false;
-          ok = init_cmd_line (page->frame->base, page->addr, cmd_line, esp);
+          page->mmap = false;
+          ok = init_cmd_line (page->frame->addr, page->addr, cmd_line, esp);
           frame_unlock (page->frame);
           return ok;
         }
