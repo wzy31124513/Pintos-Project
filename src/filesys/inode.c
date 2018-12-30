@@ -95,7 +95,7 @@ inode_create (block_sector_t sector, bool directory)
   memset (block->data, 0, BLOCK_SECTOR_SIZE);
   block->correct = true;
   block->dirty = true;
-  disk_inode = (struct inode*)block->data;
+  disk_inode = (struct inode_disk*)block->data;
   disk_inode->directory = directory;
   disk_inode->length = 0;
   disk_inode->magic = INODE_MAGIC;
