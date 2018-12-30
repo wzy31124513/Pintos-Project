@@ -31,13 +31,16 @@ struct lock search_lock;
 struct lock readahead_lock;
 struct condition readahead_list_nonempty;
 struct list readahead_list;
-size_t mark;
+size_t mark=0;
 
-void cache_init(void);
-void* cache_read(struct cache_entry* c);
-struct cache_entry* cache_alloc(block_sector_t sector);
-void cache_unlock(struct cache_entry *c);
-struct cache_entry * cache_lock(block_sector_t sector);
-void cache_flush(void);
+void cache_init (void);
+void cache_flush (void);
+struct cache_block *cache_lock (block_sector_t, enum lock_type);
+void *cache_read (struct cache_block *);
+void *cache_zero (struct cache_block *);
+void cache_dirty (struct cache_block *);
+void cache_unlock (struct cache_block *);
+void cache_free (block_sector_t);
+void cache_readahead (block_sector_t);
 
-#endif
+#endif /* filesys/cache.h */
