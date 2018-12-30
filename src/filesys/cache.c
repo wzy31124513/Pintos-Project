@@ -34,6 +34,7 @@ void cache_init (void) {
   thread_create ("readahead",0,readahead,NULL);
 }
 
+
 void cache_flush (void) {
   for (int i = 0; i < 64; ++i)
   {
@@ -54,47 +55,11 @@ void cache_flush (void) {
   }
 }
 
-static void cache_writebehind (void *aux UNUSED) {
-  while(1){
-    timer_msleep (30 * 1000);
-    cache_flush ();
-  }
-}
-
-static void readahead (void *aux UNUSED) 
-{ while(1){
-    struct readahead_block* r;
-    lock_acquire(&readahead_lock);
-    while(list_empty(&readahead_list)){
-      cond_wait(&readahead_list_nonempty,&readahead_lock);
-    }
-    r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
-    lock_release (&readahead_lock);
-    struct cache_entry* c=cache_lock(r->sector, 0);
-    cache_read(c);
-    cache_unlock(c);
-    free (r);
-  }
-}
-
-
-void* cache_read(struct cache_entry* c){
-  lock_acquire(&c->data_lock);
-  if (!c->correct)
-  {
-    block_read(fs_device,c->sector,c->data);
-    c->correct=true;
-    c->dirty=false;
-  }
-  lock_release(&c->data_lock);
-  return c->data;
-}
-
 
 struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
  try_again:
   lock_acquire (&search_lock);
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector != sector) 
@@ -124,7 +89,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock);
      return b;
   }
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector == (block_sector_t)-1) {
@@ -142,7 +107,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock); 
   }
 
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[m%64];
     m++;
     lock_acquire (&b->lock);
@@ -177,18 +142,42 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
 }
 
 
+void* cache_read(struct cache_entry* c){
+  lock_acquire(&c->data_lock);
+  if (!c->correct)
+  {
+    block_read(fs_device,c->sector,c->data);
+    c->correct=true;
+    c->dirty=false;
+  }
+  lock_release(&c->data_lock);
+  return c->data;
+}
+
+
+void * cache_zero (struct cache_entry *b) {
+  memset (b->data, 0, BLOCK_SECTOR_SIZE);
+  b->correct = true;
+  b->dirty = true;
+  return b->data;
+}
+
+
+void cache_dirty (struct cache_entry *b) 
+{
+  b->dirty = true;
+}
+
+
 void cache_unlock (struct cache_entry *b){
   lock_acquire (&b->lock);
   if (b->readers) {
-    c->readers--;
-    if (b->readers == 0)
-    {
+    if (--b->readers == 0){
       cond_signal (&b->no_readers, &b->lock);
     }
   }else{
-      b->writers=0;
-      if (b->read_waiters)
-      {
+      b->writers--;
+      if (b->read_waiters){
         cond_broadcast (&b->no_writers, &b->lock);
       }else{
         cond_signal (&b->no_readers, &b->lock);
@@ -198,8 +187,6 @@ void cache_unlock (struct cache_entry *b){
 }
 
 
-<<<<<<< HEAD
-=======
 void cache_free (block_sector_t sector) {
   int i;
   lock_acquire (&search_lock);
@@ -219,12 +206,11 @@ void cache_free (block_sector_t sector) {
   lock_release (&search_lock);
 }
 
-static void flushed (void *aux UNUSED) {
-  for (;;) 
-    {
-      timer_msleep (30 * 1000);
-      cache_flush ();
-    }
+static void cache_writebehind (void *aux UNUSED) {
+  while(1){
+    timer_msleep (30 * 1000);
+    cache_flush ();
+  }
 }
 
 
@@ -251,10 +237,9 @@ static void readahead (void *aux UNUSED)
     }
     r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
     lock_release (&readahead_lock);
-    struct cache_entry* c=cache_lock(ra_block->sector, 0);
+    struct cache_entry* c=cache_lock(r->sector, 0);
     cache_read(c);
     cache_unlock(c);
     free (r);
   }
 }
->>>>>>> parent of 56e0bfa... Update cache.c

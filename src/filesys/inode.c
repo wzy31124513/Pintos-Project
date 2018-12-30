@@ -92,12 +92,11 @@ inode_create (block_sector_t sector, bool directory)
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
-  block->dirty=true;
-  block->correct=true;
-  disk_inode = (struct inode_disk*)block->data;
+  disk_inode = cache_zero (block);
   disk_inode->directory = directory;
   disk_inode->length = 0;
   disk_inode->magic = INODE_MAGIC;
+  cache_dirty (block);
   cache_unlock (block);
 
   inode = inode_open (sector);
@@ -222,24 +221,8 @@ deallocate_recursive (block_sector_t sector, int level)
           deallocate_recursive (sector, level - 1);
       cache_unlock (block);
     }
-
-  lock_acquire (&search_lock);
-  for (int i = 0; i < 64; i++){
-    struct cache_entry *b = &cache[i];
-    lock_acquire (&b->lock);
-    if (b->sector == sector) {
-      lock_release (&search_lock);
-      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
-        b->sector = (block_sector_t)-1; 
-      }
-      lock_release (&b->lock);
-      break;
-    }
-    lock_release (&b->lock);
-  }
-  lock_release (&search_lock);
-
-
+  
+  cache_free (sector);
   free_map_release (sector);
 }
 
@@ -351,17 +334,9 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
                   || (level > 0 && offsets[level] + 1 < PTRS_PER_SECTOR)) 
                 {
                   uint32_t next_sector = this_level_data[offsets[level] + 1];
-                  if (next_sector&& next_sector < block_size (fs_device)){
-                    struct readahead_block *block=malloc (sizeof *block);
-                    if (block == NULL){
-                      return;
-                    }
-                    block->sector = sector;
-                    lock_acquire (&readahead_lock);
-                    list_push_back (&readahead_list, &block->elem);
-                    cond_signal (&readahead_list_nonempty, &readahead_lock);
-                    lock_release (&readahead_lock);
-                  }
+                  if (next_sector
+                      && next_sector < block_size (fs_device))
+                    cache_readahead (next_sector); 
                 }
               cache_unlock (this_level_block);
 
@@ -404,13 +379,12 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
           *data_block = NULL;
           return false;
         }
-      this_level_block->dirty=true;
+      cache_dirty (this_level_block);
 
       /* Lock and clear the new block. */
       next_level_block = cache_lock (this_level_data[offsets[level]],
                                      1);
-        next_level_block->correct = true;
-        next_level_block->dirty = true;
+      cache_zero (next_level_block);
 
       /* Release this level's block.  No one else can access the
          new block yet, because we have an exclusive lock on it. */
@@ -483,7 +457,7 @@ extend_file (struct inode *inode, off_t length)
       if (length > disk_inode->length) 
         {
           disk_inode->length = length;
-          inode_block->dirty=true;
+          cache_dirty (inode_block);
         }
       cache_unlock (inode_block);
     }
@@ -529,7 +503,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       sector_data = cache_read (block);
       memcpy (sector_data + sector_ofs, buffer + bytes_written, chunk_size);
-      block->dirty=true;
+      cache_dirty (block);
       cache_unlock (block);
 
       /* Advance. */
