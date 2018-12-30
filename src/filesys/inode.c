@@ -161,7 +161,7 @@ inode_reopen (struct inode *inode)
 }
 
 
-bool is_directory (const struct inode *);{
+bool is_directory (const struct inode *){
   struct cache_entry *inode_block = cache_lock (inode->sector, 0);
   struct inode_disk *disk_inode = cache_read (inode_block);
   bool ret = disk_inode->directory;
