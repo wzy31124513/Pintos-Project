@@ -645,9 +645,6 @@ syscall_handler (struct intr_frame *f)
   unsigned func;
   int args[3];
   copy_in(&func,f->esp,sizeof(func));
-  if(func>=15){
-    sys_exit(-1);
-  }
   memset(args,0,sizeof(args));
   if (func==SYS_HALT)
   {
@@ -728,5 +725,7 @@ syscall_handler (struct intr_frame *f)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_inumber(args[0]);
+  }else{
+    sys_exit(-1);
   }
 }
