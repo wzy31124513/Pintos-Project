@@ -100,59 +100,62 @@ void* cache_read(struct cache_entry* c){
 
 struct cache_entry * cache_lock(block_sector_t sector){
   bool a=false;
+  struct cache_entry *b;
   while(1){
     lock_acquire (&search_lock);
     for (int i = 0; i < 192; i++){
       if (i<64)
       {
-        struct cache_entry *b = &cache[i];
-        lock_acquire (&b->lock);
-        if (b->sector != sector) 
+        b = &cache[i];
+        lock_acquire(&b->lock);
+        if (b->sector!= sector) 
         {
-          lock_release (&b->lock);
+          lock_release(&b->lock);
           continue;
         }
-        lock_release (&search_lock);
+        lock_release(&search_lock);
         b->write_waiters++;
-        if (b->readers || b->read_waiters || b->writers)
-          do {
-            cond_wait (&b->no_readers, &b->lock);
-          } while (b->readers || b->writers);
+        if (b->readers||b->read_waiters||b->writers){
+          cond_wait (&b->no_readers,&b->lock);
+          while (b->readers || b->writers){
+            cond_wait (&b->no_readers,&b->lock);
+          }
+        }
         b->writers++;
         b->write_waiters--;
-        lock_release (&b->lock);
+        lock_release(&b->lock);
         return b;
       }else if (i<128){
-        struct cache_entry *b = &cache[i%64];
-        lock_acquire (&b->lock);
-        if (b->sector == (block_sector_t)-1) {
-          lock_release (&b->lock);
-          b->sector = sector;
-          b->correct = false;
-          b->writers = 1;
-          lock_release (&search_lock);
+        b=&cache[i%64];
+        lock_acquire(&b->lock);
+        if(b->sector==(block_sector_t)-1) {
+          lock_release(&b->lock);
+          b->sector=sector;
+          b->correct=false;
+          b->writers=1;
+          lock_release(&search_lock);
           return b;
         }
         lock_release (&b->lock); 
       }else{
-        struct cache_entry *b = &cache[m%64];
+        b = &cache[m%64];
         m++;
-        lock_acquire (&b->lock);
-        if (b->readers || b->writers || b->read_waiters || b->write_waiters) {
+        lock_acquire(&b->lock);
+        if (b->readers||b->writers||b->read_waiters||b->write_waiters){
           lock_release (&b->lock);
           continue;
         }
-        b->writers = 1;
-        lock_release (&b->lock);
-        lock_release (&search_lock);
+        b->writers=1;
+        lock_release(&b->lock);
+        lock_release(&search_lock);
         if (b->correct && b->dirty) {
-          block_write (fs_device, b->sector, b->data);
-          b->dirty = false;
+          block_write(fs_device,b->sector,b->data);
+          b->dirty=false;
         }
-        lock_acquire (&b->lock);
-        b->writers = 0;
+        lock_acquire(&b->lock);
+        b->writers=0;
         if (!b->read_waiters && !b->write_waiters) {
-          b->sector = (block_sector_t)-1; 
+          b->sector=(block_sector_t)-1; 
         }else{
           if (b->read_waiters){
             cond_broadcast (&b->no_writers, &b->lock);
@@ -177,64 +180,67 @@ struct cache_entry * cache_lock(block_sector_t sector){
 
 struct cache_entry * cache_alloc(block_sector_t sector){
   bool a=false;
+  struct cache_entry *b;
   while(1){
     lock_acquire (&search_lock);
     for (int i = 0; i < 192; i++){
       if (i<64)
       {
-        struct cache_entry *b = &cache[i];
-        lock_acquire (&b->lock);
-        if (b->sector != sector) 
+        b=&cache[i];
+        lock_acquire(&b->lock);
+        if (b->sector!= sector) 
         {
-          lock_release (&b->lock);
+          lock_release(&b->lock);
           continue;
         }
-        lock_release (&search_lock);
+        lock_release(&search_lock);
         b->read_waiters++;
-        if (b->writers || b->write_waiters)
-          do {
+        if (b->writers|| b->write_waiters){
+          cond_wait (&b->no_writers, &b->lock);
+          while (b->writers){
             cond_wait (&b->no_writers, &b->lock);
-          } while (b->writers);
+          }
+        }
         b->readers++;
         b->read_waiters--;
-        lock_release (&b->lock);
+        lock_release(&b->lock);
         return b;
       }else if (i<128){
-        struct cache_entry *b = &cache[i%64];
-        lock_acquire (&b->lock);
-        if (b->sector == (block_sector_t)-1) {
-          lock_release (&b->lock);
-          b->sector = sector;
-          b->correct = false;
-          b->readers = 1;
-          lock_release (&search_lock);
+        b=&cache[i%64];
+        lock_acquire(&b->lock);
+        if (b->sector==(block_sector_t)-1){
+          lock_release(&b->lock);
+          b->sector=sector;
+          b->correct=false;
+          b->readers=1;
+          lock_release(&search_lock);
           return b;
         }
-        lock_release (&b->lock); 
+        lock_release(&b->lock); 
       }else{
-        struct cache_entry *b = &cache[m%64];
+        b=&cache[m%64];
         m++;
-        lock_acquire (&b->lock);
+        lock_acquire(&b->lock);
         if (b->readers || b->writers || b->read_waiters || b->write_waiters) {
-          lock_release (&b->lock);
+          lock_release(&b->lock);
           continue;
         }
-        b->writers = 1;
-        lock_release (&b->lock);
-        lock_release (&search_lock);
+        b->writers=1;
+        lock_release(&b->lock);
+        lock_release(&search_lock);
         if (b->correct && b->dirty) {
-          block_write (fs_device, b->sector, b->data);
-          b->dirty = false;
+          block_write(fs_device, b->sector, b->data);
+          b->dirty=false;
         }
-        lock_acquire (&b->lock);
-        b->writers = 0;
+        lock_acquire(&b->lock);
+        b->writers=0;
         if (!b->read_waiters && !b->write_waiters) {
-          b->sector = (block_sector_t)-1; 
+          b->sector=(block_sector_t)-1; 
         }else{
           if (b->read_waiters){
-            cond_broadcast (&b->no_writers, &b->lock);
+            cond_broadcast(&b->no_writers, &b->lock);
           }else{
-            cond_signal (&b->no_readers, &b->lock);
+            cond_signal(&b->no_readers, &b->lock);
           }
         }
         lock_release (&b->lock);
