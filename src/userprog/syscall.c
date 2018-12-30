@@ -42,19 +42,25 @@ static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
  
-void halt(void)
+struct fds
 {
+  int handle;
+  struct list_elem elem;
+  struct file *file;
+  struct dir *dir;   
+  struct list_elem elem;
+};
+
+void halt(void){
   shutdown_power_off ();
 }
  
-
-void exit1(int status) {
+void exit1(int status){
   thread_current ()->exit_code = status;
   thread_exit ();
 }
  
-int exec(const char* cmd_line)
-{
+int exec(const char* cmd_line){
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
   ret=process_execute(fn_copy);
@@ -62,13 +68,11 @@ int exec(const char* cmd_line)
   return ret;
 }
  
-int wait(int pid)
-{
+int wait(int pid){
   return process_wait(pid);
 }
  
-bool create(const char *file, unsigned initial_size)
-{
+bool create(const char *file, unsigned initial_size){
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
   ret=filesys_create(fn_copy,initial_size,0);
@@ -76,8 +80,7 @@ bool create(const char *file, unsigned initial_size)
   return ret;
 }
  
-bool remove(const char* file)
-{
+bool remove(const char* file){
   char* fn_copy=strcpy_to_kernel(file);
   bool ret;
   ret=filesys_remove(fn_copy);
@@ -86,18 +89,9 @@ bool remove(const char* file)
 }
 
 
-struct file_descriptor
-  {
-    struct list_elem elem;      /* List element. */
-    struct file *file;          /* File. */
-    struct dir *dir;            /* Directory. */
-    int handle;                 /* File handle. */
-  };
- 
-int open(const char* ufile)
-{
-  char *kfile = strcpy_to_kernel (ufile);
-  struct file_descriptor *fd;
+int open(const char* file){
+  char *kfile = strcpy_to_kernel (file);
+  struct fds *fd;
   int handle = -1;
  
   fd = calloc (1, sizeof *fd);
@@ -123,37 +117,24 @@ int open(const char* ufile)
             }
         }
     }
-  
   palloc_free_page (kfile);
   return handle;
 }
  
-
-static struct file_descriptor *
-lookup_fd (int handle) 
-{
+static struct fds *lookup_fd (int fd){
   struct thread *cur = thread_current ();
   struct list_elem *e;
-   
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds);
-       e = list_next (e))
-    {
-      struct file_descriptor *fd;
-      fd = list_entry (e, struct file_descriptor, elem);
-      if (fd->handle == handle)
-        return fd;
+  for (e = list_begin (&cur->fds); e!=list_end(&cur->fds);e = list_next (e)){
+    struct fds *f=list_entry (e, struct fds, elem);
+    if (f->handle == fd){
+      return f;
     }
- 
+  }
   thread_exit ();
 }
- 
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open ordinary file. */
-static struct file_descriptor *
-lookup_file_fd (int handle) 
-{
-  struct file_descriptor *fd = lookup_fd (handle);
+
+static struct fds *lookup_file_fd (int handle) { 
+  struct fds *fd = lookup_fd (handle);
   if (fd->file == NULL)
     thread_exit ();
   return fd;
@@ -162,10 +143,10 @@ lookup_file_fd (int handle)
 /* Returns the file descriptor associated with the given handle.
    Terminates the process if HANDLE is not associated with an
    open directory. */
-static struct file_descriptor *
+static struct fds *
 lookup_dir_fd (int handle) 
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = lookup_fd (handle);
   if (fd->dir == NULL)
     thread_exit ();
   return fd;
@@ -173,7 +154,7 @@ lookup_dir_fd (int handle)
 
 int filesize(int fd)
 {
-  struct file_descriptor* f=lookup_file_fd(fd);
+  struct fds* f=lookup_file_fd(fd);
   int ret;
   ret=file_length(f->file);
   return ret;
@@ -183,7 +164,7 @@ int filesize(int fd)
 int read (int handle, void *udst_, unsigned size) 
 {
   uint8_t *udst = udst_;
-  struct file_descriptor *fd;
+  struct fds *fd;
   int bytes_read = 0;
 
   /* Look up file descriptor. */
@@ -240,7 +221,7 @@ int read (int handle, void *udst_, unsigned size)
 int write (int handle, void *usrc_, unsigned size) 
 {
   uint8_t *usrc = usrc_;
-  struct file_descriptor *fd = NULL;
+  struct fds *fd = NULL;
   int bytes_written = 0;
 
   /* Lookup up file descriptor. */
@@ -305,7 +286,7 @@ unsigned tell (int handle)
 
 void close (int handle) 
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = lookup_fd (handle);
   file_close (fd->file);
   dir_close (fd->dir);
   list_remove (&fd->elem);
@@ -345,7 +326,7 @@ lookup_mapping (int handle)
 
 int mmap (int handle, void *addr)
 {
-  struct file_descriptor *fd = lookup_file_fd (handle);
+  struct fds *fd = lookup_file_fd (handle);
   struct mapping *m = malloc (sizeof *m);
   size_t offset;
   off_t length;
@@ -427,7 +408,7 @@ bool mkdir (const char *udir)
 
 bool readdir (int handle, char *uname)
 {
-  struct file_descriptor *fd = lookup_dir_fd (handle);
+  struct fds *fd = lookup_dir_fd (handle);
   char name[NAME_MAX + 1];
   bool ok = dir_readdir (fd->dir, name);
   if (ok)
@@ -437,7 +418,7 @@ bool readdir (int handle, char *uname)
 
 bool isdir (int handle)
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = lookup_fd (handle);
   return fd->dir != NULL;
 }
 
@@ -446,12 +427,12 @@ int inumber (int handle)
 {
   if(isdir(handle))
   {
-    struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
+    struct fds *dir_descriptor = lookup_dir_fd(handle);
     struct inode *inode = dir_get_inode(dir_descriptor->dir);
     return inode_get_inumber(inode);
   }
 
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = lookup_fd (handle);
   struct inode *inode = file_get_inode (fd->file);
   return inode_get_inumber (inode);
 }
@@ -464,7 +445,7 @@ syscall_exit (void)
    
   for (e = list_begin (&cur->fds); e != list_end (&cur->fds); e = next)
     {
-      struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
+      struct fds *fd = list_entry (e, struct fds, elem);
       next = list_next (e);
       file_close (fd->file);
       dir_close (fd->dir);
