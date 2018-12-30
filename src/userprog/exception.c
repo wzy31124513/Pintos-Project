@@ -4,7 +4,7 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "vm/page.h"
+#include "threads/vaddr.h"
 #include "userprog/syscall.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -151,7 +151,7 @@ page_fault (struct intr_frame *f)
 
   if ((!is_user_vaddr(fault_addr) && user)||not_present)
   {
-    exit(-1);
+    exit1(-1);
   }
 
   printf ("Page fault at %p: %s error %s page in %s context.\n",
