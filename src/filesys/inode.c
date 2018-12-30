@@ -14,17 +14,6 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-#define DIRECT_CNT 123
-#define INDIRECT_CNT 1
-#define DBL_INDIRECT_CNT 1
-#define SECTOR_CNT (DIRECT_CNT + INDIRECT_CNT + DBL_INDIRECT_CNT)
-
-#define PTRS_PER_SECTOR ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))
-#define INODE_SPAN ((DIRECT_CNT                                              \
-                     + PTRS_PER_SECTOR * INDIRECT_CNT                        \
-                     + PTRS_PER_SECTOR * PTRS_PER_SECTOR * DBL_INDIRECT_CNT) \
-                    * BLOCK_SECTOR_SIZE)
-
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -199,7 +188,7 @@ void inode_deallocate (block_sector_t sector, int level) {
   {
     struct cache_entry* c=cache_lock(sector);
     block_sector_t* block=cache_read(c);
-    for (int i = 0; i < PTRS_PER_SECTOR; ++i)
+    for (int i = 0; i < ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))); ++i)
     {
       if (block[i])
       {
@@ -249,18 +238,18 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
     offset_cnt=1;
   }else{
     sector_idx-=123;
-    if (sector_idx<PTRS_PER_SECTOR * INDIRECT_CNT)
+    if (sector_idx<((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))
     {
-      offsets[0]=123 + sector_idx / PTRS_PER_SECTOR;
-      offsets[1]=sector_idx % PTRS_PER_SECTOR;
+      offsets[0]=123 + sector_idx / ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
+      offsets[1]=sector_idx % ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
       offset_cnt=2;
     }else{
-      sector_idx-=PTRS_PER_SECTOR*INDIRECT_CNT;
-      if (sector_idx < DBL_INDIRECT_CNT * PTRS_PER_SECTOR * PTRS_PER_SECTOR)
+      sector_idx-=((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
+      if (sector_idx < 1 * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))) * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))
       {
-        offsets[0]=(DIRECT_CNT + INDIRECT_CNT+ sector_idx / (PTRS_PER_SECTOR * PTRS_PER_SECTOR));
-        offsets[1]=sector_idx / PTRS_PER_SECTOR;
-        offsets[2]=sector_idx % PTRS_PER_SECTOR;
+        offsets[0]=(124+ sector_idx / (((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))) * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))));
+        offsets[1]=sector_idx / ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
+        offsets[2]=sector_idx % ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
         offset_cnt=3;
       }
     }
@@ -278,7 +267,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
       level++;
       if (level==offset_cnt) 
       {
-        if ((level==0 && offsets[level]+1<DIRECT_CNT) || (level>0 && offsets[level]+1 < PTRS_PER_SECTOR)) 
+        if ((level==0 && offsets[level]+1<123) || (level>0 && offsets[level]+1 < ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))) 
         {
           uint32_t next_sector=data[offsets[level]+1];
           if (next_sector && next_sector < block_size(fs_device)){
@@ -395,7 +384,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       struct cache_entry *block;
 
       /* Bytes to max inode size, bytes left in sector, lesser of the two. */
-      off_t inode_left = INODE_SPAN - offset;
+      off_t inode_left = ((123+((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))+((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))*((off_t)(BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))* BLOCK_SECTOR_SIZE) - offset;
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
       int min_left = inode_left < sector_left ? inode_left : sector_left;
 
