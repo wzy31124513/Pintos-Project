@@ -15,7 +15,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "filesys/directory.h"
- 
+
+void* is_valid_vaddr(const void* esp);
 void halt (void);
 int exec (const char *cmd_line);
 int wait (int pid);
@@ -35,8 +36,21 @@ bool isdir (int fd);
 int inumber (int fd);
  
 static void syscall_handler (struct intr_frame *);
-static void argcpy(void* cp,const void* addr1,size_t size);
 static struct fds * getfile (int fd);
+
+void* is_valid_vaddr(const void* esp){
+  if(esp==NULL || !is_user_vaddr(esp)){
+    exit1(-1);
+    return 0;
+  }
+  if (pagedir_get_page(thread_current()->pagedir,esp)==NULL)
+  {
+    exit1(-1);
+    return 0;
+  }
+  return pagedir_get_page(thread_current()->pagedir,esp);
+}
+
 
 struct fds{
   int handle;
@@ -308,102 +322,90 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  unsigned func;
-  argcpy(&func,f->esp,sizeof(func));
-  int args[3];
-  memset(args,0,sizeof(args));
-  if (func==SYS_HALT)
+  int *esp=f->esp;
+  is_valid_vaddr(esp);
+  if (*esp==SYS_HALT)
   {
     halt();
-  }else if (func==SYS_EXIT)
+  }else if (*esp==SYS_EXIT)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    exit1(args[0]);
-  }else if (func==SYS_EXEC)
+    is_valid_vaddr(esp+1);
+    exit(*(esp+1));
+  }else if (*esp==SYS_EXEC)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=exec((const char *)args[0]);
-  }else if (func==SYS_WAIT)
+    is_valid_vaddr(esp+1);
+    is_valid_vaddr((void*)*(esp+1));
+    f->eax=exec((char*)*(esp+1));
+  }else if (*esp==SYS_WAIT)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=wait(args[0]);
-  }else if (func==SYS_CREATE)
+    is_valid_vaddr(esp+1);
+    f->eax=wait((int)*(esp+1));
+  }else if (*esp==SYS_CREATE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=create((const char *)args[0],(unsigned)args[1]);
-  }else if (func==SYS_REMOVE)
+    is_valid_vaddr(esp+5);
+    is_valid_vaddr((void*)*(esp+4));
+    f->eax=create((char*)*(esp+4),*(esp+5));
+  }else if (*esp==SYS_REMOVE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=remove((const char *)args[0]);
-  }else if (func==SYS_OPEN){
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=open((const char *)args[0]);
+    is_valid_vaddr(esp+1);
+    is_valid_vaddr((void*)*(esp+1));
+    f->eax=remove((char*)*(esp+1));
+  }else if (*esp==SYS_OPEN){
+    is_valid_vaddr(esp+1);
+    is_valid_vaddr((void*)*(esp+1));
+    f->eax=open((char *)*(esp+1));
   }
-  else if (func==SYS_FILESIZE)
+  else if (*esp==SYS_FILESIZE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=filesize(args[0]);
-  }else if (func==SYS_READ)
+    is_valid_vaddr(esp+1);
+    f->eax=filesize((int)*(esp+1));
+  }else if (*esp==SYS_READ)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=read(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_WRITE)
+    is_valid_vaddr(esp+7);
+    is_valid_vaddr((void*)*(esp+6));
+    f->eax=read(*(esp+5),(void*)*(esp+6),*(esp+7));
+  }else if (*esp==SYS_WRITE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=write(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_SEEK)
+    is_valid_vaddr(esp+7);
+    is_valid_vaddr((void*)*(esp+6));
+    f->eax=write(*(esp+5),(void*)*(esp+6),*(esp+7));
+  }else if (*esp==SYS_SEEK)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    seek(args[0],args[1]);
-  }else if (func==SYS_TELL)
+    is_valid_vaddr(esp+5);
+    seek(*(esp+4),*(esp+5));
+  }else if (*esp==SYS_TELL)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=tell(args[0]);
-  }else if (func==SYS_CLOSE)
+    is_valid_vaddr(esp+1);
+    f->eax=tell(*(esp+1));
+  }else if (*esp==SYS_CLOSE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    close(args[0]);
-  }else if (func==SYS_CHDIR)
+    is_valid_vaddr(esp+1);
+    close(*(esp+1));
+  }else if (*esp==SYS_CHDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=chdir((const char *)args[0]);
-  }else if (func==SYS_MKDIR)
+    is_valid_vaddr(esp+1);
+    f->eax=chdir((const char *)*(esp+1));
+  }else if (*esp==SYS_MKDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=mkdir((const char *)args[0]);
-  }else if (func==SYS_READDIR)
+    is_valid_vaddr(esp+1);
+    f->eax=mkdir((const char *)*(esp+1));
+  }else if (*esp==SYS_READDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=readdir(args[0],(char*)args[1]);
-  }else if (func==SYS_ISDIR)
+    is_valid_vaddr(esp+5);
+    f->eax=readdir(*(esp+4),(char*)*(esp+5));
+  }else if (*esp==SYS_ISDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=isdir(args[0]);
-  }else if (func==SYS_INUMBER)
+    is_valid_vaddr(esp+1);
+    f->eax=isdir(*(esp+1));
+  }else if (*esp==SYS_INUMBER)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=inumber(args[0]);
+    is_valid_vaddr(esp+1);
+    f->eax=inumber(*(esp+1));
   }else{
     exit1(-1);
   }
 }
 
-
-
-static void argcpy(void* cp,const void* addr1,size_t size){
-  uint8_t *dst=cp;
-  const uint8_t *addr=addr1;
-  while(size>0){
-    size_t s=PGSIZE-pg_ofs(addr);
-    if(s>size){
-      s=size;
-    }
-    memcpy(dst,addr,s);
-    dst+=s;
-    addr+=s;
-    size-=s;
-  }
-}
 
 static struct fds * getfile (int fd){
   struct thread *cur=thread_current ();
