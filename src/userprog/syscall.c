@@ -148,7 +148,7 @@ bool create(const char *file, unsigned initial_size)
 {
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
-  ret=filesys_create(fn_copy,initial_size);
+  ret=filesys_create(fn_copy,initial_size,FILE_INODE);
   palloc_free_page (fn_copy);
   return ret;
 }
@@ -173,7 +173,7 @@ struct file_descriptor
  
 int open(const char* ufile)
 {
-  char *kfile = copy_in_string (ufile);
+  char *kfile = strcpy_to_kernel (ufile);
   struct file_descriptor *fd;
   int handle = -1;
  
@@ -372,7 +372,6 @@ void seek (int handle, unsigned position)
 {
   if ((off_t) position >= 0)
     file_seek (lookup_file_fd (handle)->file, position);
-  return 0;
 }
  
 unsigned tell (int handle) 
@@ -381,14 +380,13 @@ unsigned tell (int handle)
 }
  
 
-int close (int handle) 
+void close (int handle) 
 {
   struct file_descriptor *fd = lookup_fd (handle);
   file_close (fd->file);
   dir_close (fd->dir);
   list_remove (&fd->elem);
   free (fd);
-  return 0;
 }
 
 struct mapping
@@ -450,7 +448,7 @@ int mmap (int handle, void *addr)
       struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
-          unmap (m);
+          munmap(m->base);
           return -1;
         }
       p->mmap = false;
@@ -484,7 +482,7 @@ bool chdir (const char *udir)
   bool ok = false;
 
   // ADD CODE HERE
-  char *kdir = copy_in_string(udir);
+  char *kdir = strcpy_to_kernel(udir);
   ok = filesys_chdir(kdir);
   palloc_free_page(kdir);
 
@@ -494,7 +492,7 @@ bool chdir (const char *udir)
 
 bool mkdir (const char *udir)
 {
-  char *kdir = copy_in_string (udir);
+  char *kdir = strcpy_to_kernel (udir);
   bool ok = filesys_create (kdir, 0, DIR_INODE);
   palloc_free_page (kdir);
  
@@ -520,7 +518,7 @@ bool isdir (int handle)
 
 int inumber (int handle)
 {
-  if(sys_isdir(handle))
+  if(isdir(handle))
   {
     struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
     struct inode *inode = dir_get_inode(dir_descriptor->dir);
@@ -623,7 +621,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_CLOSE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=close(args[0]);
+    close(args[0]);
   }else if (func==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
