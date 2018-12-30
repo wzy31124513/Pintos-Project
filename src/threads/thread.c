@@ -15,7 +15,6 @@
 #include "userprog/process.h"
 #include "userprog/syscall.h"
 #endif
-#include "vm/page.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -95,7 +94,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  lock_init (&file_lock);
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT, 0);
@@ -135,17 +134,6 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
-   struct list_elem* a=list_begin(&all_list);          
-   for(a=list_begin(&all_list);a!=list_end(&all_list);a=list_next(a)){
-     struct thread* t=list_entry(a,struct thread,allelem);
-      if(t->ticks>0){
-      t->ticks=t->ticks-1;
-      if(t->ticks==0){
-        thread_unblock(t);
-      }
-    }
-   }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -303,6 +291,7 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
+  syscall_exit ();
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -482,20 +471,19 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->exit_code = -1;
+  t->wait_status = NULL;
+  list_init (&t->children);
+  sema_init (&t->timer_sema, 0);
+  t->pagedir = NULL;
+  t->pages = NULL;
+  t->bin_file = NULL;
+  list_init (&t->fds);
+  list_init (&t->mappings);
+  t->next_handle = 2;
+  t->wd = NULL;
   t->magic = THREAD_MAGIC;
-  t->ticks=0;
-  t->exitcode=-1;
-  t->child_proc=NULL;
-  list_init(&t->children);
-  t->pages=NULL;
-  t->self=NULL;
-  t->pagedir=NULL;
-  list_init(&t->file_list);
-  list_init(&t->mapping);
-  t->fd_num=2;
-  t->wd=NULL;
   list_push_back (&all_list, &t->allelem);
-  
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

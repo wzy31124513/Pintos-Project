@@ -1,10 +1,11 @@
 #ifndef VM_SWAP_H
-#define VM_SWAP_H
+#define VM_SWAP_H 1
 
-#include "vm/page.h"
+#include <stdbool.h>
 
+struct page;
 void swap_init (void);
 void swap_in (struct page *);
 bool swap_out (struct page *);
 
-#endif
+#endif /* vm/swap.h */
