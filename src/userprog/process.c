@@ -516,60 +516,66 @@ setup_stack (void **esp,char* file_name)
 {
   uint8_t *kpage;
   bool success = false;
+  char *token;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
+  if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
-      else{
+        *esp = PHYS_BASE; 
+      else
         palloc_free_page (kpage);
-      }
     }
-   
-    char* p;
-    char* name;
-    int argc=0;
-    char* fn_copy=calloc(1,strlen(file_name)+1);
-    strlcpy(fn_copy,file_name,strlen(file_name)+1);
-    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
-    {
-      argc=argc+1;
-    }
-    int i=0;
-    int* argv=calloc(argc,sizeof(int));
-    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
-    {
-      *esp-=strlen(name)+1;
-      memcpy(*esp,name,strlen(name)+1);
-      argv[i]=(int)*esp;
-      i++;
-    }
-    while((int)*esp%4!=0){
-      char a=0;
-      *esp-=1;
-      memcpy(*esp,&a,1);
-    }
-    int null=0;
-    *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
-    for ( i = argc-1; i >= 0; i--)
-    {
-      *esp-=sizeof(int);
-      memcpy(*esp,&argv[i],sizeof(int));
-    }
-    int aa=(int)*esp;
-    *esp-=sizeof(int);
-    memcpy(*esp,&aa,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&argc,sizeof(int));
-    *esp-=sizeof(int);
-    memcpy(*esp,&null,sizeof(int));
 
+  char **argv = malloc (DEFAULT_ARGV_SIZE * sizeof(char *));
+  int argc = 0, argv_size = DEFAULT_ARGV_SIZE;
 
-    free(argv);
-    return success;
+  for (token = (char *)file_name; token != NULL;
+       token = strtok_r (NULL, " ", save_ptr))
+  {
+    *esp -= strlen (token) + 1;
+    argv[argc] = *esp;
+    argc++;
+    
+    if (argc >= argv_size) 
+    {
+      argv_size = argv_size * 2;
+      argv = realloc (argv, argv_size * sizeof (char *));
+    }
+    memcpy (*esp, token, strlen (token) + 1); 
+  }
+
+  size_t align = ((size_t) *esp) & (WORD_SIZE - 1);
+  if (align) 
+  {
+   *esp -= align;
+   char *align_value = calloc (align, sizeof (char));
+   memcpy (*esp, align_value , align);
+  }
+
+  argv[argc] = 0; 
+
+  int i = 0;
+  for (i = argc; i >= 0; i--)
+  {
+   *esp -= sizeof (char *);
+   memcpy (*esp, &argv[i], sizeof (char *));
+  }
+  
+  char *argv_addr = *esp;
+  *esp -= sizeof (char **);
+  memcpy (*esp, &argv_addr, sizeof (char **));
+
+  *esp -= sizeof (int);
+  memcpy (*esp, &argc, sizeof (int));
+
+  *esp -= sizeof (void *);
+  memcpy (*esp, &argv[argc], sizeof (void *));
+
+  free (argv);
+
+  return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
