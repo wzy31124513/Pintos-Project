@@ -125,7 +125,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_MKDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_mkdir((const char *)*(esp+1));
+    f->eax=sys_mkdir((const char *)args[0]);
   }else if (func==SYS_READDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
