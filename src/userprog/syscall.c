@@ -450,20 +450,20 @@ bool mkdir (const char *dir){
 }
 
 bool readdir (int fd, char *name){
-  struct fds *fd = getfile (handle);
-  if (fds->dir==NULL)
+  struct fds *f = getfile (fd);
+  if (f->dir==NULL)
   {
     exit1(-1);
   }
   char name1[15];
-  bool ok = dir_readdir (fd->dir, name1);
+  bool ok = dir_readdir (f->dir, name1);
   if (ok)
     copy_out (name, name1, strlen (name1) + 1);
   return ok;
 }
 bool isdir (int fd){
-  struct fds *fd = getfile (handle);
-  return fd->dir != NULL;
+  struct fds *f = getfile (fd);
+  return f->dir != NULL;
 }
 int inumber (int fd){
   struct fds* fds=getfile(fd);
@@ -581,7 +581,7 @@ syscall_handler (struct intr_frame *f)
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=inumber(args[0]);
   }else{
-    exit(-1);
+    exit1(-1);
   }
 }
 
