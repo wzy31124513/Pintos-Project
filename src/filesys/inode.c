@@ -421,9 +421,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   {
     struct cache_entry* inode_block=cache_lock(inode->sector, 1);
     struct inode_disk* disk_inode=cache_read(inode_block);
-    if(offset > disk_inode->offset) 
+    if(offset>disk_inode->length) 
     {
-      disk_inode->offset=offset;
+      disk_inode->length=offset;
       inode_block->dirty=true;
     }
     cache_unlock (inode_block);
