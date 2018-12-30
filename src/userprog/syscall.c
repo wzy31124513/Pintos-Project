@@ -104,7 +104,6 @@ bool remove(const char* file){
   return ret;
 }
 
-
 int open(const char* file){
   struct fds *fd;
   int handle = -1;
