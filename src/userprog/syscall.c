@@ -112,42 +112,7 @@ int open(const char* file){
   return fd;
 }
  
-
-static struct fds * getfile (int handle){
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-  for(e=list_begin(&cur->fds);e!=list_tail(&cur->fds);e=list_next (e)){
-    struct fds *fd;
-    fd = list_entry(e, struct fds, elem);
-    if (fd->fd == handle){
-      return fd;
-    }
-  }
-  thread_exit ();
-}
- 
-
-static struct fds *
-lookup_file_fd (int handle) 
-{
-  struct fds *fd = getfile (handle);
-  if (fd->file == NULL)
-    thread_exit ();
-  return fd;
-}
- 
-
-static struct fds *
-lookup_dir_fd (int handle) 
-{
-  struct fds *fd = getfile (handle);
-  if (fd->dir == NULL)
-    thread_exit ();
-  return fd;
-}
-
-int filesize(int fd)
-{
+int filesize(int fd){
   struct fds* f=lookup_file_fd(fd);
   int ret;
   ret=file_length(f->file);
@@ -155,115 +120,107 @@ int filesize(int fd)
 }
 
  
-int read (int handle, void *udst_, unsigned size) 
-{
-  uint8_t *udst = udst_;
-  struct fds *fd;
-  int bytes_read = 0;
-
-  /* Look up file descriptor. */
-  if (handle != STDIN_FILENO)
-    fd = lookup_file_fd (handle);
-
-  while (size > 0) 
+int read (int fd, void *buffer, unsigned size) {
+  int read=0;
+  struct fds* f=lookup_file_fd(fd);
+  uint8_t* b=(uint8_t*)buffer;
+  while(size>0){
+    size_t page_left=PGSIZE-pg_ofs(b);
+    int32_t ret=0;
+    size_t read_size;
+    if (size<page_left)
     {
-      /* How much to read into this page? */
-      size_t page_left = PGSIZE - pg_ofs (udst);
-      size_t read_amt = size < page_left ? size : page_left;
-      off_t retval;
-
-      /* Check that touching this page is okay. */
-      if (!page_lock (udst, true)) 
-        thread_exit ();
-
-      /* Read from file into page. */
-      if (handle != STDIN_FILENO) 
-        {
-          retval = file_read (fd->file, udst, read_amt);
-          if (retval < 0)
-            {
-              if (bytes_read == 0)
-                bytes_read = -1; 
-              break;
-            }
-          bytes_read += retval; 
-        }
-      else 
-        {
-          size_t i;
-          
-          for (i = 0; i < read_amt; i++) 
-            udst[i] = input_getc ();
-          bytes_read = read_amt;
-        }
-
-      /* Release page. */
-      page_unlock (udst);
-
-      /* If it was a short read we're done. */
-      if (retval != (off_t) read_amt)
-        break;
-
-      /* Advance. */
-      udst += retval;
-      size -= retval;
+      read_size=size;
+    }else{
+      read_size=page_left;
     }
-   
-  return bytes_read;
+    if (fd!=0)
+    {
+      if (!page_lock(b,true))
+      {
+        thread_exit();
+      }
+      ret=file_read(f->file,b,read_size);
+      page_unlock(b);
+    }else{
+      for (size_t i = 0; i < read_size; ++i)
+      {
+        char c=input_getc();
+        if (!page_lock(b,true))
+        {
+          thread_exit();
+        }
+        b[i]=c;
+        page_unlock(b);
+      }
+      read=read_size;
+    }
+    if (ret<0)
+    {
+      if (read==0)
+      {
+        read=-1;
+      }
+      break;
+    }
+    read+=ret;
+    if (ret!=(int32_t)read_size)
+    {
+      break;
+    }
+    b+=ret;
+    size-=ret;
+  }
+  return read;
 }
  
-int write (int handle, void *usrc_, unsigned size) 
-{
-  uint8_t *usrc = usrc_;
-  struct fds *fd = NULL;
-  int bytes_written = 0;
-
-  /* Lookup up file descriptor. */
-  if (handle != STDOUT_FILENO)
-    fd = lookup_file_fd (handle);
-
-  while (size > 0) 
+int write (int fd,void *buffer,unsigned size) {
+  uint8_t* b=(uint8_t*)buffer;
+  struct fds* f;
+  int write=0;
+  if (fd!=1)
+  {
+    f=lookup_file_fd(fd);
+  }
+  while(size>0){
+    size_t page_left=PGSIZE-pg_ofs(b);
+    size_t write_size;
+    int32_t ret;
+    if (size<page_left)
     {
-      /* How much bytes to write to this page? */
-      size_t page_left = PGSIZE - pg_ofs (usrc);
-      size_t write_amt = size < page_left ? size : page_left;
-      off_t retval;
-
-      /* Check that we can touch this user page. */
-      if (!page_lock (usrc, false)) 
-        thread_exit ();
-
-      /* Do the write. */
-      if (handle == STDOUT_FILENO)
-        {
-          putbuf ((char *) usrc, write_amt);
-          retval = write_amt;
-        }
-      else
-        retval = file_write (fd->file, usrc, write_amt);
-
-      /* Release user page. */
-      page_unlock (usrc);
-
-      /* Handle return value. */
-      if (retval < 0) 
-        {
-          if (bytes_written == 0)
-            bytes_written = -1;
-          break;
-        }
-      bytes_written += retval;
-
-      /* If it was a short write we're done. */
-      if (retval != (off_t) write_amt)
-        break;
-
-      /* Advance. */
-      usrc += retval;
-      size -= retval;
+      write_size=size;
+    }else{
+      write_size=page_left;
     }
- 
-  return bytes_written;
+    if (!page_lock(b,false))
+    {
+      thread_exit();   
+    }
+    if (fd==1)
+    {
+      putbuf((char*)b,write_size);
+      ret=write_size;
+    }else{
+      ret=file_write(f->file,b,write_size);
+    }
+    page_unlock(b);
+    if (ret<0)
+    {
+      if (write==0)
+      {
+        write=-1;
+      }
+      break;
+    }
+    write+=ret;
+    if (ret!=(int32_t)write_size)
+    {
+      break;
+    }
+    b+=ret;
+    size-=ret;
+  }
+  return write;
 }
  
 void seek (int handle, unsigned position) 
@@ -365,14 +322,17 @@ void munmap (int mapping)
 {
   struct mapping *m=lookup_mapping (mapping);
   list_remove (&m->elem);
-  while (m->page_cnt-- > 0) 
+  for(int i=0;i<m->num;i++)
+  {
+    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
     {
-      page_deallocate (m->base);
-      m->base += PGSIZE;
+      file_write_at(m->file,(const void *)(m->addr+PGSIZE * i),PGSIZE*(m->num),PGSIZE*i);
     }
-  file_close (m->file);
-  free (m);
-
+  }
+  for(int i=0;i<m->num;i++)
+  {
+    page_deallocate((void *)(m->addr+PGSIZE * i));
+  }
 }
 
 bool chdir (const char *udir) 
@@ -626,4 +586,31 @@ static char * strcpy_to_kernel (const char *str)
     }
     page_unlock (addr);
   }
+}
+
+static struct fds * getfile (int handle){
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  for(e=list_begin(&cur->fds);e!=list_tail(&cur->fds);e=list_next (e)){
+    struct fds *fd;
+    fd = list_entry(e, struct fds, elem);
+    if (fd->fd == handle){
+      return fd;
+    }
+  }
+  thread_exit ();
+}
+ 
+static struct fds * lookup_file_fd (int handle){
+  struct fds *fd = getfile (handle);
+  if (fd->file == NULL)
+    thread_exit ();
+  return fd;
+}
+ 
+static struct fds * lookup_dir_fd (int handle){
+  struct fds *fd = getfile (handle);
+  if (fd->dir == NULL)
+    thread_exit ();
+  return fd;
 }
