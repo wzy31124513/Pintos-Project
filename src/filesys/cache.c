@@ -9,6 +9,7 @@
 static void flushed (void *aux);
 static void readahead (void *aux);
 static size_t m=0;
+
 void cache_init (void) {
   lock_init(&search_lock);
   for (int i = 0; i < 64; ++i)
@@ -55,10 +56,7 @@ void cache_flush (void) {
 }
 
 
-struct cache_entry *
-cache_lock (block_sector_t sector,bool exclusive) 
-{
-  int i;
+struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
  try_again:
   lock_acquire (&search_lock);
   for (i = 0; i < 64; i++){
@@ -232,20 +230,17 @@ void cache_readahead (block_sector_t sector) {
 
 static void readahead (void *aux UNUSED) 
 {
-  for (;;) 
-  {
-    struct readahead_block *ra_block;
-    struct cache_entry *cache_entry;
-    lock_acquire (&readahead_lock);
-    while (list_empty (&readahead_list)){
-      cond_wait (&readahead_list_nonempty, &readahead_lock);
+  while(1){
+    struct readahead_block* r;
+    lock_acquire(&readahead_lock);
+    while(list_empty(&readahead_list)){
+      cond_wait(&readahead_list_nonempty,&readahead_lock);
     }
-    ra_block = list_entry (list_pop_front (&readahead_list),struct readahead_block,elem);
+    r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
     lock_release (&readahead_lock);
-
-    cache_entry = cache_lock (ra_block->sector, 0);
-    cache_read (cache_entry);
-    cache_unlock (cache_entry);
-    free (ra_block);
+    struct cache_entry* c=cache_lock(ra_block->sector, 0);
+    cache_read(c);
+    cache_unlock(c);
+    free (r);
   }
 }
