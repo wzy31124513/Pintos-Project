@@ -42,8 +42,6 @@ static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
 static struct fds * getfile (int fd);
-static struct fds * lookup_file_fd (int fd);
-static struct fds * lookup_dir_fd (int fd);
 static struct mapping * getmap (int handle);
 
 struct fds{
@@ -129,7 +127,11 @@ int open(const char* file){
 }
 
 int filesize(int fd){
-  struct fds* f=lookup_file_fd(fd);
+  struct fds* f=getfile(fd);
+  if (f->file=NULL)
+  {
+    thread_exit();
+  }
   int ret;
   ret=file_length(f->file);
   return ret;
@@ -137,7 +139,11 @@ int filesize(int fd){
 
 int read (int fd, void *buffer, unsigned size){
   int read=0;
-  struct fds* f=lookup_file_fd(fd);
+  struct fds* f=getfile(fd);
+  if (f->file=NULL)
+  {
+    thread_exit();
+  }
   uint8_t* b=(uint8_t*)buffer;
   while(size>0){
     size_t page_left=PGSIZE-pg_ofs(b);
@@ -195,7 +201,11 @@ int write (int fd,void *buffer, unsigned size){
   int write=0;
   if (fd!=1)
   {
-    f=lookup_file_fd(fd);
+    f=getfile(fd);
+    if (f->file=NULL)
+    {
+      thread_exit();
+    }
   }
   while(size>0){
     size_t page_left=PGSIZE-pg_ofs(b);
@@ -239,12 +249,20 @@ int write (int fd,void *buffer, unsigned size){
 }
  
 void seek (int fd, unsigned position) {
-  struct fds* fds=lookup_file_fd(fd);
+  struct fds* fds=getfile(fd);
+  if (fds->file=NULL)
+  {
+    thread_exit();
+  }
   file_seek(fds->file, position);
 }
  
 unsigned tell (int fd){
-  struct fds* fds=lookup_file_fd(fd);
+  struct fds* fds=getfile(fd);
+  if (fds->file=NULL)
+  {
+    thread_exit();
+  }
   return file_tell(fds->file);
 }
  
@@ -257,7 +275,11 @@ void close (int fd) {
 }
 
 int mmap (int fd, void *addr){
-  struct fds *f=lookup_file_fd (fd);
+  struct fds *f=getfile(fd);
+  if (f->file=NULL)
+  {
+    thread_exit();
+  }
   struct mapping *m= malloc (sizeof(struct mapping));
   size_t offset;
   off_t length;
@@ -325,7 +347,10 @@ bool mkdir (const char *dir){
 }
 
 bool readdir (int fd, char *name){
-  struct fds *f=lookup_dir_fd(fd);
+  struct fds *f=getfile(fd);
+  if (f->dir == NULL){
+    thread_exit ();
+  }
   char cp[15];
   bool ret = dir_readdir(f->dir, cp);
   if (ret){
@@ -344,18 +369,24 @@ int inumber (int fd)
 {
   if(isdir(fd))
   {
-    struct fds *f=lookup_dir_fd(fd);
+    struct fds *f=getfile(fd);
+    if (f->dir == NULL){
+      thread_exit ();
+    }
     struct inode *inode=dir_get_inode(f->dir);
     return inode_get_inumber(inode);
   }
-  struct fds *f=lookup_file_fd (fd);
+  struct fds *f=getfile(fd);
+  if (f->file=NULL)
+  {
+    thread_exit();
+  }
   struct inode *inode=file_get_inode (f->file);
   return inode_get_inumber(inode);
 }
 
 void
-syscall_exit (void) 
-{
+syscall_exit (void) {
   struct thread *cur = thread_current ();
   struct list_elem *e, *next;
    
@@ -378,7 +409,6 @@ syscall_exit (void)
 
   dir_close (cur->wd);
 }
-
 
 void
 syscall_init (void)
@@ -502,21 +532,20 @@ static void argcpy(void* cp,const void* addr1,size_t size){
 static void copy_out (void *udst_, const void *src_, size_t size) {
   uint8_t *udst = udst_;
   const uint8_t *src = src_;
-  while (size > 0) 
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (udst);
-      if (chunk_size > size)
-        chunk_size = size;
-      
-      if (!page_lock (udst, false))
-        thread_exit ();
-      memcpy (udst, src, chunk_size);
-      page_unlock (udst);
-
-      udst += chunk_size;
-      src += chunk_size;
-      size -= chunk_size;
+  while (size > 0) {
+    size_t chunk_size=PGSIZE-pg_ofs(udst);
+    if (chunk_size>size){
+      chunk_size = size;
     }
+    if (!page_lock (udst, false)){
+      thread_exit ();
+    }
+    memcpy(udst, src, chunk_size);
+    page_unlock (udst);
+    udst+=chunk_size;
+    src+=chunk_size;
+    size-=chunk_size;
+  }
 }
  
 static char * strcpy_to_kernel (const char *str){
@@ -564,21 +593,6 @@ static struct fds * getfile (int fd){
   thread_exit ();
 }
 
-static struct fds * lookup_file_fd (int fd) { 
-  struct fds *f = getfile (fd);
-  if (f->file == NULL){
-    thread_exit ();
-  }
-  return f;
-}
-
-static struct fds * lookup_dir_fd (int fd) {
-  struct fds *f = getfile (fd);
-  if (f->dir == NULL){
-    thread_exit ();
-  }
-  return f;
-}
 
 static struct mapping * getmap (int handle) {
   struct thread *cur = thread_current ();
