@@ -34,9 +34,9 @@ struct list readahead_list;
 
 void cache_init (void);
 void cache_flush (void);
-struct cache_entry *cache_lock (block_sector_t, bool exclusive);
 void *cache_read (struct cache_entry *);
 void cache_unlock (struct cache_entry *);
 void cache_readahead (block_sector_t);
-
+struct cache_entry * cache_lock(block_sector_t sector);
+struct cache_entry * cache_alloc(block_sector_t sector);
 #endif /* filesys/cache.h */

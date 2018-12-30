@@ -63,7 +63,7 @@ inode_create (block_sector_t sector, bool directory)
 {
   struct inode_disk *disk_inode;
   struct inode* inode;
-  struct cache_entry* cache=cache_lock(sector,1);
+  struct cache_entry* cache=cache_lock(sector);
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
@@ -168,7 +168,7 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
-          struct cache_entry* cache=cache_lock(inode->sector,1);
+          struct cache_entry* cache=cache_lock(inode->sector);
           struct inode_disk* disk=cache_read(cache);
           for (int i = 0; i < 125; ++i)
           {
@@ -197,7 +197,7 @@ inode_close (struct inode *inode)
 void inode_deallocate (block_sector_t sector, int level) {
   if (level>0)
   {
-    struct cache_entry* c=cache_lock(sector,1);
+    struct cache_entry* c=cache_lock(sector);
     block_sector_t* block=cache_read(c);
     for (int i = 0; i < PTRS_PER_SECTOR; ++i)
     {
@@ -269,7 +269,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
   size_t level = 0;
   block_sector_t sector = inode->sector;
   while(1){
-    struct cache_entry *c=cache_lock(sector,0);
+    struct cache_entry *c=cache_alloc(sector);
     uint32_t *data=cache_read(c);
     data = cache_read (c);
     if(data[offsets[level]]!=0)
@@ -286,7 +286,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
           }
         }
         cache_unlock (c);
-        *data_block=cache_lock (sector, 0);
+        *data_block=cache_alloc(sector);
         return true;
       }
       cache_unlock (c);
@@ -298,7 +298,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
       *data_block = NULL;
       return true;
     }
-    c=cache_lock(sector, 1);
+    c=cache_lock(sector);
     data=cache_read(c);
     if (data[offsets[level]] != 0)
     {
@@ -312,7 +312,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
       return false;
     }
     c->dirty=true;
-    struct cache_entry *next_cache=cache_lock(data[offsets[level]],1);
+    struct cache_entry *next_cache=cache_lock(data[offsets[level]]);
     memset(next_cache->data,0,BLOCK_SECTOR_SIZE);
     next_cache->correct = true;
     next_cache->dirty = true;
@@ -418,7 +418,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (offset>inode_length(inode)) 
   {
-    struct cache_entry* inode_block=cache_lock(inode->sector, 1);
+    struct cache_entry* inode_block=cache_lock(inode->sector);
     struct inode_disk* disk_inode=cache_read(inode_block);
     if(offset>disk_inode->length) 
     {
@@ -469,14 +469,14 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_entry *inode_block=cache_lock(inode->sector,0);
+  struct cache_entry *inode_block=cache_alloc(inode->sector);
   struct inode_disk *disk=cache_read(inode_block);
   cache_unlock (inode_block);
   return disk->length;
 }
 
 bool is_directory (const struct inode * inode){
-  struct cache_entry *cache=cache_lock(inode->sector,0);
+  struct cache_entry *cache=cache_alloc(inode->sector);
   struct inode_disk *disk=cache_read(cache);
   bool ret=disk->directory;
   cache_unlock(cache);
