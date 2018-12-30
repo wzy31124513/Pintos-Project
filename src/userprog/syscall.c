@@ -351,8 +351,15 @@ void munmap (int mapping){
 }
 
 bool chdir (const char *dir) {
+  bool ret=false;
   char *cp = strcpy_to_kernel(dir);
-  bool ret=filesys_chdir(cp);
+  struct dir* d=dir_open(filesys_open(dir));
+  if (d!=NULL)
+  {
+    dir_close(thread_current()->wd);
+    thread_current()->wd=d;
+    ret=true;
+  }
   palloc_free_page(cp);
   return ret;
 }
