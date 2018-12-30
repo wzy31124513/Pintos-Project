@@ -236,51 +236,6 @@ inode_remove (struct inode *inode)
   inode->removed = true;
 }
 
-/* Translates SECTOR_IDX into a sequence of block indexes in
-   OFFSETS and sets *OFFSET_CNT to the number of offsets. */
-static void
-calculate_indices (off_t sector_idx, size_t offsets[], size_t *offset_cnt)
-{
-  /* Handle direct blocks. */
-  if (sector_idx < DIRECT_CNT) 
-    {
-      offsets[0] = sector_idx;
-      *offset_cnt = 1;
-      return;
-    }
-  sector_idx -= DIRECT_CNT;
-
-  /* Handle indirect blocks. */
-  if (sector_idx < PTRS_PER_SECTOR * INDIRECT_CNT)
-    {
-      offsets[0] = DIRECT_CNT + sector_idx / PTRS_PER_SECTOR;
-      offsets[1] = sector_idx % PTRS_PER_SECTOR;
-      *offset_cnt = 2;
-      return;
-    }
-  sector_idx -= PTRS_PER_SECTOR * INDIRECT_CNT;
-
-  /* Handle doubly indirect blocks. */
-  if (sector_idx < DBL_INDIRECT_CNT * PTRS_PER_SECTOR * PTRS_PER_SECTOR)
-    {
-      offsets[0] = (DIRECT_CNT + INDIRECT_CNT
-                    + sector_idx / (PTRS_PER_SECTOR * PTRS_PER_SECTOR));
-      offsets[1] = sector_idx / PTRS_PER_SECTOR;
-      offsets[2] = sector_idx % PTRS_PER_SECTOR;
-      *offset_cnt = 3;
-      return;
-    }
-  NOT_REACHED ();
-}
-
-/* Retrieves the data block for the given byte OFFSET in INODE,
-   setting *DATA_BLOCK to the block.
-   Returns true if successful, false on failure.
-   If ALLOCATE is false, then missing blocks will be successful
-   with *DATA_BLOCk set to a null pointer.
-   If ALLOCATE is true, then missing blocks will be allocated.
-   The block returned will be locked, normally non-exclusively,
-   but a newly allocated block will have an exclusive lock. */
 static bool
 get_data_block (struct inode *inode, off_t offset, bool allocate,
                 struct cache_entry **data_block) 
@@ -288,12 +243,31 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
   block_sector_t this_level_sector;
   size_t offsets[3];
   size_t offset_cnt;
-  size_t level;
+  off_t sector_idx=offset/BLOCK_SECTOR_SIZE;
+  if (sector_idx < 123) 
+  {
+    offsets[0]=sector_idx;
+    offset_cnt=1;
+  }else{
+    sector_idx -= 123;
+    if (sector_idx < PTRS_PER_SECTOR * INDIRECT_CNT)
+    {
+      offsets[0] = 123 + sector_idx / PTRS_PER_SECTOR;
+      offsets[1] = sector_idx % PTRS_PER_SECTOR;
+      offset_cnt = 2;
+    }else{
+      sector_idx -= PTRS_PER_SECTOR * INDIRECT_CNT;
+      if (sector_idx < DBL_INDIRECT_CNT * PTRS_PER_SECTOR * PTRS_PER_SECTOR)
+      {
+        offsets[0] = (DIRECT_CNT + INDIRECT_CNT+ sector_idx / (PTRS_PER_SECTOR * PTRS_PER_SECTOR));
+        offsets[1] = sector_idx / PTRS_PER_SECTOR;
+        offsets[2] = sector_idx % PTRS_PER_SECTOR;
+        offset_cnt = 3;
+      }
+    }
+  }
 
-  ASSERT (offset >= 0);
-
-  calculate_indices (offset / BLOCK_SECTOR_SIZE, offsets, &offset_cnt);
-  level = 0;
+  size_t level = 0;
   this_level_sector = inode->sector;
   for (;;) 
     {
