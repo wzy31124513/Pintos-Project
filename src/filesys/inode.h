@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "filesys/off_t.h"
 #include "devices/block.h"
-#include "thread/synch.h"
+#include "threads/synch.h"
 #include <list.h>
 
 struct bitmap;
