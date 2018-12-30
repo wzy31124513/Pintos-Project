@@ -29,10 +29,11 @@
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t sectors[SECTOR_CNT]; /* Sectors. */
-    bool directory;               /* FILE_INODE or DIR_INODE. */
+    block_sector_t sectors[125];         /* First data sector. */
+    bool directory;
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
+    uint32_t unused[125];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -46,9 +47,6 @@ bytes_to_sectors (off_t size)
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
-
-/* Controls access to open_inodes list. */
-static struct lock open_inodes_lock;
 
 static void deallocate_inode (const struct inode *);
 
@@ -67,27 +65,27 @@ inode_init (void)
 struct inode *
 inode_create (block_sector_t sector, bool directory) 
 {
-  struct cache_entry *block;
   struct inode_disk *disk_inode;
-  struct inode *inode;
-
-  block = cache_lock (sector, 1);
+  struct inode* inode;
+  struct cache_entry* cache=cache_lock(sector);
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
-  memset (block->data, 0, BLOCK_SECTOR_SIZE);
-  block->correct = true;
-  block->dirty = true;
-  disk_inode = (struct inode_disk*)block->data;
-  disk_inode->directory = directory;
-  disk_inode->length = 0;
-  disk_inode->magic = INODE_MAGIC;
-  cache_unlock (block);
+  memset(cache->data,0,BLOCK_SECTOR_SIZE);
+  cache->correct=true;
+  disk_inode=(struct inode_disk*)cache->data;
+  disk_inode->directory=directory;
+  disk_inode->length=0;
+  disk_inode->magic=INODE_MAGIC;
+  cache->dirty=true;
+  cache_unlock(cache);
+  inode=inode_open(sector);
+  if (inode==NULL)
+  {
+    free_map_release(sector);
+  }
 
-  inode = inode_open (sector);
-  if (inode == NULL)
-    free_map_release (sector);
   return inode;
 }
 
@@ -99,9 +97,8 @@ inode_open (block_sector_t sector)
 {
   struct list_elem *e;
   struct inode *inode;
-
-  /* Check whether this inode is already open. */
   lock_acquire (&open_inodes_lock);
+  /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
     {
@@ -109,27 +106,28 @@ inode_open (block_sector_t sector)
       if (inode->sector == sector) 
         {
           inode->open_cnt++;
-          goto done; 
+          lock_release(&open_inodes_lock);
+          return inode;
         }
     }
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
-  if (inode == NULL)
-    goto done;
+  if (inode == NULL){
+    lock_release(&open_inodes_lock);
+    return NULL;
+  }
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
   inode->sector = sector;
   inode->open_cnt = 1;
-  lock_init (&inode->lock);
   inode->deny_write_cnt = 0;
-  lock_init (&inode->deny_write);
-  cond_init (&inode->no_writers);
   inode->removed = false;
-  
- done:
-  lock_release (&open_inodes_lock);
+  lock_init(&inode->lock);
+  lock_init(&inode->deny_write);
+  cond_init(&inode->no_writers);
+  lock_release(&open_inodes_lock);
   return inode;
 }
 
