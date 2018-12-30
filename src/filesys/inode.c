@@ -33,7 +33,6 @@ struct inode_disk
     bool directory;
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -65,27 +64,27 @@ inode_init (void)
 struct inode *
 inode_create (block_sector_t sector, bool directory) 
 {
-  struct cache_entry *block;
   struct inode_disk *disk_inode;
-  struct inode *inode;
-
-  block = cache_lock (sector, 1);
+  struct inode* inode;
+  struct cache_entry* cache=cache_lock(sector,1);
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
-  memset (block->data, 0, BLOCK_SECTOR_SIZE);
-  block->correct = true;
-  block->dirty = true;
-  disk_inode = (struct inode_disk*)block->data;
-  disk_inode->directory = directory;
-  disk_inode->length = 0;
-  disk_inode->magic = INODE_MAGIC;
-  cache_unlock (block);
+  memset(cache->data,0,BLOCK_SECTOR_SIZE);
+  cache->correct=true;
+  disk_inode=(struct inode_disk*)cache->data;
+  disk_inode->directory=directory;
+  disk_inode->length=0;
+  disk_inode->magic=INODE_MAGIC;
+  cache->dirty=true;
+  cache_unlock(cache);
+  inode=inode_open(sector);
+  if (inode==NULL)
+  {
+    free_map_release(sector);
+  }
 
-  inode = inode_open (sector);
-  if (inode == NULL)
-    free_map_release (sector);
   return inode;
 }
 
