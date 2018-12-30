@@ -31,24 +31,30 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct inode* inode= inode_create (sector,true);
-  if (inode!=NULL)
-  {
-    struct dir_entry entries[2];
-    memset(entries,0,sizeof(entries));
-    entries[0].inode_sector=sector;
-    strlcpy(entries[0].name,".",sizeof(entries[0].name));
-    entries[0].in_use=true;
-    entries[1].inode_sector=parent_sector;
-    strlcpy(entries[1].name,".",sizeof(entries[1].name));
-    entries[1].in_use=true;
-    if (inode_write_at(inode,entries,sizeof(entries),0)!=sizeof(entries))
+  struct inode *inode = inode_create (sector, 1);
+  if (inode != NULL) 
     {
-      inode_remove(inode);
-      inode_close(inode);
-      inode=NULL;
+      struct dir_entry entries[2];
+
+      memset (entries, 0, sizeof entries);
+
+      /* "." entry. */
+      entries[0].inode_sector = sector;
+      strlcpy (entries[0].name, ".", sizeof entries[0].name);
+      entries[0].in_use = true;
+
+      /* ".." entry. */
+      entries[1].inode_sector = parent_sector;
+      strlcpy (entries[1].name, "..", sizeof entries[1].name);
+      entries[1].in_use = true;
+      
+      if (inode_write_at (inode, entries, sizeof entries, 0) != sizeof entries)
+        {
+          inode_remove (inode);
+          inode_close (inode); 
+          inode = NULL;
+        } 
     }
-  }
   return inode;
 }
 
