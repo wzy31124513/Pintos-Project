@@ -42,6 +42,13 @@ static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
 
+struct fds{
+    int fd;
+    struct file *file;
+    struct dir *dir;
+    struct list_elem elem;
+};
+
 void halt(void){
   shutdown_power_off ();
 }
@@ -92,10 +99,10 @@ int open(const char* file){
     }else{
       f->dir = dir_open(inode);
     }
-    if (f->file != NULL || fd->dir != NULL)
+    if (f->file != NULL || f->dir != NULL)
     {
       fd=f->fd=thread_current()->next_handle++;
-      list_push_front(&thread_current()->fds,&fd->elem);
+      list_push_front(&thread_current()->fds,&f->elem);
     }else {
         free(f);
         inode_close(inode);
@@ -112,7 +119,7 @@ static struct fds * getfile (int handle){
   for(e=list_begin(&cur->fds);e!=list_tail(&cur->fds);e=list_next (e)){
     struct fds *fd;
     fd = list_entry(e, struct fds, elem);
-    if (fd->handle == handle){
+    if (fd->fd == handle){
       return fd;
     }
   }
