@@ -22,8 +22,7 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
+struct inode * file_create (block_sector_t sector, off_t length);
 int inode_open_cnt (const struct inode *);
-void inode_lock (struct inode *);
-void inode_unlock (struct inode *);
 bool is_directory (const struct inode *);
 #endif /* filesys/inode.h */

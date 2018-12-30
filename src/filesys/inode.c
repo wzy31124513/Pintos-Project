@@ -234,7 +234,8 @@ deallocate_recursive (block_sector_t sector, int level)
         b->sector = (block_sector_t)-1; 
       }
       lock_release (&b->lock);
-      break;
+      free_map_release (sector);
+      return;
     }
     lock_release (&b->lock);
   }
@@ -590,16 +591,13 @@ inode_open_cnt (const struct inode *inode)
   return open_cnt;
 }
 
-/* Locks INODE. */
-void
-inode_lock (struct inode *inode) 
-{
-  lock_acquire (&inode->lock);
-}
-
-/* Releases INODE's lock. */
-void
-inode_unlock (struct inode *inode) 
-{
-  lock_release (&inode->lock);
+struct inode * file_create (block_sector_t sector, off_t length) {
+  struct inode *inode = inode_create(sector, 0);
+  if (inode != NULL && length>0 && inode_write_at(inode,"",1,length-1)!=1)
+  {
+    inode_remove (inode); 
+    inode_close (inode);
+    inode = NULL;
+  }
+  return inode;
 }
