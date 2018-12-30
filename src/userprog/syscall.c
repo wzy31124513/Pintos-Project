@@ -30,8 +30,6 @@ static int sys_write (int handle, void *usrc_, unsigned size);
 static int sys_seek (int handle, unsigned position);
 static int sys_tell (int handle);
 static int sys_close (int handle);
-static int sys_mmap (int handle, void *addr);
-static int sys_munmap (int mapping);
 static int sys_chdir (const char *udir);
 static int sys_mkdir (const char *udir);
 static int sys_readdir (int handle, char *name);
@@ -65,30 +63,6 @@ copy_in (void *dst_, const void *usrc_, size_t size)
     }
 }
  
-/* Copies SIZE bytes from kernel address SRC to user address
-   UDST.
-   Call thread_exit() if any of the user accesses are invalid. */
-static void
-copy_out (void *udst_, const void *src_, size_t size) 
-{
-  uint8_t *udst = udst_;
-  const uint8_t *src = src_;
-
-  while (size > 0) 
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (udst);
-      if (chunk_size > size)
-        chunk_size = size;
-      
-      memcpy (udst, src, chunk_size);
-
-
-      udst += chunk_size;
-      src += chunk_size;
-      size -= chunk_size;
-    }
-}
-
  
 /* Halt system call. */
 static int
@@ -258,7 +232,7 @@ sys_read (int handle, void *udst_, unsigned size)
       /* How much to read into this page? */
       size_t page_left = PGSIZE - pg_ofs (udst);
       size_t read_amt = size < page_left ? size : page_left;
-      off_t retval;
+      off_t retval=0;
 
 
       /* Read from file into page. */
