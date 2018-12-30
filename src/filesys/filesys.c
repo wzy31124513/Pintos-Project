@@ -43,38 +43,6 @@ filesys_done (void)
   free_map_close ();
   cache_flush ();
 }
-
-
-/* Resolves relative or absolute file NAME to an inode.
-   Returns an inode if successful, or a null pointer on failure.
-   The caller is responsible for closing the returned inode. */
-static struct inode *
-resolve_name_to_inode (const char *name)
-{
-  if (name[0] == '/' && name[strspn (name, "/")] == '\0') 
-    {
-      /* The name represents the root directory.
-         There's no name part at all, so name2entry()
-         would reject it entirely.
-         Special case it. */
-      return inode_open (ROOT_DIR_SECTOR);
-    }
-  else 
-    {
-      struct dir *dir;
-      char base_name[NAME_MAX + 1];
-
-      if (name2entry (name, &dir, base_name)) 
-        {
-          struct inode *inode;
-          dir_lookup (dir, base_name, &inode);
-          dir_close (dir);
-          return inode; 
-        }
-      else
-        return NULL;
-    }
-}
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
    Returns true if successful, false otherwise.
@@ -119,8 +87,87 @@ filesys_create (const char *name, off_t initial_size, bool directory)
 struct inode *
 filesys_open (const char *name)
 {
-  return resolve_name_to_inode (name);
+  if (name[0]=='/' && name[strspn(name, "/")]=='\0') 
+  {
+    return inode_open (ROOT_DIR_SECTOR);
+  }else {
+    struct dir *dir;
+    char base_name[15];
+    if(name2entry(name, &dir, base_name)) 
+    {
+      struct inode *inode;
+      dir_lookup (dir, base_name, &inode);
+      dir_close (dir);
+      return inode; 
+    }else{
+      return NULL;
+    }
+  }
 }
+
+static bool name2entry (const char *name,struct dir **dirp, char base_name[15]) 
+{
+  struct dir* d;
+  struct inode* inode;
+  const char* cp;
+  char name1[15],next[15];
+  int a;
+  if (name[0]=='/'|| thread_current()->wd==NULL)
+  {
+    d=dir_open_root();
+  }else{
+    d=dir_reopen(thread_current()->wd);
+  }
+
+  if (d==NULL)
+  {
+    dir_close(d);
+    *dir=NULL;
+    base_name[0]='\0';
+    return false;
+  }
+  cp=name;
+  if (get_next_part(name1,&cp)<=0)
+  {
+    dir_close(d);
+    *dir=NULL;
+    base_name[0]='\0';
+    return false;
+  }
+  while((a=get_next_part(next,&cp))>0){
+    if (!dir_lookup(d,name1,&inode))
+    {
+      dir_close(d);
+      *dir=NULL;
+      base_name[0]='\0';
+      return false;
+    }
+    dir_close(d);
+    d=dir_open(inode);
+    if (d==NULL)
+    {
+      dir_close(d);
+      *dir=NULL;
+      base_name[0]='\0';
+      return false;
+    }
+    strlcpy(name1,next,15);
+  }
+  if (a<0)
+  {
+    dir_close(d);
+    *dir=NULL;
+    base_name[0]='\0';
+    return false;
+  }
+  *dir=d;
+  strlcpy(base_name,name1,15);
+  return true;
+}
+
+
+
+
 
 
 /* Extracts a file name part from *SRCP into PART,
@@ -156,65 +203,6 @@ static int get_next_part (char part[NAME_MAX], const char **srcp)
   *srcp = src;
   return 1;
 }
-
-/* Resolves relative or absolute file NAME.
-   Returns true if successful, false on failure.
-   Stores the directory corresponding to the name into *DIRP,
-   and the file name part into BASE_NAME. */
-static bool
-name2entry (const char *name,
-                       struct dir **dirp, char base_name[NAME_MAX + 1]) 
-{
-  struct dir *dir = NULL;
-  struct inode *inode;
-  const char *cp;
-  char part[NAME_MAX + 1], next_part[NAME_MAX + 1];
-  int ok;
-
-  /* Find starting directory. */
-  if (name[0] == '/' || thread_current ()->wd == NULL)
-    dir = dir_open_root ();
-  else
-    dir = dir_reopen (thread_current ()->wd);
-  if (dir == NULL)
-    goto error;
-
-  /* Get first name part. */
-  cp = name;
-  if (get_next_part (part, &cp) <= 0)
-    goto error;
-
-  /* As long as another part follows the current one,
-     traverse down another directory. */
-  while ((ok = get_next_part (next_part, &cp)) > 0)
-    {
-      if (!dir_lookup (dir, part, &inode))
-        goto error;
-
-      dir_close (dir);
-      dir = dir_open (inode);
-      if (dir == NULL)
-        goto error;
-
-      strlcpy (part, next_part, NAME_MAX + 1);
-    }
-  if (ok < 0)
-    goto error;
-
-  /* Return our results. */
-  *dirp = dir;
-  strlcpy (base_name, part, NAME_MAX + 1);
-  return true;
-
- error:
-  /* Return failure. */
-  dir_close (dir);
-  *dirp = NULL;
-  base_name[0] = '\0';
-  return false;
-}
-
-
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
