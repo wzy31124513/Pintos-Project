@@ -101,14 +101,14 @@ int open(const char* file){
     }
     if (f->file!= NULL||f->dir!=NULL){
       thread_current()->next_handle++;
-      handle=f->handle=thread_current()->next_handle;
-      list_push_front (&cur->fds,&f->elem);
+      fd=f->handle=thread_current()->next_handle;
+      list_push_front (&thread_current()->fds,&f->elem);
     }else{
       free (f);
       inode_close (inode);
     }
   }
-  palloc_free_page (kfile);
+  palloc_free_page (fn_copy);
   return fd;
 }
 
