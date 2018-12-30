@@ -143,99 +143,72 @@ int filesize(int fd){
 }
 
 int read (int fd, void *buffer, unsigned size){
-  int read=0;
-  struct fds* f=getfile(fd);
-  if (f->file==NULL)
+  int ret=size;
+  char* check=(char*)buffer;
+  for (unsigned i = 0; i < size; ++i)
   {
-    exit1(-1);
-  }
-  uint8_t* b=(uint8_t*)buffer;
-  while(size>0){
-    size_t page_left=PGSIZE-pg_ofs(b);
-    int32_t ret=0;
-    size_t read_size;
-    if (size<page_left)
-    {
-      read_size=size;
-    }else{
-      read_size=page_left;
-    }
-    if (fd!=0)
-    {
-      ret=file_read(f->file,b,read_size);
-    }else{
-      for (size_t i = 0; i < read_size; ++i)
-      {
-        char c=input_getc();
-        b[i]=c;
-      }
-      read=read_size;
-    }
-    if (ret<0)
-    {
-      if (read==0)
-      {
-        read=-1;
-      }
-      break;
-    }
-    read+=ret;
-    if (ret!=(int32_t)read_size)
-    {
-      break;
-    }
-    b+=ret;
-    size-=ret;
-  }
-  return read;
-}
- 
-int write (int fd,void *buffer, unsigned size){
-  uint8_t* b=(uint8_t*)buffer;
-  struct fds* f;
-  int write=0;
-  if (fd!=1)
-  {
-    f=getfile(fd);
-    if (f->file==NULL)
+    if (!is_user_vaddr(check) || check==NULL)
     {
       exit1(-1);
     }
+    if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
+    {
+      exit1(-1);
+    }
+    check=check+1;
   }
-  while(size>0){
-    size_t page_left=PGSIZE-pg_ofs(b);
-    size_t write_size;
-    int32_t ret;
-    if (size<page_left)
+
+  if (fd==0)
+  {
+    for (unsigned i = 0; i < size; i++)
     {
-      write_size=size;
+      buffer[i]=input_getc();
+    }
+  }else{
+    struct fds* fds=getfile(fd);
+    if (fds==NULL)
+    {
+      ret = -1;
     }else{
-      write_size=page_left;
+      ret = file_read(fds->f,buffer,size);
     }
-    if (fd==1)
-    {
-      putbuf((char*)b,write_size);
-      ret=write_size;
-    }else{
-      ret=file_write(f->file,b,write_size);
-    }
-    if (ret<0)
-    {
-      if (write==0)
-      {
-        write=-1;
-      }
-      break;
-    }
-    write+=ret;
-    if (ret!=(int32_t)write_size)
-    {
-      break;
-    }
-    b+=ret;
-    size-=ret;
   }
-  return write;
+  return ret;
+}
+ 
+int write (int fd,void *buffer, unsigned size){
+  int ret;
+  char* check=(char*)buffer;
+  for (unsigned i = 0; i < size+1; ++i)
+  {
+    if (!is_user_vaddr(check) || check==NULL)
+    {
+      exit1(-1);
+    }
+    if (pagedir_get_page(thread_current()->pagedir,check)==NULL)
+    {
+      exit1(-1);
+    }
+    check=check+1;
+  }
+  if (fd==0)
+  {
+    ret= -1;
+  }
+  else if (fd==1)
+  {
+    putbuf(buffer,size);
+    ret= size;
+  }else{
+    struct fds* fds=getfile(fd);
+    if (fds==NULL)
+    {
+      ret= -1;
+    }else{
+      ret= file_write(fds->f,buffer,size);
+    }
+  }
+  return ret;
 }
  
 void seek (int fd, unsigned position) {
