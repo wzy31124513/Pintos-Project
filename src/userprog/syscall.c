@@ -128,7 +128,7 @@ int open(const char* file){
 
 int filesize(int fd){
   struct fds* f=getfile(fd);
-  if (f->file=NULL)
+  if (f->file==NULL)
   {
     thread_exit();
   }
@@ -140,7 +140,7 @@ int filesize(int fd){
 int read (int fd, void *buffer, unsigned size){
   int read=0;
   struct fds* f=getfile(fd);
-  if (f->file=NULL)
+  if (f->file==NULL)
   {
     thread_exit();
   }
@@ -202,7 +202,7 @@ int write (int fd,void *buffer, unsigned size){
   if (fd!=1)
   {
     f=getfile(fd);
-    if (f->file=NULL)
+    if (f->file==NULL)
     {
       thread_exit();
     }
@@ -250,7 +250,7 @@ int write (int fd,void *buffer, unsigned size){
  
 void seek (int fd, unsigned position) {
   struct fds* fds=getfile(fd);
-  if (fds->file=NULL)
+  if (fds->file==NULL)
   {
     thread_exit();
   }
@@ -259,7 +259,7 @@ void seek (int fd, unsigned position) {
  
 unsigned tell (int fd){
   struct fds* fds=getfile(fd);
-  if (fds->file=NULL)
+  if (fds->file==NULL)
   {
     thread_exit();
   }
@@ -276,7 +276,7 @@ void close (int fd) {
 
 int mmap (int fd, void *addr){
   struct fds *f=getfile(fd);
-  if (f->file=NULL)
+  if (f->file==NULL)
   {
     thread_exit();
   }
@@ -370,14 +370,14 @@ int inumber (int fd)
   if(isdir(fd))
   {
     struct fds *f=getfile(fd);
-    if (f->dir == NULL){
+    if (f->dir==NULL){
       thread_exit ();
     }
     struct inode *inode=dir_get_inode(f->dir);
     return inode_get_inumber(inode);
   }
   struct fds *f=getfile(fd);
-  if (f->file=NULL)
+  if (f->file==NULL)
   {
     thread_exit();
   }
