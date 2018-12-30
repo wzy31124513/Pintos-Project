@@ -15,6 +15,7 @@
 #include "userprog/process.h"
 #include "userprog/syscall.h"
 #endif
+#include "vm/page.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -94,7 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  lock_init (&file_lock);
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT, 0);
@@ -291,7 +292,6 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
-  syscall_exit ();
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -471,19 +471,19 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->exit_code = -1;
-  t->wait_status = NULL;
-  list_init (&t->children);
-  sema_init (&t->timer_sema, 0);
-  t->pagedir = NULL;
-  t->pages = NULL;
-  t->bin_file = NULL;
-  list_init (&t->fds);
-  list_init (&t->mappings);
-  t->next_handle = 2;
-  t->wd = NULL;
   t->magic = THREAD_MAGIC;
+
+  t->exitcode=-1;
+  t->child_proc=NULL;
+  list_init(&t->children);
+  t->pages=NULL;
+  t->self=NULL;
+  t->pagedir=NULL;
+  list_init(&t->file_list);
+  list_init(&t->mapping);
+  t->fd_num=2;
   list_push_back (&all_list, &t->allelem);
+  
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
