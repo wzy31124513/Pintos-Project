@@ -71,7 +71,7 @@ bool create(const char *file, unsigned initial_size)
 {
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
-  ret=filesys_create(fn_copy,initial_size);
+  ret=filesys_create(fn_copy,initial_size,0);
   palloc_free_page (fn_copy);
   return ret;
 }
@@ -96,7 +96,7 @@ struct file_descriptor
  
 int open(const char* ufile)
 {
-  char *kfile = copy_in_string (ufile);
+  char *kfile = strcpy_to_kernel (ufile);
   struct file_descriptor *fd;
   int handle = -1;
  
@@ -295,7 +295,6 @@ void seek (int handle, unsigned position)
 {
   if ((off_t) position >= 0)
     file_seek (lookup_file_fd (handle)->file, position);
-  return 0;
 }
  
 unsigned tell (int handle) 
@@ -304,14 +303,13 @@ unsigned tell (int handle)
 }
  
 
-int close (int handle) 
+void close (int handle) 
 {
   struct file_descriptor *fd = lookup_fd (handle);
   file_close (fd->file);
   dir_close (fd->dir);
   list_remove (&fd->elem);
   free (fd);
-  return 0;
 }
 
 struct mapping
@@ -373,7 +371,7 @@ int mmap (int handle, void *addr)
       struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
-          unmap (m);
+          munmap (m->base);
           return -1;
         }
       p->mmap = false;
@@ -392,22 +390,27 @@ void munmap (int mapping)
 {
   struct mapping *m=lookup_mapping (mapping);
   list_remove (&m->elem);
-  while (m->page_cnt-- > 0) 
+  for(int i=0;i<m->page_cnt;i++)
+  {
+    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
     {
-      page_deallocate (m->base);
-      m->base += PGSIZE;
+      lock_acquire (&file_lock);
+      file_write_at(m->file,(const void *)(m->addr+PGSIZE * i),PGSIZE*(m->page_cnt),PGSIZE*i);
+      lock_release (&file_lock);
     }
-  file_close (m->file);
+  }
+  for(int i=0;i<m->page_cnt;i++)
+  {
+    page_deallocate((void *)(m->addr+PGSIZE * i));
+  }
   free (m);
 
 }
 
-bool chdir (const char *udir) 
+bool chdir (const char *dir) 
 {
   bool ok = false;
-
-  // ADD CODE HERE
-  char *kdir = copy_in_string(udir);
+  char *kdir = strcpy_to_kernel(dir);
   ok = filesys_chdir(kdir);
   palloc_free_page(kdir);
 
@@ -417,8 +420,8 @@ bool chdir (const char *udir)
 
 bool mkdir (const char *udir)
 {
-  char *kdir = copy_in_string (udir);
-  bool ok = filesys_create (kdir, 0, DIR_INODE);
+  char *kdir = strcpy_to_kernel (udir);
+  bool ok = filesys_create (kdir, 0, 1);
   palloc_free_page (kdir);
  
   return ok;
@@ -443,7 +446,7 @@ bool isdir (int handle)
 
 int inumber (int handle)
 {
-  if(sys_isdir(handle))
+  if(isdir(handle))
   {
     struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
     struct inode *inode = dir_get_inode(dir_descriptor->dir);
@@ -475,7 +478,7 @@ syscall_exit (void)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
       next = list_next (e);
-      unmap (m);
+      munmap (m->base);
     }
 
   dir_close (cur->wd);
@@ -546,7 +549,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_CLOSE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=close(args[0]);
+    close(args[0]);
   }else if (func==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
