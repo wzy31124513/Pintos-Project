@@ -7,12 +7,7 @@
 
 struct bitmap;
 
-/* Type of an inode. */
-enum inode_type 
-  {
-    FILE_INODE,         /* Ordinary file. */
-    DIR_INODE           /* Directory. */
-  };
+
 
 void inode_init (void);
 struct inode *inode_create (block_sector_t, enum inode_type);
@@ -30,5 +25,5 @@ off_t inode_length (const struct inode *);
 int inode_open_cnt (const struct inode *);
 void inode_lock (struct inode *);
 void inode_unlock (struct inode *);
-enum inode_type inode_get_type (const struct inode *);
+bool is_directory (const struct inode *);
 #endif /* filesys/inode.h */

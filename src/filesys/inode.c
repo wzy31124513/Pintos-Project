@@ -30,7 +30,7 @@
 struct inode_disk
   {
     block_sector_t sectors[SECTOR_CNT]; /* Sectors. */
-    enum inode_type type;               /* FILE_INODE or DIR_INODE. */
+    bool directory;               /* FILE_INODE or DIR_INODE. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
   };
@@ -81,7 +81,7 @@ inode_init (void)
    inode thus created.  Returns a null pointer if unsuccessful,
    in which case SECTOR is released in the free map. */  
 struct inode *
-inode_create (block_sector_t sector, enum inode_type type) 
+inode_create (block_sector_t sector, bool directory) 
 {
   struct cache_entry *block;
   struct inode_disk *disk_inode;
@@ -93,7 +93,7 @@ inode_create (block_sector_t sector, enum inode_type type)
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
   disk_inode = cache_zero (block);
-  disk_inode->type = type;
+  disk_inode->directory = directory;
   disk_inode->length = 0;
   disk_inode->magic = INODE_MAGIC;
   cache_dirty (block);
@@ -160,14 +160,13 @@ inode_reopen (struct inode *inode)
   return inode;
 }
 
-/* Returns the type of INODE. */
-enum inode_type inode_get_type (const struct inode *inode) 
-{
+
+bool is_directory (const struct inode *);{
   struct cache_entry *inode_block = cache_lock (inode->sector, 0);
   struct inode_disk *disk_inode = cache_read (inode_block);
-  enum inode_type type = disk_inode->type;
+  bool ret = disk_inode->directory;
   cache_unlock (inode_block);
-  return type;
+  return ret;
 }
 
 /* Returns INODE's inode number. */
