@@ -76,7 +76,7 @@ void exit1(int status){
     dir_close(fd->dir);
     free (fd);
   }
-  for (e =list_begin(&thread_current()->mapping);e!=list_end(&thread_current()->mapping);e=next)
+  for (e =list_begin(&thread_current()->mappings);e!=list_end(&thread_current()->mappings);e=next)
   {
     next=list_next(e);
     struct mapping *m=list_entry(e,struct mapping,elem);
@@ -584,6 +584,7 @@ static struct fds * getfile (int fd){
     }
   }
   exit1(-1);
+  NOT_REACHED();
 }
 
 
@@ -597,4 +598,5 @@ static struct mapping * getmap (int handle) {
       }
     }
   exit1(-1);
+  NOT_REACHED();
 }
