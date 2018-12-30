@@ -97,8 +97,9 @@ inode_open (block_sector_t sector)
 {
   struct list_elem *e;
   struct inode *inode;
-  lock_acquire (&open_inodes_lock);
+
   /* Check whether this inode is already open. */
+  lock_acquire (&open_inodes_lock);
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
     {
@@ -106,28 +107,27 @@ inode_open (block_sector_t sector)
       if (inode->sector == sector) 
         {
           inode->open_cnt++;
-          lock_release(&open_inodes_lock);
-          return inode;
+          goto done; 
         }
     }
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
-  if (inode == NULL){
-    lock_release(&open_inodes_lock);
-    return NULL;
-  }
+  if (inode == NULL)
+    goto done;
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
   inode->sector = sector;
   inode->open_cnt = 1;
+  lock_init (&inode->lock);
   inode->deny_write_cnt = 0;
+  lock_init (&inode->deny_write);
+  cond_init (&inode->no_writers);
   inode->removed = false;
-  lock_init(&inode->lock);
-  lock_init(&inode->deny_write);
-  cond_init(&inode->no_writers);
-  lock_release(&open_inodes_lock);
+  
+ done:
+  lock_release (&open_inodes_lock);
   return inode;
 }
 
