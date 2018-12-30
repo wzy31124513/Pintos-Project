@@ -13,6 +13,8 @@
 struct block *fs_device;
 
 static void do_format (void);
+static bool name2entry(const char *name,struct dir **dir, char* base_name);
+static int get_next_part (char *name, const char **srcp);
 /* Initializes the file system module.
    If FORMAT is true, reformats the file system. */
 void
@@ -23,8 +25,9 @@ filesys_init (bool format)
     PANIC ("No file system device found, can't initialize file system.");
 
   inode_init ();
-  cache_init ();
   free_map_init ();
+
+  cache_init ();
 
   if (format) 
     do_format ();
@@ -40,14 +43,92 @@ filesys_done (void)
   free_map_close ();
   cache_flush ();
 }
+
+
+/* Resolves relative or absolute file NAME to an inode.
+   Returns an inode if successful, or a null pointer on failure.
+   The caller is responsible for closing the returned inode. */
+static struct inode *
+resolve_name_to_inode (const char *name)
+{
+  if (name[0] == '/' && name[strspn (name, "/")] == '\0') 
+    {
+      /* The name represents the root directory.
+         There's no name part at all, so name2entry()
+         would reject it entirely.
+         Special case it. */
+      return inode_open (ROOT_DIR_SECTOR);
+    }
+  else 
+    {
+      struct dir *dir;
+      char base_name[NAME_MAX + 1];
+
+      if (name2entry (name, &dir, base_name)) 
+        {
+          struct inode *inode;
+          dir_lookup (dir, base_name, &inode);
+          dir_close (dir);
+          return inode; 
+        }
+      else
+        return NULL;
+    }
+}
+
+/* Creates a file named NAME with the given INITIAL_SIZE.
+   Returns true if successful, false otherwise.
+   Fails if a file named NAME already exists,
+   or if internal memory allocation fails. */
+bool
+filesys_create (const char *name, off_t initial_size, bool directory) 
+{
+  struct dir *dir;
+  char base_name[15];
+  block_sector_t inode_sector;
+
+  bool success = (name2entry (name, &dir, base_name) && free_map_allocate (&inode_sector));
+  if (success) 
+  {
+    struct inode *inode;
+    if (!directory){
+      inode = file_create(inode_sector,initial_size);
+    }else{
+          inode = dir_create(inode_sector,inode_get_inumber(dir_get_inode(dir))); 
+    }
+    if (inode != NULL)
+    {
+      success = dir_add(dir, base_name, inode_sector);
+       if (!success){
+        inode_remove(inode);
+       }
+      inode_close(inode);
+    }else{
+      success = false;
+    }
+  }
+  dir_close (dir);
+  return success;
+}
+
+/* Opens the file with the given NAME.
+   Returns the new file if successful or a null pointer
+   otherwise.
+   Fails if no file named NAME exists,
+   or if an internal memory allocation fails. */
+struct inode *
+filesys_open (const char *name)
+{
+  return resolve_name_to_inode (name);
+}
+
 
 /* Extracts a file name part from *SRCP into PART,
    and updates *SRCP so that the next call will return the next
    file name part.
    Returns 1 if successful, 0 at end of string, -1 for a too-long
    file name part. */
-static int
-get_next_part (char part[NAME_MAX], const char **srcp)
+static int get_next_part (char part[NAME_MAX], const char **srcp)
 {
   const char *src = *srcp;
   char *dst = part;
@@ -81,7 +162,7 @@ get_next_part (char part[NAME_MAX], const char **srcp)
    Stores the directory corresponding to the name into *DIRP,
    and the file name part into BASE_NAME. */
 static bool
-resolve_name_to_entry (const char *name,
+name2entry (const char *name,
                        struct dir **dirp, char base_name[NAME_MAX + 1]) 
 {
   struct dir *dir = NULL;
@@ -133,83 +214,7 @@ resolve_name_to_entry (const char *name,
   return false;
 }
 
-/* Resolves relative or absolute file NAME to an inode.
-   Returns an inode if successful, or a null pointer on failure.
-   The caller is responsible for closing the returned inode. */
-static struct inode *
-resolve_name_to_inode (const char *name)
-{
-  if (name[0] == '/' && name[strspn (name, "/")] == '\0') 
-    {
-      /* The name represents the root directory.
-         There's no name part at all, so resolve_name_to_entry()
-         would reject it entirely.
-         Special case it. */
-      return inode_open (ROOT_DIR_SECTOR);
-    }
-  else 
-    {
-      struct dir *dir;
-      char base_name[NAME_MAX + 1];
 
-      if (resolve_name_to_entry (name, &dir, base_name)) 
-        {
-          struct inode *inode;
-          dir_lookup (dir, base_name, &inode);
-          dir_close (dir);
-          return inode; 
-        }
-      else
-        return NULL;
-    }
-}
-
-/* Creates a file named NAME with the given INITIAL_SIZE.
-   Returns true if successful, false otherwise.
-   Fails if a file named NAME already exists,
-   or if internal memory allocation fails. */
-bool
-filesys_create (const char *name, off_t initial_size, bool directory) 
-{
-  struct dir *dir;
-  char base_name[NAME_MAX + 1];
-  block_sector_t inode_sector;
-
-  bool success = (resolve_name_to_entry (name, &dir, base_name)
-                  && free_map_allocate (&inode_sector));
-  if (success) 
-    {
-      struct inode *inode;
-      if (!directory)
-        inode = file_create (inode_sector, initial_size);
-      else
-        inode = dir_create (inode_sector,
-                            inode_get_inumber (dir_get_inode (dir))); 
-      if (inode != NULL)
-        {
-          success = dir_add (dir, base_name, inode_sector);
-          if (!success)
-            inode_remove (inode);
-          inode_close (inode);
-        }
-      else
-        success = false;
-    }
-  dir_close (dir);
-
-  return success;
-}
-
-/* Opens the file with the given NAME.
-   Returns the new file if successful or a null pointer
-   otherwise.
-   Fails if no file named NAME exists,
-   or if an internal memory allocation fails. */
-struct inode *
-filesys_open (const char *name)
-{
-  return resolve_name_to_inode (name);
-}
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
@@ -222,7 +227,7 @@ filesys_remove (const char *name)
   char base_name[NAME_MAX + 1];
   bool success;
 
-  if (resolve_name_to_entry (name, &dir, base_name)) 
+  if (name2entry (name, &dir, base_name)) 
     {
       success = dir_remove (dir, base_name);
       dir_close (dir);
