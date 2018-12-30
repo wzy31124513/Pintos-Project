@@ -81,8 +81,7 @@ void exit1(int status){
 }
  
 int exec(const char* cmd_line){
-  int ret;
-  ret=process_execute(cmd_line);
+  int ret=process_execute(cmd_line);
   return ret;
 }
  
@@ -405,7 +404,6 @@ syscall_handler (struct intr_frame *f)
     exit1(-1);
   }
 }
-
 
 static struct fds * getfile (int fd){
   struct thread *cur=thread_current ();
