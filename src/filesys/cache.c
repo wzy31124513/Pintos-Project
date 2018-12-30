@@ -94,7 +94,7 @@ void* cache_read(struct cache_entry* c){
 struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
  try_again:
   lock_acquire (&search_lock);
-  for (int i = 0; i < 64; i++){
+  for (i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector != sector) 
@@ -124,7 +124,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock);
      return b;
   }
-  for (int i = 0; i < 64; i++){
+  for (i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector == (block_sector_t)-1) {
@@ -142,7 +142,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock); 
   }
 
-  for (int i = 0; i < 64; i++){
+  for (i = 0; i < 64; i++){
     struct cache_entry *b = &cache[m%64];
     m++;
     lock_acquire (&b->lock);
@@ -198,3 +198,63 @@ void cache_unlock (struct cache_entry *b){
 }
 
 
+<<<<<<< HEAD
+=======
+void cache_free (block_sector_t sector) {
+  int i;
+  lock_acquire (&search_lock);
+  for (i = 0; i < 64; i++){
+    struct cache_entry *b = &cache[i];
+    lock_acquire (&b->lock);
+    if (b->sector == sector) {
+      lock_release (&search_lock);
+      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
+        b->sector = (block_sector_t)-1; 
+      }
+      lock_release (&b->lock);
+      return;
+    }
+    lock_release (&b->lock);
+  }
+  lock_release (&search_lock);
+}
+
+static void flushed (void *aux UNUSED) {
+  for (;;) 
+    {
+      timer_msleep (30 * 1000);
+      cache_flush ();
+    }
+}
+
+
+
+void cache_readahead (block_sector_t sector) {
+  struct readahead_block *block = malloc (sizeof *block);
+  if (block == NULL){
+    return;
+  }
+  block->sector = sector;
+  lock_acquire (&readahead_lock);
+  list_push_back (&readahead_list, &block->elem);
+  cond_signal (&readahead_list_nonempty, &readahead_lock);
+  lock_release (&readahead_lock);
+}
+
+static void readahead (void *aux UNUSED) 
+{
+  while(1){
+    struct readahead_block* r;
+    lock_acquire(&readahead_lock);
+    while(list_empty(&readahead_list)){
+      cond_wait(&readahead_list_nonempty,&readahead_lock);
+    }
+    r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
+    lock_release (&readahead_lock);
+    struct cache_entry* c=cache_lock(ra_block->sector, 0);
+    cache_read(c);
+    cache_unlock(c);
+    free (r);
+  }
+}
+>>>>>>> parent of 56e0bfa... Update cache.c
