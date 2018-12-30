@@ -31,30 +31,24 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct inode *inode = inode_create (sector, 1);
-  if (inode != NULL) 
+  struct inode* inode= inode_create (sector,true);
+  if (inode!=NULL)
+  {
+    struct dir_entry entries[2];
+    memset(entries,0,sizeof(entries));
+    entries[0].inode_sector=sector;
+    strlcpy(entries[0].name,".",sizeof(entries[0].name));
+    entries[0].in_use=true;
+    entries[1].inode_sector=parent_sector;
+    strlcpy(entries[1].name,".",sizeof(entries[1].name));
+    entries[1].in_use=true;
+    if (inode_write_at(inode,entries,sizeof(entries),0)!=sizeof(entries))
     {
-      struct dir_entry entries[2];
-
-      memset (entries, 0, sizeof entries);
-
-      /* "." entry. */
-      entries[0].inode_sector = sector;
-      strlcpy (entries[0].name, ".", sizeof entries[0].name);
-      entries[0].in_use = true;
-
-      /* ".." entry. */
-      entries[1].inode_sector = parent_sector;
-      strlcpy (entries[1].name, "..", sizeof entries[1].name);
-      entries[1].in_use = true;
-      
-      if (inode_write_at (inode, entries, sizeof entries, 0) != sizeof entries)
-        {
-          inode_remove (inode);
-          inode_close (inode); 
-          inode = NULL;
-        } 
+      inode_remove(inode);
+      inode_close(inode);
+      inode=NULL;
     }
+  }
   return inode;
 }
 
@@ -147,6 +141,7 @@ dir_lookup (const struct dir *dir, const char *name,
             struct inode **inode) 
 {
   struct dir_entry e;
+
   bool ok;
 
   ASSERT (dir != NULL);
@@ -157,7 +152,13 @@ dir_lookup (const struct dir *dir, const char *name,
   ok = lookup (dir, name, &e, NULL);
   lock_release(&dir->inode->lock);
 
-  *inode = ok ? inode_open (e.inode_sector) : NULL;
+  if (ok)
+  {
+    *inode=inode_open(e.inode_sector);
+  }else{
+    *inode=NULL;
+  }
+  
   return *inode != NULL;
 }
 
