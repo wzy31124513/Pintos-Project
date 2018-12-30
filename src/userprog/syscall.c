@@ -36,7 +36,6 @@ int inumber (int fd);
  
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
-static char * strcpy_to_kernel (const char *us);
 static struct fds * getfile (int fd);
 
 struct fds{
@@ -403,46 +402,6 @@ static void argcpy(void* cp,const void* addr1,size_t size){
     dst+=s;
     addr+=s;
     size-=s;
-  }
-}
- 
-static void copy_out (void *udst_, const void *src_, size_t size) {
-  uint8_t *udst = udst_;
-  const uint8_t *src = src_;
-  while (size > 0) {
-    size_t chunk_size=PGSIZE-pg_ofs(udst);
-    if (chunk_size>size){
-      chunk_size = size;
-    }
-    memcpy(udst, src, chunk_size);
-    udst+=chunk_size;
-    src+=chunk_size;
-    size-=chunk_size;
-  }
-}
- 
-static char * strcpy_to_kernel (const char *str){
-  char* cp;
-  char* addr;
-  size_t length;
-  cp=palloc_get_page(0);
-  if(cp==NULL){
-    exit1(-1);
-  }
-  length=0;
-  while(1){
-    addr=pg_round_down (str);
-    while(str<addr+PGSIZE){
-      cp[length++]=*str;
-      if (*str=='\0')
-        {
-          return cp;
-        }
-        else if (length>=PGSIZE){
-          return NULL;
-        }
-      str++;
-    }
   }
 }
 
