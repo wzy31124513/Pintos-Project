@@ -67,7 +67,7 @@ inode_create (block_sector_t sector, bool directory)
 {
   struct inode_disk *disk_inode;
   struct inode* inode;
-  struct cache_entry* cache=cache_lock(sector);
+  struct cache_entry* cache=cache_lock(sector,1);
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
