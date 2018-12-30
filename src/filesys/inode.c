@@ -388,7 +388,6 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
       memset (next_level_block->data, 0, BLOCK_SECTOR_SIZE);
       next_level_block->correct = true;
       next_level_block->dirty = true;
-      disk_inode = (struct inode*)block->data;
 
       /* Release this level's block.  No one else can access the
          new block yet, because we have an exclusive lock on it. */
