@@ -6,8 +6,8 @@
 #include "threads/synch.h"
 #include <string.h>
 
-static void flushd (void *aux);
-static void readaheadd (void *aux);
+static void flushed (void *aux);
+static void readahead (void *aux);
 
 void cache_init (void) {
   lock_init(&search_lock);
@@ -208,7 +208,7 @@ void cache_free (block_sector_t sector) {
   lock_release (&search_lock);
 }
 
-static void flushd (void *aux UNUSED) {
+static void flushed (void *aux UNUSED) {
   for (;;) 
     {
       timer_msleep (30 * 1000);
@@ -230,7 +230,7 @@ void cache_readahead (block_sector_t sector) {
   lock_release (&readahead_lock);
 }
 
-static void readaheadd (void *aux UNUSED) 
+static void readahead (void *aux UNUSED) 
 {
   for (;;) 
   {
