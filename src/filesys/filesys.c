@@ -181,7 +181,7 @@ filesys_create (const char *name, off_t initial_size, bool directory)
   if (success) 
     {
       struct inode *inode;
-      if (type == 0)
+      if (!directory)
         inode = file_create (inode_sector, initial_size);
       else
         inode = dir_create (inode_sector,
