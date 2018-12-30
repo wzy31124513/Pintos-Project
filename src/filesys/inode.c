@@ -463,14 +463,14 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   off_t bytes_written = 0;
 
   /* Don't write if writes are denied. */
-  lock_acquire (&inode->deny_write_lock);
+  lock_acquire (&inode->deny_write);
   if (inode->deny_write_cnt) 
     {
-      lock_release (&inode->deny_write_lock);
+      lock_release (&inode->deny_write);
       return 0;
     }
   inode->writer_cnt++;
-  lock_release (&inode->deny_write_lock);
+  lock_release (&inode->deny_write);
 
   while (size > 0) 
     {
@@ -503,10 +503,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   extend_file (inode, offset);
 
-  lock_acquire (&inode->deny_write_lock);
+  lock_acquire (&inode->deny_write);
   if (--inode->writer_cnt == 0)
-    cond_signal (&inode->no_writers_cond, &inode->deny_write_lock);
-  lock_release (&inode->deny_write_lock);
+    cond_signal (&inode->no_writers, &inode->deny_write);
+  lock_release (&inode->deny_write);
 
   return bytes_written;
 }
