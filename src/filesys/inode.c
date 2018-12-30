@@ -531,21 +531,35 @@ inode_deny_write (struct inode *inode)
 void
 inode_allow_write (struct inode *inode) 
 {
-  lock_acquire(&inode->deny_write);
+  lock_acquire (&inode->deny_write_lock);
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
   inode->deny_write_cnt--;
-  lock_release(&inode->deny_write);
+  lock_release (&inode->deny_write_lock);
 }
 
 /* Returns the length, in bytes, of INODE's data. */
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_entry* inode_block=cache_lock(inode->sector,0);
-  struct inode_disk* disk=cache_read(inode_block);
-  cache_unlock(inode_block);
-  return disk->length;
+  struct cache_entry *inode_block = cache_lock (inode->sector, 0);
+  struct inode_disk *disk_inode = cache_read (inode_block);
+  off_t length = disk_inode->length;
+  cache_unlock (inode_block);
+  return length;
+}
+
+/* Returns the number of openers. */
+int
+inode_open_cnt (const struct inode *inode) 
+{
+  int open_cnt;
+  
+  lock_acquire (&open_inodes_lock);
+  open_cnt = inode->open_cnt;
+  lock_release (&open_inodes_lock);
+
+  return open_cnt;
 }
 
 bool is_directory (const struct inode * inode){
