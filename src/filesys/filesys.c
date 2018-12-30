@@ -165,32 +165,26 @@ static bool name2entry (const char *name,struct dir **dir, char base_name[15])
   return true;
 }
 
-static int get_next_part (char part[NAME_MAX], const char **srcp)
-{
-  const char *src = *srcp;
-  char *dst = part;
-
-  /* Skip leading slashes.
-     If it's all slashes, we're done. */
-  while (*src == '/')
+static int get_next_part (char part[NAME_MAX], const char **srcp){
+  const char* src=*srcp;
+  char* dst=name;
+  while(*src=='/'){
     src++;
-  if (*src == '\0')
+  }
+  if (*src=='\0')
+  {
     return 0;
-
-  /* Copy up to NAME_MAX character from SRC to DST.
-     Add null terminator. */
-  while (*src != '/' && *src != '\0') 
+  }
+  while(*src!='/' && *src!='\0'){
+    if (dst<name+14)
     {
-      if (dst < part + NAME_MAX)
-        *dst++ = *src;
-      else
-        return -1;
-      src++; 
+      *dst++=*src;
+    }else{
+      return -1;
     }
-  *dst = '\0';
-
-  /* Advance source pointer. */
-  *srcp = src;
+    src++;
+  }
+  *srcp=src;
   return 1;
 }
 
@@ -202,17 +196,14 @@ bool
 filesys_remove (const char *name) 
 {
   struct dir *dir;
-  char base_name[NAME_MAX + 1];
-  bool success;
+  char base_name[15];
+  bool success=false;
 
-  if (name2entry (name, &dir, base_name)) 
-    {
-      success = dir_remove (dir, base_name);
-      dir_close (dir);
-    }
-  else
-    success = false;
-  
+  if (name2entry(name, &dir,base_name)) 
+  {
+    success=dir_remove(dir,base_name);
+    dir_close(dir);
+  }
   return success;
 }
 
@@ -221,19 +212,12 @@ filesys_remove (const char *name)
 static void
 do_format (void)
 {
-  struct inode *inode;
   printf ("Formatting file system...");
-
-  /* Set up free map. */
   free_map_create ();
-
-  /* Set up root directory. */
-  inode = dir_create (ROOT_DIR_SECTOR, ROOT_DIR_SECTOR);
+  struct inode* inode = dir_create (ROOT_DIR_SECTOR, ROOT_DIR_SECTOR);
   if (inode == NULL)
     PANIC ("root directory creation failed");
   inode_close (inode);  
-
   free_map_close ();
-
   printf ("done.\n");
 }
