@@ -165,7 +165,7 @@ static bool name2entry (const char *name,struct dir **dir, char base_name[15])
   return true;
 }
 
-static int get_next_part (char part[NAME_MAX], const char **srcp){
+static int get_next_part (char name[14], const char **srcp){
   const char* src=*srcp;
   char* dst=name;
   while(*src=='/'){
