@@ -13,7 +13,7 @@
 struct block *fs_device;
 
 static void do_format (void);
-static bool name2entry(const char *name,struct dir **dir, char name[15]);
+static bool name2entry(const char *name,struct dir **dir, char base_name[15]);
 static int get_next_part (char *name, const char **srcp);
 /* Initializes the file system module.
    If FORMAT is true, reformats the file system. */
