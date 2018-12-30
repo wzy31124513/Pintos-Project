@@ -92,11 +92,12 @@ inode_create (block_sector_t sector, bool directory)
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
-  disk_inode = cache_zero (block);
+  block->dirty=true;
+  block->correct=true;
+  disk_inode = (struct inode_disk*)block->data;
   disk_inode->directory = directory;
   disk_inode->length = 0;
   disk_inode->magic = INODE_MAGIC;
-  cache_dirty (block);
   cache_unlock (block);
 
   inode = inode_open (sector);
@@ -221,8 +222,24 @@ deallocate_recursive (block_sector_t sector, int level)
           deallocate_recursive (sector, level - 1);
       cache_unlock (block);
     }
-  
-  cache_free (sector);
+
+  lock_acquire (&search_lock);
+  for (int i = 0; i < 64; i++){
+    struct cache_entry *b = &cache[i];
+    lock_acquire (&b->lock);
+    if (b->sector == sector) {
+      lock_release (&search_lock);
+      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
+        b->sector = (block_sector_t)-1; 
+      }
+      lock_release (&b->lock);
+      break;
+    }
+    lock_release (&b->lock);
+  }
+  lock_release (&search_lock);
+
+
   free_map_release (sector);
 }
 
@@ -379,12 +396,13 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
           *data_block = NULL;
           return false;
         }
-      cache_dirty (this_level_block);
+      this_level_block->dirty=true;
 
       /* Lock and clear the new block. */
       next_level_block = cache_lock (this_level_data[offsets[level]],
                                      1);
-      cache_zero (next_level_block);
+        next_level_block->correct = true;
+        next_level_block->dirty = true;
 
       /* Release this level's block.  No one else can access the
          new block yet, because we have an exclusive lock on it. */
@@ -457,7 +475,7 @@ extend_file (struct inode *inode, off_t length)
       if (length > disk_inode->length) 
         {
           disk_inode->length = length;
-          cache_dirty (inode_block);
+          inode_block->dirty=true;
         }
       cache_unlock (inode_block);
     }
@@ -503,7 +521,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       sector_data = cache_read (block);
       memcpy (sector_data + sector_ofs, buffer + bytes_written, chunk_size);
-      cache_dirty (block);
+      block->dirty=true;
       cache_unlock (block);
 
       /* Advance. */

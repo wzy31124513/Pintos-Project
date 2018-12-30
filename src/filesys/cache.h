@@ -36,10 +36,7 @@ void cache_init (void);
 void cache_flush (void);
 struct cache_entry *cache_lock (block_sector_t, bool exclusive);
 void *cache_read (struct cache_entry *);
-void *cache_zero (struct cache_entry *);
-void cache_dirty (struct cache_entry *);
 void cache_unlock (struct cache_entry *);
-void cache_free (block_sector_t);
 void cache_readahead (block_sector_t);
 
 
