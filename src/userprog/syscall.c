@@ -90,7 +90,7 @@ bool remove(const char* file){
   return ret;
 }
 
-
+/*
 int open(const char* file){
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* f=malloc(sizeof(struct fds));
@@ -114,6 +114,40 @@ int open(const char* file){
   palloc_free_page (fn_copy);
   return fd;
 }
+*/
+
+int open(const char* file){
+  char *kfile = strcpy_to_kernel (file);
+  struct fds *fd;
+  int handle = -1;
+ 
+  fd = calloc (1, sizeof *fd);
+  if (fd != NULL)
+    {
+      struct inode *inode = filesys_open (kfile);
+      if (inode != NULL)
+        {
+          if (inode_get_type (inode) == FILE_INODE)
+            fd->file = file_open (inode);
+          else
+            fd->dir = dir_open (inode);
+          if (fd->file != NULL || fd->dir != NULL)
+            {
+              struct thread *cur = thread_current ();
+              handle = fd->handle = cur->next_handle++;
+              list_push_front (&cur->fds, &fd->elem);
+            }
+          else 
+            {
+              free (fd);
+              inode_close (inode);
+            }
+        }
+    }
+  palloc_free_page (kfile);
+  return handle;
+}
+
 
 
 int filesize(int fd)
@@ -267,51 +301,45 @@ struct mapping
   };
 
 
-int mmap (int handle, void *addr)
+int mmap (int fd, void *addr)
 {
-  struct fds *fd = lookup_file_fd (handle);
-  struct mapping *m = malloc (sizeof *m);
+  struct fds *f=lookup_file_fd (fd);
+  struct mapping *m= malloc (sizeof(struct mapping));
   size_t offset;
   off_t length;
-
-  if (m == NULL || addr == NULL || pg_ofs (addr) != 0)
+  if (m == NULL|| addr == NULL || pg_ofs (addr) != 0){
     return -1;
-
-  m->handle = thread_current ()->next_handle++;
-  m->file = file_reopen (fd->file);
-  if (m->file == NULL) 
-    {
-      free (m);
+  }
+  thread_current()->next_handle++;
+  m->id=thread_current()->next_handle;
+  m->file = file_reopen(f->file);
+  if (m->file == NULL) {
+    free (m);
+    return -1;
+  }
+  m->base=addr;
+  m->page_cnt=0;
+  list_push_front(&thread_current()->mappings, &m->elem);
+  offset=0;
+  length=file_length (m->file);
+  while (length > 0){
+    struct page *p=page_alloc((uint8_t *)addr+offset,false);
+    if (p == NULL){
+      munmap (m->id);
       return -1;
     }
-  m->base = addr;
-  m->page_cnt = 0;
-  list_push_front (&thread_current ()->mappings, &m->elem);
-
-  offset = 0;
-  length = file_length (m->file);
-  while (length > 0)
-    {
-      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
-      if (p == NULL)
-        {
-          munmap (m->id);
-          return -1;
-        }
-      p->mmap = false;
-      p->file = m->file;
-      p->offset = offset;
-      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
-      offset += p->rw_bytes;
-      length -= p->rw_bytes;
-      m->page_cnt++;
-    }
-  
-  return m->handle;
+    p->mmap = false;
+    p->file = m->file;
+    p->offset = offset;
+    p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
+    offset += p->rw_bytes;
+    length -= p->rw_bytes;
+    m->page_cnt++;
+  }
+  return m->id;
 }
 
-void munmap (int mapping) 
-{
+void munmap (int mapping){
   struct mapping *m=getmap (mapping);
   list_remove (&m->elem);
   for(int i=0;i<m->page_cnt;i++)
@@ -326,11 +354,9 @@ void munmap (int mapping)
     page_deallocate((void *)(m->base+PGSIZE * i));
   }
   free (m);
-
 }
 
-bool chdir (const char *dir) 
-{
+bool chdir (const char *dir) {
   bool ok = false;
   char *kdir = strcpy_to_kernel(dir);
   ok = filesys_chdir(kdir);
@@ -340,17 +366,14 @@ bool chdir (const char *dir)
 }
 
 
-bool mkdir (const char *udir)
-{
+bool mkdir (const char *udir){
   char *kdir = strcpy_to_kernel (udir);
   bool ok = filesys_create (kdir, 0, 1);
   palloc_free_page (kdir);
- 
   return ok;
 }
 
-bool readdir (int handle, char *uname)
-{
+bool readdir (int handle, char *uname){
   struct fds *fd = lookup_dir_fd (handle);
   char name[NAME_MAX + 1];
   bool ok = dir_readdir (fd->dir, name);
@@ -374,8 +397,7 @@ int inumber (int handle)
     struct inode *inode = dir_get_inode(dir_descriptor->dir);
     return inode_get_inumber(inode);
   }
-
-  struct fds *fd = getfile (handle);
+  struct fds *fd = lookup_file_fd (handle);
   struct inode *inode = file_get_inode (fd->file);
   return inode_get_inumber (inode);
 }
