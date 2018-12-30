@@ -45,7 +45,6 @@ static void copy_out (void *udst_, const void *src_, size_t size);
 struct fds
 {
   int handle;
-  struct list_elem elem;
   struct file *file;
   struct dir *dir;   
   struct list_elem elem;
