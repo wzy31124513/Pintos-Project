@@ -21,6 +21,8 @@ struct inode
     struct condition no_writers;
   };
 
+struct lock open_inodes_lock;
+
 
 void inode_init (void);
 struct inode * inode_create (block_sector_t sector, bool directory);
