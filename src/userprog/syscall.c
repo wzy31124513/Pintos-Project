@@ -53,7 +53,7 @@ static void argcpy(void* cp,const void* addr1,size_t size){
       s=size;
     }
     if(!page_lock(addr,false)){
-      exit1(-1);
+      thread_exit();
     }
     memcpy(dst,addr,s);
     page_unlock(addr);
