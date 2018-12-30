@@ -42,104 +42,7 @@ static int sys_inumber (int handle);
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
  
-void
-syscall_init (void) 
-{
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-}
  
-/* System call handler. */
-static void
-syscall_handler (struct intr_frame *f)
-{
-  unsigned func;
-  int args[3];
-  copy_in(&func,f->esp,sizeof(func));
-  if(func>=15){
-    sys_exit(-1);
-  }
-  memset(args,0,sizeof(args));
-  if (func==SYS_HALT)
-  {
-    sys_halt();
-  }else if (func==SYS_EXIT)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    sys_exit(args[0]);
-  }else if (func==SYS_EXEC)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_exec((const char *)args[0]);
-  }else if (func==SYS_WAIT)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_wait(args[0]);
-  }else if (func==SYS_CREATE)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=sys_create((const char *)args[0],(unsigned)args[1]);
-  }else if (func==SYS_REMOVE)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_remove((const char *)args[0]);
-  }else if (func==SYS_OPEN){
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_open((const char *)args[0]);
-  }
-  else if (func==SYS_FILESIZE)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_filesize(args[0]);
-  }else if (func==SYS_READ)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=sys_read(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_WRITE)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
-    f->eax=sys_write(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_SEEK)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    sys_seek(args[0],args[1]);
-  }else if (func==SYS_TELL)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_tell(args[0]);
-  }else if (func==SYS_CLOSE)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    sys_close(args[0]);
-  }else if (func==SYS_MMAP)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=sys_mmap(args[0],(void*)args[1]);
-  }else if (func==SYS_MUNMAP)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_munmap(args[0]);
-  }else if (func==SYS_CHDIR)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_chdir(args[0]);
-  }else if (func==SYS_MKDIR)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_mkdir((const char *)args[0]);
-  }else if (func==SYS_READDIR)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=sys_readdir(args[0],args[1]);
-  }else if (func==SYS_ISDIR)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-   f->eax= sys_isdir(args[0]);
-  }else if (func==SYS_INUMBER)
-  {
-    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=sys_inumber(args[0]);
-  }
-}
 /* Copies SIZE bytes from user address USRC to kernel address
    DST.
    Call thread_exit() if any of the user accesses are invalid. */
@@ -726,4 +629,104 @@ syscall_exit (void)
     }
 
   dir_close (cur->wd);
+}
+
+void
+syscall_init (void) 
+{
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+
+/* System call handler. */
+static void
+syscall_handler (struct intr_frame *f)
+{
+  unsigned func;
+  int args[3];
+  copy_in(&func,f->esp,sizeof(func));
+  if(func>=15){
+    sys_exit(-1);
+  }
+  memset(args,0,sizeof(args));
+  if (func==SYS_HALT)
+  {
+    sys_halt();
+  }else if (func==SYS_EXIT)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    sys_exit(args[0]);
+  }else if (func==SYS_EXEC)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_exec((const char *)args[0]);
+  }else if (func==SYS_WAIT)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_wait(args[0]);
+  }else if (func==SYS_CREATE)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_create((const char *)args[0],(unsigned)args[1]);
+  }else if (func==SYS_REMOVE)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_remove((const char *)args[0]);
+  }else if (func==SYS_OPEN){
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_open((const char *)args[0]);
+  }
+  else if (func==SYS_FILESIZE)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_filesize(args[0]);
+  }else if (func==SYS_READ)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=sys_read(args[0],(void*)args[1],args[2]);
+  }else if (func==SYS_WRITE)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=sys_write(args[0],(void*)args[1],args[2]);
+  }else if (func==SYS_SEEK)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    sys_seek(args[0],args[1]);
+  }else if (func==SYS_TELL)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_tell(args[0]);
+  }else if (func==SYS_CLOSE)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    sys_close(args[0]);
+  }else if (func==SYS_MMAP)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_mmap(args[0],(void*)args[1]);
+  }else if (func==SYS_MUNMAP)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_munmap(args[0]);
+  }else if (func==SYS_CHDIR)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_chdir(args[0]);
+  }else if (func==SYS_MKDIR)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_mkdir((const char *)args[0]);
+  }else if (func==SYS_READDIR)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_readdir(args[0],args[1]);
+  }else if (func==SYS_ISDIR)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+   f->eax= sys_isdir(args[0]);
+  }else if (func==SYS_INUMBER)
+  {
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_inumber(args[0]);
+  }
 }
