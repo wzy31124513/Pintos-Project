@@ -469,10 +469,18 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_entry *inode_block=cache_lock(inode->sector, 0);
+  struct cache_entry *inode_block=cache_lock(inode->sector,0);
   struct inode_disk *disk=cache_read(inode_block);
   cache_unlock (inode_block);
   return disk->length;
+}
+
+bool is_directory (const struct inode * inode){
+  struct cache_entry *cache=cache_lock(inode->sector,0);
+  struct inode_disk *disk=cache_read(cache);
+  bool ret=disk->directory;
+  cache_unlock(cache);
+  return ret;
 }
 
 /* Returns the number of openers. */
@@ -497,12 +505,4 @@ struct inode * file_create (block_sector_t sector, off_t length) {
     inode = NULL;
   }
   return inode;
-}
-
-bool is_directory (const struct inode * inode){
-  struct cache_entry *cache=cache_lock(inode->sector, 0);
-  struct inode_disk *disk=cache_read(cache);
-  bool ret=disk->directory;
-  cache_unlock(cache);
-  return ret;
 }
