@@ -392,14 +392,12 @@ void munmap (int mapping)
   list_remove (&m->elem);
   for(int i=0;i<m->page_cnt;i++)
   {
-    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
+    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->base+PGSIZE * i))))
     {
-      lock_acquire (&file_lock);
-      file_write_at(m->file,(const void *)(m->addr+PGSIZE * i),PGSIZE*(m->page_cnt),PGSIZE*i);
-      lock_release (&file_lock);
+      file_write_at(m->file,(const void *)(m->base+PGSIZE * i),PGSIZE*(m->page_cnt),PGSIZE*i);
     }
   }
-  for(int i=0;i<m->page_cnt;i++)
+  for(int i=0;i<m->(int)page_cnt;i++)
   {
     page_deallocate((void *)(m->addr+PGSIZE * i));
   }
