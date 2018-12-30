@@ -83,7 +83,7 @@ inode_init (void)
 struct inode *
 inode_create (block_sector_t sector, enum inode_type type) 
 {
-  struct cache_block *block;
+  struct cache_entry *block;
   struct inode_disk *disk_inode;
   struct inode *inode;
 
@@ -163,7 +163,7 @@ inode_reopen (struct inode *inode)
 /* Returns the type of INODE. */
 enum inode_type inode_get_type (const struct inode *inode) 
 {
-  struct cache_block *inode_block = cache_lock (inode->sector, 0);
+  struct cache_entry *inode_block = cache_lock (inode->sector, 0);
   struct inode_disk *disk_inode = cache_read (inode_block);
   enum inode_type type = disk_inode->type;
   cache_unlock (inode_block);
@@ -214,7 +214,7 @@ deallocate_recursive (block_sector_t sector, int level)
 {
   if (level > 0) 
     {
-      struct cache_block *block = cache_lock (sector, 1);
+      struct cache_entry *block = cache_lock (sector, 1);
       block_sector_t *pointers = cache_read (block);
       int i;
       for (i = 0; i < PTRS_PER_SECTOR; i++)
@@ -231,7 +231,7 @@ deallocate_recursive (block_sector_t sector, int level)
 static void
 deallocate_inode (const struct inode *inode)
 {
-  struct cache_block *block = cache_lock (inode->sector, 1);
+  struct cache_entry *block = cache_lock (inode->sector, 1);
   struct inode_disk *disk_inode = cache_read (block);
   int i;
   for (i = 0; i < SECTOR_CNT; i++)
@@ -300,7 +300,7 @@ calculate_indices (off_t sector_idx, size_t offsets[], size_t *offset_cnt)
    but a newly allocated block will have an exclusive lock. */
 static bool
 get_data_block (struct inode *inode, off_t offset, bool allocate,
-                struct cache_block **data_block) 
+                struct cache_entry **data_block) 
 {
   block_sector_t this_level_sector;
   size_t offsets[3];
@@ -314,10 +314,10 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
   this_level_sector = inode->sector;
   for (;;) 
     {
-      struct cache_block *this_level_block;
+      struct cache_entry *this_level_block;
       uint32_t *this_level_data;
 
-      struct cache_block *next_level_block;
+      struct cache_entry *next_level_block;
 
       /* Check whether the block for the next level is allocated. */
       this_level_block = cache_lock (this_level_sector, 0);
@@ -417,7 +417,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
     {
       /* Sector to read, starting byte offset within sector, sector data. */
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-      struct cache_block *block;
+      struct cache_entry *block;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = inode_length (inode) - offset;
@@ -453,7 +453,7 @@ extend_file (struct inode *inode, off_t length)
 {
   if (length > inode_length (inode)) 
     {
-      struct cache_block *inode_block = cache_lock (inode->sector, 1);
+      struct cache_entry *inode_block = cache_lock (inode->sector, 1);
       struct inode_disk *disk_inode = cache_read (inode_block);
       if (length > disk_inode->length) 
         {
@@ -488,7 +488,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     {
       /* Sector to write, starting byte offset within sector, sector data. */
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-      struct cache_block *block;
+      struct cache_entry *block;
       uint8_t *sector_data;
 
       /* Bytes to max inode size, bytes left in sector, lesser of the two. */
@@ -553,7 +553,7 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_block *inode_block = cache_lock (inode->sector, 0);
+  struct cache_entry *inode_block = cache_lock (inode->sector, 0);
   struct inode_disk *disk_inode = cache_read (inode_block);
   off_t length = disk_inode->length;
   cache_unlock (inode_block);

@@ -6,9 +6,7 @@
 #include "threads/synch.h"
 
 
-static void readaheadd_init (void);
-static void flushd (void *aux);
-static void readaheadd (void *aux);
+
 
 void cache_init (void) {
   lock_init(&search_lock);
@@ -44,7 +42,7 @@ void cache_flush (void) {
     lock_release(&c->lock);
     if (sector!=(block_sector_t)-1)
     {
-      c=cache_lock(sector);
+      c=cache_lock(sector,1);
       if (c->correct&&c->dirty)
       {
         block_write(fs_device,c->sector,c->data);
@@ -71,7 +69,7 @@ cache_lock (block_sector_t sector,bool exclusive)
       continue;
     }
     lock_release (&search_lock);
-    if (type == 0) 
+    if (!exclusive) 
       {
         b->read_waiters++;
         if (b->writers || b->write_waiters)
@@ -84,7 +82,7 @@ cache_lock (block_sector_t sector,bool exclusive)
         b->write_waiters++;
         if (b->readers || b->read_waiters || b->writers)
           do {
-            cond_wait (&b->no_readers_or_writers, &b->lock);
+            cond_wait (&b->no_readers, &b->lock);
           } while (b->readers || b->writers);
         b->writers++;
         b->write_waiters--;
@@ -99,7 +97,7 @@ cache_lock (block_sector_t sector,bool exclusive)
       lock_release (&b->lock);
       b->sector = sector;
       b->correct = false;
-      if (type == 0){
+      if (!exclusive){
         b->readers = 1;
       }else{
         b->writers = 1;
@@ -128,12 +126,12 @@ cache_lock (block_sector_t sector,bool exclusive)
     lock_acquire (&b->lock);
     b->writers = 0;
     if (!b->read_waiters && !b->write_waiters) {
-      b->sector = INVALID_SECTOR; 
+      b->sector = (block_sector_t)-1; 
     }else{
       if (b->read_waiters){
         cond_broadcast (&b->no_writers, &b->lock);
       }else{
-        cond_signal (&b->no_readers_or_writers, &b->lock);
+        cond_signal (&b->no_readers, &b->lock);
       }
     }
     lock_release (&b->lock);
@@ -176,14 +174,14 @@ void cache_unlock (struct cache_entry *b){
   lock_acquire (&b->lock);
   if (b->readers) {
     if (--b->readers == 0){
-      cond_signal (&b->no_readers_or_writers, &b->lock);
+      cond_signal (&b->no_readers, &b->lock);
     }
   }else{
       b->writers--;
       if (b->read_waiters){
         cond_broadcast (&b->no_writers, &b->lock);
       }else{
-        cond_signal (&b->no_readers_or_writers, &b->lock);
+        cond_signal (&b->no_readers, &b->lock);
       }
   }
   lock_release (&b->lock);
@@ -199,7 +197,7 @@ void cache_free (block_sector_t sector) {
     if (b->sector == sector) {
       lock_release (&search_lock);
       if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
-        b->sector = INVALID_SECTOR; 
+        b->sector = (block_sector_t)-1; 
       }
       lock_release (&b->lock);
       return;
@@ -209,7 +207,7 @@ void cache_free (block_sector_t sector) {
   lock_release (&search_lock);
 }
 
-static void flushd (void *aux UNUSED) {
+void flushd (void *aux UNUSED) {
   for (;;) 
     {
       timer_msleep (30 * 1000);
@@ -226,12 +224,12 @@ void cache_readahead (block_sector_t sector) {
   }
   block->sector = sector;
   lock_acquire (&readahead_lock);
-  list_push_back (&readahead_list, &block->list_elem);
+  list_push_back (&readahead_list, &block->elem);
   cond_signal (&readahead_list_nonempty, &readahead_lock);
   lock_release (&readahead_lock);
 }
 
-static void readaheadd (void *aux UNUSED) 
+void readaheadd (void *aux UNUSED) 
 {
   for (;;) 
   {
@@ -241,7 +239,7 @@ static void readaheadd (void *aux UNUSED)
     while (list_empty (&readahead_list)){
       cond_wait (&readahead_list_nonempty, &readahead_lock);
     }
-    ra_block = list_entry (list_pop_front (&readahead_list),struct readahead_block, list_elem);
+    ra_block = list_entry (list_pop_front (&readahead_list),struct readahead_block,elem);
     lock_release (&readahead_lock);
 
     cache_entry = cache_lock (ra_block->sector, 0);
