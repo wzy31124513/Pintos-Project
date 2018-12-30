@@ -6,7 +6,6 @@
 #include "userprog/pagedir.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
-#include "filesys/directory.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/init.h"
@@ -16,33 +15,32 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/page.h"
+#include "filesys/directory.h"
  
- 
-static int sys_halt (void);
-static int sys_exit (int status);
-static int sys_exec (const char *ufile);
-static int sys_wait (tid_t);
-static int sys_create (const char *ufile, unsigned initial_size);
-static int sys_remove (const char *ufile);
-static int sys_open (const char *ufile);
-static int sys_filesize (int handle);
-static int sys_read (int handle, void *udst_, unsigned size);
-static int sys_write (int handle, void *usrc_, unsigned size);
-static int sys_seek (int handle, unsigned position);
-static int sys_tell (int handle);
-static int sys_close (int handle);
-static int sys_mmap (int handle, void *addr);
-static int sys_munmap (int mapping);
-static int sys_chdir (const char *udir);
-static int sys_mkdir (const char *udir);
-static int sys_readdir (int handle, char *name);
-static int sys_isdir (int handle);
-static int sys_inumber (int handle);
+void halt (void);
+int exec (const char *cmd_line);
+int wait (int pid);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+int read (int fd, void *buffer, unsigned size);
+int write (int fd,  void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
+int mmap (int fd, void *addr);
+void munmap (int mapping);
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char *name);
+bool isdir (int fd);
+int inumber (int fd);
  
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
- 
-
+static char * strcpy_to_kernel (const char *us);
+static void copy_out (void *udst_, const void *src_, size_t size);
  
 static void argcpy(void* cp,const void* addr1,size_t size){
   uint8_t *dst=cp;
@@ -63,15 +61,11 @@ static void argcpy(void* cp,const void* addr1,size_t size){
   }
 }
  
-/* Copies SIZE bytes from kernel address SRC to user address
-   UDST.
-   Call thread_exit() if any of the user accesses are invalid. */
 static void
 copy_out (void *udst_, const void *src_, size_t size) 
 {
   uint8_t *udst = udst_;
   const uint8_t *src = src_;
-
   while (size > 0) 
     {
       size_t chunk_size = PGSIZE - pg_ofs (udst);
@@ -89,111 +83,92 @@ copy_out (void *udst_, const void *src_, size_t size)
     }
 }
  
-/* Creates a copy of user string US in kernel memory
-   and returns it as a page that must be freed with
-   palloc_free_page().
-   Truncates the string at PGSIZE bytes in size.
-   Call thread_exit() if any of the user accesses are invalid. */
-static char *
-copy_in_string (const char *us) 
+static char * strcpy_to_kernel (const char *str)
 {
-  char *ks;
-  char *upage;
+  char* cp;
+  char* addr;
   size_t length;
- 
-  ks = palloc_get_page (0);
-  if (ks == NULL) 
-    thread_exit ();
-
-  length = 0;
-  for (;;) 
-    {
-      upage = pg_round_down (us);
-      if (!page_lock (upage, false))
-        goto lock_error;
-
-      for (; us < upage + PGSIZE; us++) 
-        {
-          ks[length++] = *us;
-          if (*us == '\0') 
-            {
-              page_unlock (upage);
-              return ks; 
-            }
-          else if (length >= PGSIZE) 
-            goto too_long_error;
-        }
-
-      page_unlock (upage);
+  cp=palloc_get_page(0);
+  if(cp==NULL){
+    exit1(-1);
+  }
+  length=0;
+  while(1){
+    addr=pg_round_down (str);
+    if(!page_lock(addr,false)){
+      palloc_free_page (cp);
+      thread_exit();
+      return NULL;
     }
-
- too_long_error:
-  page_unlock (upage);
- lock_error:
-  palloc_free_page (ks);
-  thread_exit ();
+    while(str<addr+PGSIZE){
+      cp[length++]=*str;
+      if (*str=='\0')
+        {
+          page_unlock(addr);
+          return cp;
+        }
+        else if (length>=PGSIZE){
+          page_unlock(addr);
+          return NULL;
+        }
+      str++;
+    }
+    page_unlock (addr);
+  }
 }
+
  
-/* Halt system call. */
-static int
-sys_halt (void)
+
+void halt(void)
 {
   shutdown_power_off ();
 }
  
-/* Exit system call. */
-static int
-sys_exit (int exit_code) 
-{
-  thread_current ()->exit_code = exit_code;
+
+void exit1(int status) {
+  thread_current ()->exit_code = status;
   thread_exit ();
-  NOT_REACHED ();
 }
  
-/* Exec system call. */
-static int
-sys_exec (const char *ufile) 
+int exec(const char* cmd_line)
 {
-  tid_t tid;
-  char *kfile = copy_in_string (ufile);
- 
-  tid = process_execute (kfile);
- 
-  palloc_free_page (kfile);
- 
-  return tid;
+  int ret;
+  char* fn_copy=strcpy_to_kernel(cmd_line);
+  lock_acquire(&file_lock);
+  ret=process_execute(fn_copy);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
 }
  
-/* Wait system call. */
-static int
-sys_wait (tid_t child) 
+int wait(int pid)
 {
-  return process_wait (child);
+  return process_wait(pid);
 }
  
-/* Create system call. */
-static int
-sys_create (const char *ufile, unsigned initial_size) 
+bool create(const char *file, unsigned initial_size)
 {
-  char *kfile = copy_in_string (ufile);
-  bool ok = filesys_create (kfile, initial_size, FILE_INODE);
-  palloc_free_page (kfile);
- 
-  return ok;
+  bool ret;
+  char* fn_copy=strcpy_to_kernel(file);
+  lock_acquire(&file_lock);
+  ret=filesys_create(fn_copy,initial_size);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
 }
  
-/* Remove system call. */
-static int
-sys_remove (const char *ufile) 
+bool remove(const char* file)
 {
-  char *kfile = copy_in_string (ufile);
-  bool ok = filesys_remove (kfile);
-  palloc_free_page (kfile);
- 
-  return ok;
+  char* fn_copy=strcpy_to_kernel(file);
+  bool ret;
+  lock_acquire(&file_lock);
+  ret=filesys_remove(fn_copy);
+  lock_release(&file_lock);
+  palloc_free_page (fn_copy);
+  return ret;
 }
-
-/* A file descriptor, for binding a file handle to a file. */
+
+
 struct file_descriptor
   {
     struct list_elem elem;      /* List element. */
@@ -202,9 +177,7 @@ struct file_descriptor
     int handle;                 /* File handle. */
   };
  
-/* Open system call. */
-static int
-sys_open (const char *ufile) 
+int open(const char* ufile)
 {
   char *kfile = copy_in_string (ufile);
   struct file_descriptor *fd;
@@ -238,9 +211,7 @@ sys_open (const char *ufile)
   return handle;
 }
  
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open file. */
+
 static struct file_descriptor *
 lookup_fd (int handle) 
 {
@@ -283,21 +254,18 @@ lookup_dir_fd (int handle)
   return fd;
 }
 
-/* Filesize system call. */
-static int
-sys_filesize (int handle) 
+int filesize(int fd)
 {
-  struct file_descriptor *fd = lookup_file_fd (handle);
-  int size;
- 
-  size = file_length (fd->file);
- 
-  return size;
+  struct file_descriptor* f=lookup_file_fd(fd);
+  int ret;
+  lock_acquire (&file_lock);
+  ret=file_length(f->file);
+  lock_release (&file_lock);
+  return ret;
 }
+
  
-/* Read system call. */
-static int
-sys_read (int handle, void *udst_, unsigned size) 
+int read (int handle, void *udst_, unsigned size) 
 {
   uint8_t *udst = udst_;
   struct file_descriptor *fd;
@@ -354,9 +322,7 @@ sys_read (int handle, void *udst_, unsigned size)
   return bytes_read;
 }
  
-/* Write system call. */
-static int
-sys_write (int handle, void *usrc_, unsigned size) 
+int write (int handle, void *usrc_, unsigned size) 
 {
   uint8_t *usrc = usrc_;
   struct file_descriptor *fd = NULL;
@@ -410,25 +376,20 @@ sys_write (int handle, void *usrc_, unsigned size)
   return bytes_written;
 }
  
-/* Seek system call. */
-static int
-sys_seek (int handle, unsigned position) 
+void seek (int handle, unsigned position) 
 {
   if ((off_t) position >= 0)
     file_seek (lookup_file_fd (handle)->file, position);
   return 0;
 }
  
-/* Tell system call. */
-static int
-sys_tell (int handle) 
+unsigned tell (int handle) 
 {
   return file_tell (lookup_file_fd (handle)->file);
 }
  
-/* Close system call. */
-static int
-sys_close (int handle) 
+
+int close (int handle) 
 {
   struct file_descriptor *fd = lookup_fd (handle);
   file_close (fd->file);
@@ -437,8 +398,7 @@ sys_close (int handle)
   free (fd);
   return 0;
 }
-
-/* Binds a mapping id to a region of memory and a file. */
+
 struct mapping
   {
     struct list_elem elem;      /* List element. */
@@ -468,24 +428,9 @@ lookup_mapping (int handle)
   thread_exit ();
 }
 
-/* Remove mapping M from the virtual address space,
-   writing back any pages that have changed. */
-static void
-unmap (struct mapping *m) 
-{
-  list_remove (&m->elem);
-  while (m->page_cnt-- > 0) 
-    {
-      page_deallocate (m->base);
-      m->base += PGSIZE;
-    }
-  file_close (m->file);
-  free (m);
-}
  
-/* Mmap system call. */
-static int
-sys_mmap (int handle, void *addr)
+
+int mmap (int handle, void *addr)
 {
   struct file_descriptor *fd = lookup_file_fd (handle);
   struct mapping *m = malloc (sizeof *m);
@@ -528,17 +473,21 @@ sys_mmap (int handle, void *addr)
   return m->handle;
 }
 
-/* Munmap system call. */
-static int
-sys_munmap (int mapping) 
+void munmap (int mapping) 
 {
-  unmap (lookup_mapping (mapping));
-  return 0;
+  struct mapping *m=lookup_mapping (mapping);
+  list_remove (&m->elem);
+  while (m->page_cnt-- > 0) 
+    {
+      page_deallocate (m->base);
+      m->base += PGSIZE;
+    }
+  file_close (m->file);
+  free (m);
+
 }
 
-/* Chdir system call. */
-static int
-sys_chdir (const char *udir) 
+bool chdir (const char *udir) 
 {
   bool ok = false;
 
@@ -550,9 +499,8 @@ sys_chdir (const char *udir)
   return ok;
 }
 
-/* Mkdir system call. */
-static int
-sys_mkdir (const char *udir)
+
+bool mkdir (const char *udir)
 {
   char *kdir = copy_in_string (udir);
   bool ok = filesys_create (kdir, 0, DIR_INODE);
@@ -561,9 +509,7 @@ sys_mkdir (const char *udir)
   return ok;
 }
 
-/* Readdir system call. */
-static int
-sys_readdir (int handle, char *uname)
+bool readdir (int handle, char *uname)
 {
   struct file_descriptor *fd = lookup_dir_fd (handle);
   char name[NAME_MAX + 1];
@@ -573,19 +519,15 @@ sys_readdir (int handle, char *uname)
   return ok;
 }
 
-/* Isdir system call. */
-static int
-sys_isdir (int handle)
+bool isdir (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   return fd->dir != NULL;
 }
 
-/* Inumber system call. */
-static int
-sys_inumber (int handle)
+
+int inumber (int handle)
 {
-  // ADD AND MODIFY CODE HERE - call dir_get_inode() for directories
   if(sys_isdir(handle))
   {
     struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
@@ -597,8 +539,7 @@ sys_inumber (int handle)
   struct inode *inode = file_get_inode (fd->file);
   return inode_get_inumber (inode);
 }
- 
-/* On thread exit, close all open files and unmap all mappings. */
+
 void
 syscall_exit (void) 
 {
