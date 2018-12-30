@@ -24,7 +24,7 @@ bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
 int filesize (int fd);
-int read (int fd, void *buffer, unsigned size);
+int read (int fd, char *buffer, unsigned size);
 int write (int fd,  void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
@@ -142,7 +142,7 @@ int filesize(int fd){
   return ret;
 }
 
-int read (int fd, void *buffer, unsigned size){
+int read (int fd, char *buffer, unsigned size){
   int ret=size;
   char* check=(char*)buffer;
   for (unsigned i = 0; i < size; ++i)
@@ -170,7 +170,7 @@ int read (int fd, void *buffer, unsigned size){
     {
       ret = -1;
     }else{
-      ret = file_read(fds->f,buffer,size);
+      ret = file_read(fds->file,buffer,size);
     }
   }
   return ret;
@@ -205,7 +205,7 @@ int write (int fd,void *buffer, unsigned size){
     {
       ret= -1;
     }else{
-      ret= file_write(fds->f,buffer,size);
+      ret= file_write(fds->file,buffer,size);
     }
   }
   return ret;
