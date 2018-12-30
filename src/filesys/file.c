@@ -37,7 +37,7 @@ struct file *
 file_open (struct inode *inode) 
 {
   struct file *file = calloc (1, sizeof *file);
-  if (inode != NULL && file != NULL && inode_get_type (inode) == FILE_INODE)
+  if (inode != NULL && file != NULL && is_directory (inode) == 0)
     {
       file->inode = inode;
       file->pos = 0;
