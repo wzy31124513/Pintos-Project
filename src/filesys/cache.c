@@ -43,7 +43,7 @@ void cache_flush (void) {
     lock_release(&c->lock);
     if (sector!=(block_sector_t)-1)
     {
-      c=cache_lock(sector,1);
+      c=cache_lock(sector);
       if (c->correct&&c->dirty)
       {
         block_write(fs_device,c->sector,c->data);
@@ -70,7 +70,7 @@ static void readahead (void *aux UNUSED){
     }
     r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
     lock_release (&readahead_lock);
-    struct cache_entry* c=cache_lock(r->sector, 0);
+    struct cache_entry* c=cache_alloc(r->sector);
     cache_read(c);
     cache_unlock(c);
     free (r);
