@@ -64,79 +64,79 @@ syscall_handler (struct intr_frame *f)
     sys_halt();
   }else if (func==SYS_EXIT)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     sys_exit(args[0]);
   }else if (func==SYS_EXEC)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_exec((const char *)args[0]);
   }else if (func==SYS_WAIT)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_wait(args[0]);
   }else if (func==SYS_CREATE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=sys_create((const char *)args[0],(unsigned)args[1]);
   }else if (func==SYS_REMOVE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_remove((const char *)args[0]);
   }else if (func==SYS_OPEN){
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_open((const char *)args[0]);
   }
   else if (func==SYS_FILESIZE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_filesize(args[0]);
   }else if (func==SYS_READ)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=sys_read(args[0],(void*)args[1],args[2]);
   }else if (func==SYS_WRITE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=sys_write(args[0],(void*)args[1],args[2]);
   }else if (func==SYS_SEEK)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     sys_seek(args[0],args[1]);
   }else if (func==SYS_TELL)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_tell(args[0]);
   }else if (func==SYS_CLOSE)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     sys_close(args[0]);
   }else if (func==SYS_MMAP)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=sys_mmap(args[0],(void*)args[1]);
   }else if (func==SYS_MUNMAP)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_munmap(args[0]);
   }else if (*esp==SYS_CHDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_chdir(args[0]);
   }else if (*esp==SYS_MKDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_mkdir((const char *)*(esp+1));
   }else if (*esp==SYS_READDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=sys_readdir(args[0],args[1]);
   }else if (*esp==SYS_ISDIR)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
    f->eax= sys_isdir(args[0]);
   }else if (*esp==SYS_INUMBER)
   {
-    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_inumber(args[0]);
   }
 }
