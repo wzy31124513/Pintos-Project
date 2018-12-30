@@ -46,9 +46,6 @@ bytes_to_sectors (off_t size)
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
-
-static void deallocate_inode (const struct inode *);
-
 /* Initializes the inode module. */
 void
 inode_init (void) 
@@ -171,7 +168,7 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
-          struct cache_entry* cache=cache_lock(inode->sector);
+          struct cache_entry* cache=cache_lock(inode->sector,1);
           struct inode_disk* disk=cache_read(cache);
           for (int i = 0; i < 125; ++i)
           {
@@ -200,7 +197,7 @@ inode_close (struct inode *inode)
 void inode_deallocate (block_sector_t sector, int level) {
   if (level>0)
   {
-    struct cache_entry* c=cache_lock(sector);
+    struct cache_entry* c=cache_lock(sector,1);
     block_sector_t* block=cache_read(c);
     for (int i = 0; i < (off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)); ++i)
     {
