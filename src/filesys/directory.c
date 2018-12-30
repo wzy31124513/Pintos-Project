@@ -158,7 +158,7 @@ dir_lookup (const struct dir *dir, const char *name,
   }else{
     *inode=NULL;
   }
-  
+
   return *inode != NULL;
 }
 
@@ -224,9 +224,10 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  /* Don't allow . or .. to be removed */  
-  if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+  if (strcmp(name,".")==0||strcmp(name,"..")==0)
+  {
     return false;
+  }
 
   /* Find directory entry. */
   lock_acquire(&dir->inode->lock);
@@ -238,29 +239,29 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  /* Verify that it is not an in-use or non-empty directory. */  
   if(is_directory(inode) == 1)
   {
-    if(inode_open_cnt(inode) > 1)
+
+    if(inode_open_cnt(inode)>1){
       goto done;
-
-    struct dir_entry scan_entry;
-    off_t scan_offset;
-    int in_use_count = 0;
-
-    for(scan_offset = 0;
-        inode_read_at(inode,
-                      &scan_entry,
-                      sizeof scan_entry,
-                      scan_offset) == sizeof scan_entry;
-        scan_offset += sizeof scan_entry)
-    {
-      if(scan_entry.in_use)
-        in_use_count++;
     }
 
-    if(in_use_count > 2)
+    struct dir_entry scan;
+    off_t scan_ofs;
+    int in_use_cnt = 0;
+
+    while(inode_read_at(inode,&scan,sizeof(scan),scan_ofs)==sizeof(scan)){
+      if (scan.in_use)
+      {
+        in_ust_cnt++;
+      }
+      scan_ofs+=sizeof(scan);
+    }
+
+    if(in_use_cnt>2){
       goto done;
+    }
+
   }
 
   /* Erase directory entry. */
@@ -285,7 +286,6 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-
   lock_acquire(&dir->inode->lock);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
