@@ -247,7 +247,7 @@ dir_remove (struct dir *dir, const char *name)
     }
 
     struct dir_entry scan;
-    off_t scan_ofs;
+    off_t scan_ofs=0;
     int in_use_cnt = 0;
 
     while(inode_read_at(inode,&scan,sizeof(scan),scan_ofs)==sizeof(scan)){
