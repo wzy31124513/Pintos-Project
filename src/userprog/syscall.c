@@ -68,7 +68,7 @@ void exit1(int status){
   cur->exit_code=status;
   struct list_elem* e;
   struct list_elem* next;
-  for (e=list_begin(&cur->fds);e!=list_end(&cur->fds);e=next)
+  for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=next)
   {
     struct fds *fd=list_entry(e,struct fds,elem);
     next=list_next(e);
@@ -132,8 +132,8 @@ int open(const char* file){
       if (fd->file != NULL || fd->dir != NULL)
       {
         struct thread *cur = thread_current ();
-        handle = fd->handle = cur->next_handle++;
-        list_push_front (&cur->fds, &fd->elem);
+        handle = fd->handle = cur->fd_num++;
+        list_push_front (&cur->file_list, &fd->elem);
       }else {
         free (fd);
         inode_close (inode);
@@ -304,8 +304,8 @@ int mmap (int fd, void *addr){
   if (m == NULL|| addr == NULL || pg_ofs (addr) != 0){
     return -1;
   }
-  thread_current()->next_handle++;
-  m->id=thread_current()->next_handle;
+  thread_current()->fd_num++;
+  m->id=thread_current()->fd_num;
   m->file = file_reopen(f->file);
   if (m->file == NULL) {
     free (m);
@@ -577,7 +577,7 @@ static char * strcpy_to_kernel (const char *str){
 static struct fds * getfile (int fd){
   struct thread *cur=thread_current ();
   struct list_elem *e;
-  for (e=list_begin(&cur->fds);e!=list_end(&cur->fds);e=list_next (e)){
+  for (e=list_begin(&cur->file_list);e!=list_end(&cur->file_list);e=list_next (e)){
     struct fds *f=list_entry(e,struct fds, elem);
     if (f->handle == fd){
       return f;

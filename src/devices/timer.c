@@ -24,9 +24,6 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
-/* Threads waiting in timer_sleep(). */
-static struct list wait_list;
-
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -89,17 +86,13 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Compares two threads based on their wake-up times. */
-static bool
-compare_threads_by_wakeup_time (const struct list_elem *a_,
-                                const struct list_elem *b_,
-                                void *aux UNUSED) 
-{
+static bool cmp (const struct list_elem *a_,const struct list_elem *b_,void *aux UNUSED){
   const struct thread *a = list_entry (a_, struct thread, timer_elem);
   const struct thread *b = list_entry (b_, struct thread, timer_elem);
-
   return a->wakeup_time < b->wakeup_time;
 }
+
+static struct list wait_list;
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
@@ -107,18 +100,11 @@ void
 timer_sleep (int64_t ticks) 
 {
   struct thread *t = thread_current ();
-
-  /* Schedule our wake-up time. */
-  t->wakeup_time = timer_ticks () + ticks;
-
-  /* Atomically insert the current thread into the wait list. */
+  t->wakeup_time=timer_ticks()+ticks;
   ASSERT (intr_get_level () == INTR_ON);
-  intr_disable ();
-  list_insert_ordered (&wait_list, &t->timer_elem,
-                       compare_threads_by_wakeup_time, NULL);
-  intr_enable ();
-
-  /* Wait. */
+  enum intr_level old_level = intr_disable ();
+  list_insert_ordered(&wait_list,&t->timer_elem,cmp,NULL);
+  intr_set_level(old_level);
   sema_down (&t->timer_sema);
 }
 

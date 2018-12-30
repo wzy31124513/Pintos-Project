@@ -3,6 +3,14 @@
 
 #include "threads/thread.h"
 
+struct exec_table{
+	const char* file_name;
+	struct semaphore load;
+	struct child_proc* child_proc;
+	bool success;
+	struct dir* wd;
+};
+
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_exit (void);
