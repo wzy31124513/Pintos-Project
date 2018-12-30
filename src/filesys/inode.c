@@ -13,7 +13,16 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
+#define DIRECT_CNT 123
+#define INDIRECT_CNT 1
+#define DBL_INDIRECT_CNT 1
+#define SECTOR_CNT (DIRECT_CNT + INDIRECT_CNT + DBL_INDIRECT_CNT)
 
+#define PTRS_PER_SECTOR ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))
+#define INODE_SPAN ((DIRECT_CNT                                              \
+                     + PTRS_PER_SECTOR * INDIRECT_CNT                        \
+                     + PTRS_PER_SECTOR * PTRS_PER_SECTOR * DBL_INDIRECT_CNT) \
+                    * BLOCK_SECTOR_SIZE)
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
