@@ -91,32 +91,36 @@ bool remove(const char* file){
   return ret;
 }
 
-/*
+
 int open(const char* file){
   char* fn_copy=strcpy_to_kernel(file);
   struct fds* f=malloc(sizeof(struct fds));
   int fd=-1;
-  struct inode *inode=filesys_open (fn_copy);
-  if (inode != NULL){
-    if (inode_get_type(inode)== 0){
-      f->file = file_open (inode);
-    }else{
-      f->dir = dir_open (inode);
-    }
-    if (f->file!= NULL||f->dir!=NULL){
-      thread_current()->next_handle++;
-      fd=f->handle=thread_current()->next_handle;
-      list_push_front (&thread_current()->fds,&f->elem);
-    }else{
-      free (f);
-      inode_close (inode);
+  if (f!=NULL)
+  {
+    struct inode *inode=filesys_open(fn_copy);
+    if (inode != NULL){
+      if (inode_get_type(inode)== 0){
+        f->file=file_open(inode);
+      }else{
+        f->dir=dir_open(inode);
+      }
+      if (f->file!= NULL||f->dir!=NULL){
+        thread_current()->next_handle++;
+        fd=thread_current()->next_handle;
+        f->handle=fd;
+        list_push_front (&thread_current()->fds,&f->elem);
+      }else{
+        free (f);
+        inode_close (inode);
+      }
     }
   }
   palloc_free_page (fn_copy);
   return fd;
 }
-*/
 
+/*
 int open(const char* file){
   char *kfile = strcpy_to_kernel (file);
   struct fds *fd;
@@ -148,7 +152,7 @@ int open(const char* file){
   palloc_free_page (kfile);
   return handle;
 }
-
+*/
 
 
 int filesize(int fd)
