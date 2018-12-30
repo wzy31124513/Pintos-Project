@@ -113,11 +113,11 @@ static bool name2entry(const char *name,struct dir **dir, char *base_name){
   const char* cp;
   char name1[15],next[15];
   int a;
-  if (name[0]=='/'|| thread_current()->directory==NULL)
+  if (name[0]=='/'|| thread_current()->wd==NULL)
   {
     d=dir_open_root();
   }else{
-    d=dir_reopen(thread_current()->directory);
+    d=dir_reopen(thread_current()->wd);
   }
   if (d==NULL)
   {
