@@ -204,3 +204,22 @@ void cache_unlock (struct cache_entry *b){
 }
 
 
+void cache_free (block_sector_t sector) {
+  int i;
+  lock_acquire (&search_lock);
+  for (i = 0; i < 64; i++){
+    struct cache_entry *b = &cache[i];
+    lock_acquire (&b->lock);
+    if (b->sector == sector) {
+      lock_release (&search_lock);
+      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
+        b->sector = (block_sector_t)-1; 
+      }
+      lock_release (&b->lock);
+      return;
+    }
+    lock_release (&b->lock);
+  }
+  lock_release (&search_lock);
+}
+

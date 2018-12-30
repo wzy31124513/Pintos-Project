@@ -223,24 +223,8 @@ deallocate_recursive (block_sector_t sector, int level)
           deallocate_recursive (sector, level - 1);
       cache_unlock (block);
     }
-    
-  lock_acquire (&search_lock);
-  for (int i = 0; i < 64; i++){
-    struct cache_entry *b = &cache[i];
-    lock_acquire (&b->lock);
-    if (b->sector == sector) {
-      lock_release (&search_lock);
-      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
-        b->sector = (block_sector_t)-1; 
-      }
-      lock_release (&b->lock);
-      free_map_release (sector);
-      return;
-    }
-    lock_release (&b->lock);
-  }
-  lock_release (&search_lock);
-
+  
+  cache_free (sector);
   free_map_release (sector);
 }
 
