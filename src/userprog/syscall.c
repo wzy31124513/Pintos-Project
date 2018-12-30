@@ -41,86 +41,8 @@ static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
- 
-static void argcpy(void* cp,const void* addr1,size_t size){
-  uint8_t *dst=cp;
-  const uint8_t *addr=addr1;
-  while(size>0){
-    size_t s=PGSIZE-pg_ofs(addr);
-    if(s>size){
-      s=size;
-    }
-    if(!page_lock(addr,false)){
-      thread_exit();
-    }
-    memcpy(dst,addr,s);
-    page_unlock(addr);
-    dst+=s;
-    addr+=s;
-    size-=s;
-  }
-}
- 
-static void
-copy_out (void *udst_, const void *src_, size_t size) 
-{
-  uint8_t *udst = udst_;
-  const uint8_t *src = src_;
-  while (size > 0) 
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (udst);
-      if (chunk_size > size)
-        chunk_size = size;
-      
-      if (!page_lock (udst, false))
-        thread_exit ();
-      memcpy (udst, src, chunk_size);
-      page_unlock (udst);
 
-      udst += chunk_size;
-      src += chunk_size;
-      size -= chunk_size;
-    }
-}
- 
-static char * strcpy_to_kernel (const char *str)
-{
-  char* cp;
-  char* addr;
-  size_t length;
-  cp=palloc_get_page(0);
-  if(cp==NULL){
-    exit1(-1);
-  }
-  length=0;
-  while(1){
-    addr=pg_round_down (str);
-    if(!page_lock(addr,false)){
-      palloc_free_page (cp);
-      thread_exit();
-      return NULL;
-    }
-    while(str<addr+PGSIZE){
-      cp[length++]=*str;
-      if (*str=='\0')
-        {
-          page_unlock(addr);
-          return cp;
-        }
-        else if (length>=PGSIZE){
-          page_unlock(addr);
-          return NULL;
-        }
-      str++;
-    }
-    page_unlock (addr);
-  }
-}
-
- 
-
-void halt(void)
-{
+void halt(void){
   shutdown_power_off ();
 }
  
@@ -130,8 +52,7 @@ void exit1(int status) {
   thread_exit ();
 }
  
-int exec(const char* cmd_line)
-{
+int exec(const char* cmd_line){
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
   ret=process_execute(fn_copy);
@@ -139,22 +60,19 @@ int exec(const char* cmd_line)
   return ret;
 }
  
-int wait(int pid)
-{
+int wait(int pid){
   return process_wait(pid);
 }
  
-bool create(const char *file, unsigned initial_size)
-{
+bool create(const char *file, unsigned initial_size){
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
-  ret=filesys_create(fn_copy,initial_size,FILE_INODE);
+  ret=filesys_create(fn_copy,initial_size,0);
   palloc_free_page (fn_copy);
   return ret;
 }
  
-bool remove(const char* file)
-{
+bool remove(const char* file){
   char* fn_copy=strcpy_to_kernel(file);
   bool ret;
   ret=filesys_remove(fn_copy);
@@ -162,87 +80,60 @@ bool remove(const char* file)
   return ret;
 }
 
-
-struct file_descriptor
+int open(const char* file){
+  char* fn_copy=strcpy_to_kernel(file);
+  struct fds* f=malloc(sizeof(struct fds));
+  int fd=-1;
+  struct inode *inode=filesys_open(fn_copy);
+  if (inode != NULL)
   {
-    struct list_elem elem;      /* List element. */
-    struct file *file;          /* File. */
-    struct dir *dir;            /* Directory. */
-    int handle;                 /* File handle. */
-  };
- 
-int open(const char* ufile)
-{
-  char *kfile = strcpy_to_kernel (ufile);
-  struct file_descriptor *fd;
-  int handle = -1;
- 
-  fd = calloc (1, sizeof *fd);
-  if (fd != NULL)
-    {
-      struct inode *inode = filesys_open (kfile);
-      if (inode != NULL)
-        {
-          if (inode_get_type (inode) == FILE_INODE)
-            fd->file = file_open (inode);
-          else
-            fd->dir = dir_open (inode);
-          if (fd->file != NULL || fd->dir != NULL)
-            {
-              struct thread *cur = thread_current ();
-              handle = fd->handle = cur->next_handle++;
-              list_push_front (&cur->fds, &fd->elem);
-            }
-          else 
-            {
-              free (fd);
-              inode_close (inode);
-            }
-        }
+    if (inode_get_type(inode)==0){
+      f->file=file_open(inode);
+    }else{
+      f->dir = dir_open(inode);
     }
-  
-  palloc_free_page (kfile);
+    if (f->file != NULL || fd->dir != NULL)
+    {
+      fd=f->fd=thread_current()->next_handle++;
+      list_push_front(&thread_current()->fds,&fd->elem);
+    }else {
+        free(f);
+        inode_close(inode);
+    }
+  }
+  palloc_free_page (fn_copy);
   return handle;
 }
  
 
-static struct file_descriptor *
-lookup_fd (int handle) 
-{
+static struct fds * getfile (int handle){
   struct thread *cur = thread_current ();
   struct list_elem *e;
-   
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds);
-       e = list_next (e))
-    {
-      struct file_descriptor *fd;
-      fd = list_entry (e, struct file_descriptor, elem);
-      if (fd->handle == handle)
-        return fd;
+  for(e=list_begin(&cur->fds);e!=list_tail(&cur->fds);e=list_next (e)){
+    struct fds *fd;
+    fd = list_entry(e, struct fds, elem);
+    if (fd->handle == handle){
+      return fd;
     }
- 
+  }
   thread_exit ();
 }
  
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open ordinary file. */
-static struct file_descriptor *
+
+static struct fds *
 lookup_file_fd (int handle) 
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   if (fd->file == NULL)
     thread_exit ();
   return fd;
 }
  
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open directory. */
-static struct file_descriptor *
+
+static struct fds *
 lookup_dir_fd (int handle) 
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   if (fd->dir == NULL)
     thread_exit ();
   return fd;
@@ -250,7 +141,7 @@ lookup_dir_fd (int handle)
 
 int filesize(int fd)
 {
-  struct file_descriptor* f=lookup_file_fd(fd);
+  struct fds* f=lookup_file_fd(fd);
   int ret;
   ret=file_length(f->file);
   return ret;
@@ -260,7 +151,7 @@ int filesize(int fd)
 int read (int handle, void *udst_, unsigned size) 
 {
   uint8_t *udst = udst_;
-  struct file_descriptor *fd;
+  struct fds *fd;
   int bytes_read = 0;
 
   /* Look up file descriptor. */
@@ -317,7 +208,7 @@ int read (int handle, void *udst_, unsigned size)
 int write (int handle, void *usrc_, unsigned size) 
 {
   uint8_t *usrc = usrc_;
-  struct file_descriptor *fd = NULL;
+  struct fds *fd = NULL;
   int bytes_written = 0;
 
   /* Lookup up file descriptor. */
@@ -382,7 +273,7 @@ unsigned tell (int handle)
 
 void close (int handle) 
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   file_close (fd->file);
   dir_close (fd->dir);
   list_remove (&fd->elem);
@@ -422,7 +313,7 @@ lookup_mapping (int handle)
 
 int mmap (int handle, void *addr)
 {
-  struct file_descriptor *fd = lookup_file_fd (handle);
+  struct fds *fd = lookup_file_fd (handle);
   struct mapping *m = malloc (sizeof *m);
   size_t offset;
   off_t length;
@@ -501,7 +392,7 @@ bool mkdir (const char *udir)
 
 bool readdir (int handle, char *uname)
 {
-  struct file_descriptor *fd = lookup_dir_fd (handle);
+  struct fds *fd = lookup_dir_fd (handle);
   char name[NAME_MAX + 1];
   bool ok = dir_readdir (fd->dir, name);
   if (ok)
@@ -511,7 +402,7 @@ bool readdir (int handle, char *uname)
 
 bool isdir (int handle)
 {
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   return fd->dir != NULL;
 }
 
@@ -520,12 +411,12 @@ int inumber (int handle)
 {
   if(isdir(handle))
   {
-    struct file_descriptor *dir_descriptor = lookup_dir_fd(handle);
+    struct fds *dir_descriptor = lookup_dir_fd(handle);
     struct inode *inode = dir_get_inode(dir_descriptor->dir);
     return inode_get_inumber(inode);
   }
 
-  struct file_descriptor *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   struct inode *inode = file_get_inode (fd->file);
   return inode_get_inumber (inode);
 }
@@ -538,7 +429,7 @@ syscall_exit (void)
    
   for (e = list_begin (&cur->fds); e != list_end (&cur->fds); e = next)
     {
-      struct file_descriptor *fd = list_entry (e, struct file_descriptor, elem);
+      struct fds *fd = list_entry (e, struct fds, elem);
       next = list_next (e);
       file_close (fd->file);
       dir_close (fd->dir);
@@ -652,5 +543,80 @@ syscall_handler (struct intr_frame *f)
     f->eax=inumber(args[0]);
   }else{
     thread_exit();
+  }
+}
+
+static void argcpy(void* cp,const void* addr1,size_t size){
+  uint8_t *dst=cp;
+  const uint8_t *addr=addr1;
+  while(size>0){
+    size_t s=PGSIZE-pg_ofs(addr);
+    if(s>size){
+      s=size;
+    }
+    if(!page_lock(addr,false)){
+      thread_exit();
+    }
+    memcpy(dst,addr,s);
+    page_unlock(addr);
+    dst+=s;
+    addr+=s;
+    size-=s;
+  }
+}
+ 
+static void
+copy_out (void *udst_, const void *src_, size_t size) 
+{
+  uint8_t *udst = udst_;
+  const uint8_t *src = src_;
+  while (size > 0) 
+    {
+      size_t chunk_size = PGSIZE - pg_ofs (udst);
+      if (chunk_size > size)
+        chunk_size = size;
+      
+      if (!page_lock (udst, false))
+        thread_exit ();
+      memcpy (udst, src, chunk_size);
+      page_unlock (udst);
+
+      udst += chunk_size;
+      src += chunk_size;
+      size -= chunk_size;
+    }
+}
+ 
+static char * strcpy_to_kernel (const char *str)
+{
+  char* cp;
+  char* addr;
+  size_t length;
+  cp=palloc_get_page(0);
+  if(cp==NULL){
+    exit1(-1);
+  }
+  length=0;
+  while(1){
+    addr=pg_round_down (str);
+    if(!page_lock(addr,false)){
+      palloc_free_page (cp);
+      thread_exit();
+      return NULL;
+    }
+    while(str<addr+PGSIZE){
+      cp[length++]=*str;
+      if (*str=='\0')
+        {
+          page_unlock(addr);
+          return cp;
+        }
+        else if (length>=PGSIZE){
+          page_unlock(addr);
+          return NULL;
+        }
+      str++;
+    }
+    page_unlock (addr);
   }
 }
