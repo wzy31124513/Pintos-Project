@@ -510,7 +510,7 @@ sys_mmap (int handle, void *addr)
   length = file_length (m->file);
   while (length > 0)
     {
-      struct page *p = page_allocate ((uint8_t *) addr + offset, false);
+      struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
           unmap (m);
