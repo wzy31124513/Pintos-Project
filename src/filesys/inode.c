@@ -355,8 +355,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         memset (buffer + bytes_read, 0, chunk_size);
       else 
         {
-          const uint8_t *sector_data=cache_read(c);
-          memcpy (buffer + bytes_read, sector_data + sector_ofs, chunk_size);
+          const uint8_t* data=cache_read(c);
+          memcpy (buffer + bytes_read, data + sector_ofs, chunk_size);
           cache_unlock(c);
         }
       
