@@ -30,7 +30,7 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct inode *inode = inode_create (sector, 1);
+  struct inode *inode = DIR_INODE (sector, 1);
   if (inode != NULL) 
     {
       struct dir_entry entries[2];
@@ -63,7 +63,7 @@ struct dir *
 dir_open (struct inode *inode) 
 {
   struct dir *dir = calloc (1, sizeof *dir);
-  if (inode != NULL && dir != NULL && inode_get_type (inode) == DIR_INODE)
+  if (inode != NULL && dir != NULL && is_directory (inode) == 1)
     {
       dir->inode = inode;
       dir->pos = 0;
