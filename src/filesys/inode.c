@@ -306,7 +306,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_en
     }
     c->dirty=true;
     struct cache_entry *next_cache;
-    next_cache=cache_lock(data[offsets[level]]);
+    next_cache=cache_lock(data[offsets[level]],1);
     next_cache->correct=true;
     next_cache->dirty=true;
     cache_unlock(c);
@@ -408,7 +408,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
   if (offset>inode_length(inode))
   {
-    struct cache_entry* inode_block=cache_lock(inode->sector);
+    struct cache_entry* inode_block=cache_lock(inode->sector,1);
     struct inode_disk* disk=cache_read(inode_block);
     if (offset>disk->length)
     {
@@ -424,7 +424,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     cond_signal(&inode->no_writers,&inode->deny_write);
   }
   lock_release(&inode->deny_write);
-  
+
   return bytes_written;
 }
 
@@ -484,25 +484,11 @@ struct inode * file_create(block_sector_t sector, off_t length) {
   return inode;
 }
 
-int inode_open_cnt (struct inode *inode) 
+int inode_open_cnt (const struct inode * inode) 
 {
   int open_cnt;
   lock_acquire (&open_inodes_lock);
   open_cnt = inode->open_cnt;
   lock_release (&open_inodes_lock);
   return open_cnt;
-}
-
-/* Locks INODE. */
-void
-inode_lock (struct inode *inode) 
-{
-  lock_acquire (&inode->lock);
-}
-
-/* Releases INODE's lock. */
-void
-inode_unlock (struct inode *inode) 
-{
-  lock_release (&inode->lock);
 }

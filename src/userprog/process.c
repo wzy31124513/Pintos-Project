@@ -40,7 +40,7 @@ process_execute (const char *file_name)
   sema_init (&exec.load,0);
 
   struct dir *wd = thread_current ()->wd;
-  if (wd=NULL)
+  if (wd==NULL)
   {
     exec.wd=dir_reopen (wd);
   }else{
