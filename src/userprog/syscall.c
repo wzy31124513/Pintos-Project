@@ -550,7 +550,7 @@ syscall_exit (void)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
       next = list_next (e);
-      unmap (m);
+      munmap (m->base);
     }
 
   dir_close (cur->wd);
