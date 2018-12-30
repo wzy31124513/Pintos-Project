@@ -146,7 +146,7 @@ thread_tick (void)
       }
     }
    }
-   
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -493,6 +493,7 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   list_init(&t->file_list);
   list_init(&t->mapping);
   t->fd_num=2;
+  t->wd=NULL;
   list_push_back (&all_list, &t->allelem);
   
 }

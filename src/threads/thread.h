@@ -108,6 +108,7 @@ struct thread
     struct list mapping;
     void* esp;
     int ticks;
+    struct dir* wd;
     unsigned magic;                     /* Detects stack overflow. */
   };
 
