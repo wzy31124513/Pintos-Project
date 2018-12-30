@@ -516,8 +516,8 @@ inode_deny_write (struct inode *inode)
   while (inode->writer_cnt>0){
     cond_wait (&inode->no_writers, &inode->deny_write);
   }
-  inode->deny_write_cnt++;
   ASSERT (inode->deny_write_cnt < inode->open_cnt);
+  inode->deny_write_cnt++;
   lock_release (&inode->deny_write);
 }
 
