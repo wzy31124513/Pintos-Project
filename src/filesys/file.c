@@ -19,7 +19,7 @@ struct file
 struct inode *
 file_create (block_sector_t sector, off_t length) 
 {
-  struct inode *inode = inode_create (sector, FILE_INODE);
+  struct inode *inode = inode_create (sector, 0);
   if (inode != NULL && length > 0
       && inode_write_at (inode, "", 1, length - 1) != 1)
     {
