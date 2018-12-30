@@ -35,7 +35,7 @@ size_t mark=0;
 
 void cache_init (void);
 void cache_flush (void);
-struct cache_block *cache_lock (block_sector_t, enum lock_type);
+struct cache_block *cache_lock (block_sector_t, bool exclusive);
 void *cache_read (struct cache_block *);
 void *cache_zero (struct cache_block *);
 void cache_dirty (struct cache_block *);
