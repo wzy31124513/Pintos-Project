@@ -392,22 +392,19 @@ bool isdir (int fd){
 
 int inumber (int fd)
 {
-  if(isdir(fd))
+  struct fds *f=getfile(fd);
+  if (f->dir!=NULL)
   {
-    struct fds *f=getfile(fd);
-    if (f->dir==NULL){
-      exit1(-1);
-    }
     struct inode *inode=dir_get_inode(f->dir);
     return inode_get_inumber(inode);
   }
-  struct fds *f=getfile(fd);
-  if (f->file==NULL)
+  if (f->file!=NULL)
   {
-    exit1(-1);
+    struct inode *inode=file_get_inode (f->file);
+    return inode_get_inumber(inode);
   }
-  struct inode *inode=file_get_inode (f->file);
-  return inode_get_inumber(inode);
+  exit1(-1);
+  return 0;
 }
 
 void
@@ -419,87 +416,85 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  unsigned func;
+  int *esp=f->esp;
   int args[3];
-  argcpy(&func,f->esp,sizeof(func));
-
   memset(args,0,sizeof(args));
-  if (func==SYS_HALT)
+  if (*esp==SYS_HALT)
   {
     halt();
-  }else if (func==SYS_EXIT)
+  }else if (*esp==SYS_EXIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     exit1(args[0]);
-  }else if (func==SYS_EXEC)
+  }else if (*esp==SYS_EXEC)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=exec((const char *)args[0]);
-  }else if (func==SYS_WAIT)
+  }else if (*esp==SYS_WAIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=wait(args[0]);
-  }else if (func==SYS_CREATE)
+  }else if (*esp==SYS_CREATE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=create((const char *)args[0],(unsigned)args[1]);
-  }else if (func==SYS_REMOVE)
+  }else if (*esp==SYS_REMOVE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=remove((const char *)args[0]);
-  }else if (func==SYS_OPEN){
+  }else if (*esp==SYS_OPEN){
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=open((const char *)args[0]);
   }
-  else if (func==SYS_FILESIZE)
+  else if (*esp==SYS_FILESIZE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=filesize(args[0]);
-  }else if (func==SYS_READ)
+  }else if (*esp==SYS_READ)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=read(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_WRITE)
+  }else if (*esp==SYS_WRITE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=write(args[0],(void*)args[1],args[2]);
-  }else if (func==SYS_SEEK)
+  }else if (*esp==SYS_SEEK)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     seek(args[0],args[1]);
-  }else if (func==SYS_TELL)
+  }else if (*esp==SYS_TELL)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=tell(args[0]);
-  }else if (func==SYS_CLOSE)
+  }else if (*esp==SYS_CLOSE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     close(args[0]);
-  }else if (func==SYS_MMAP)
+  }else if (*esp==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=mmap(args[0],(void*)args[1]);
-  }else if (func==SYS_MUNMAP)
+  }else if (*esp==SYS_MUNMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     munmap(args[0]);
-  }else if (func==SYS_CHDIR)
+  }else if (*esp==SYS_CHDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=chdir((const char *)args[0]);
-  }else if (func==SYS_MKDIR)
+  }else if (*esp==SYS_MKDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=mkdir((const char *)args[0]);
-  }else if (func==SYS_READDIR)
+  }else if (*esp==SYS_READDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=readdir(args[0],(char*)args[1]);
-  }else if (func==SYS_ISDIR)
+  }else if (*esp==SYS_ISDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=isdir(args[0]);
-  }else if (func==SYS_INUMBER)
+  }else if (*esp==SYS_INUMBER)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=inumber(args[0]);
@@ -591,7 +586,7 @@ static struct fds * getfile (int fd){
     }
   }
   exit1(-1);
-  NOT_REACHED();
+  return NULL;
 }
 
 
@@ -605,5 +600,5 @@ static struct mapping * getmap (int handle) {
       }
     }
   exit1(-1);
-  NOT_REACHED();
+  return NULL;
 }
