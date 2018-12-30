@@ -81,6 +81,7 @@ void cache_readahead (block_sector_t sector) {
   struct readahead_block *block = malloc (sizeof(struct readahead_block));
   block->sector = sector;
   lock_acquire (&readahead_lock);
+  list_push_back (&readahead_list,&block->elem);
   cond_signal (&readahead_list_nonempty, &readahead_lock);
   lock_release (&readahead_lock);
 }
@@ -213,7 +214,7 @@ void cache_unlock (struct cache_entry *b){
     {
       cond_broadcast (&b->no_writers,&b->lock);
     }else{
-      cond_signal (&b->no_readers,&b->lock);
+      cond_signal(&b->no_readers,&b->lock);
     }
   }
   lock_release (&b->lock);
