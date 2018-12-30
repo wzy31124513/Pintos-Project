@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include "devices/block.h"
 
+struct lock free_map_lock;
+
 void free_map_init (void);
 void free_map_read (void);
 void free_map_create (void);
