@@ -163,10 +163,10 @@ int open(const char* file)
   if(inode!=NULL)
     {
       if (inode_get_type (inode) == FILE_INODE)
-        fd->file = file_open (inode);
+        f->file = file_open (inode);
       else
-        fd->dir = dir_open (inode);
-      if (fd->file!=NULL || fd->dir!=NULL)
+        f->dir = dir_open (inode);
+      if (f->file!=NULL || f->dir!=NULL)
       {
         thread_current()->fd_num++;
         fd=thread_current()->fd_num;
@@ -476,11 +476,11 @@ int inumber (int fd){
     struct inode* inode=dir_get_inode(fds->dir);
     return inode_get_inumber(inode);
   }else{
-    if (fds->f==NULL)
+    if (fds->file==NULL)
     {
       exit1(-1);
     }
-    struct inode* inode=file_get_inode(fds->f);
+    struct inode* inode=file_get_inode(fds->file);
     return inode_get_inumber(inode);
   }
 }
