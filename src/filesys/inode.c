@@ -240,126 +240,90 @@ static bool
 get_data_block (struct inode *inode, off_t offset, bool allocate,
                 struct cache_entry **data_block) 
 {
-  block_sector_t this_level_sector;
   size_t offsets[3];
-  size_t offset_cnt;
+  size_t offset_cnt=0;
   off_t sector_idx=offset/BLOCK_SECTOR_SIZE;
-  if (sector_idx < 123) 
+  if (sector_idx<123) 
   {
     offsets[0]=sector_idx;
     offset_cnt=1;
   }else{
-    sector_idx -= 123;
-    if (sector_idx < PTRS_PER_SECTOR * INDIRECT_CNT)
+    sector_idx-=123;
+    if (sector_idx<PTRS_PER_SECTOR * INDIRECT_CNT)
     {
-      offsets[0] = 123 + sector_idx / PTRS_PER_SECTOR;
-      offsets[1] = sector_idx % PTRS_PER_SECTOR;
-      offset_cnt = 2;
+      offsets[0]=123 + sector_idx / PTRS_PER_SECTOR;
+      offsets[1]=sector_idx % PTRS_PER_SECTOR;
+      offset_cnt=2;
     }else{
-      sector_idx -= PTRS_PER_SECTOR * INDIRECT_CNT;
+      sector_idx-=PTRS_PER_SECTOR*INDIRECT_CNT;
       if (sector_idx < DBL_INDIRECT_CNT * PTRS_PER_SECTOR * PTRS_PER_SECTOR)
       {
-        offsets[0] = (DIRECT_CNT + INDIRECT_CNT+ sector_idx / (PTRS_PER_SECTOR * PTRS_PER_SECTOR));
-        offsets[1] = sector_idx / PTRS_PER_SECTOR;
-        offsets[2] = sector_idx % PTRS_PER_SECTOR;
-        offset_cnt = 3;
+        offsets[0]=(DIRECT_CNT + INDIRECT_CNT+ sector_idx / (PTRS_PER_SECTOR * PTRS_PER_SECTOR));
+        offsets[1]=sector_idx / PTRS_PER_SECTOR;
+        offsets[2]=sector_idx % PTRS_PER_SECTOR;
+        offset_cnt=3;
       }
     }
   }
 
   size_t level = 0;
-  this_level_sector = inode->sector;
-  for (;;) 
+  block_sector_t sector = inode->sector;
+  while(1){
+    struct cache_entry *c=cache_lock(sector,0);
+    uint32_t *data=cache_read(c);
+    data = cache_read (c);
+    if(data[offsets[level]]!=0)
     {
-      struct cache_entry *this_level_block;
-      uint32_t *this_level_data;
-
-      struct cache_entry *next_level_block;
-
-      /* Check whether the block for the next level is allocated. */
-      this_level_block = cache_lock (this_level_sector, 0);
-      this_level_data = cache_read (this_level_block);
-      if (this_level_data[offsets[level]] != 0)
+      sector = data[offsets[level]];
+      level++;
+      if (level==offset_cnt) 
+      {
+        if ((level==0 && offsets[level]+1<DIRECT_CNT) || (level>0 && offsets[level]+1 < PTRS_PER_SECTOR)) 
         {
-          /* Yes, it's allocated.  Advance to next level. */
-          this_level_sector = this_level_data[offsets[level]];
-
-          if (++level == offset_cnt) 
-            {
-              /* We hit the data block.
-                 Do read-ahead. */
-              if ((level == 0 && offsets[level] + 1 < DIRECT_CNT)
-                  || (level > 0 && offsets[level] + 1 < PTRS_PER_SECTOR)) 
-                {
-                  uint32_t next_sector = this_level_data[offsets[level] + 1];
-                  if (next_sector
-                      && next_sector < block_size (fs_device))
-                    cache_readahead (next_sector); 
-                }
-              cache_unlock (this_level_block);
-
-              /* Return block. */
-              *data_block = cache_lock (this_level_sector, 0);
-              return true;
-            }
-          cache_unlock (this_level_block);
-          continue;
+          uint32_t next_sector=data[offsets[level]+1];
+          if (next_sector && next_sector < block_size(fs_device)){
+            cache_readahead (next_sector); 
+          }
         }
-      cache_unlock (this_level_block);
-
-      /* No block is allocated.  Nothing is locked.
-         If we're not allocating new blocks, then this is
-         "success" (with all-zero data). */
-      if (!allocate) 
-        {
-          *data_block = NULL;
-          return true;
-        }
-
-      /* We need to allocate a new block.
-         Grab an exclusive lock on this level's block so we can
-         insert the new block. */
-      this_level_block = cache_lock (this_level_sector, 1);
-      this_level_data = cache_read (this_level_block);
-
-      /* Since we released this level's block, someone else might
-         have allocated the block in the meantime.  Recheck. */
-      if (this_level_data[offsets[level]] != 0)
-        {
-          cache_unlock (this_level_block);
-          continue;
-        }
-
-      /* Allocate the new block. */
-      if (!free_map_allocate (&this_level_data[offsets[level]]))
-        {
-          cache_unlock (this_level_block);
-          *data_block = NULL;
-          return false;
-        }
-        this_level_block->dirty=true;
-
-      /* Lock and clear the new block. */
-      next_level_block = cache_lock (this_level_data[offsets[level]],1);
-      memset (next_level_block->data, 0, BLOCK_SECTOR_SIZE);
-      next_level_block->correct = true;
-      next_level_block->dirty = true;
-
-      /* Release this level's block.  No one else can access the
-         new block yet, because we have an exclusive lock on it. */
-      cache_unlock (this_level_block);
-
-      /* If this is the final level, then return the new block. */
-      if (level == offset_cnt - 1) 
-        {
-          *data_block = next_level_block;
-          return true;
-        }
-
-      /* Otherwise, release the new block and go around again to
-         follow the new pointer. */
-      cache_unlock (next_level_block);
+        cache_unlock (c);
+        *data_block=cache_lock (sector, 0);
+        return true;
+      }
+      cache_unlock (c);
+      continue;
     }
+    cache_unlock (c);
+    if (!allocate) 
+    {
+      *data_block = NULL;
+      return true;
+    }
+    c=cache_lock(sector, 1);
+    data=cache_read(c);
+    if (data[offsets[level]] != 0)
+    {
+      cache_unlock (c);
+      continue;
+    }
+    if (!free_map_allocate (&data[offsets[level]]))
+    {
+      cache_unlock (c);
+      *data_block = NULL;
+      return false;
+    }
+    c->dirty=true;
+    next_cache=cache_lock(data[offsets[level]],1);
+    memset(next_cache->data,0,BLOCK_SECTOR_SIZE);
+    next_cache->correct = true;
+    next_cache->dirty = true;
+    cache_unlock (c);
+    if (level == offset_cnt - 1) 
+    {
+      *data_block = next_cache;
+      return true;
+    }
+    cache_unlock (next_cache);
+  }
 }
 
 /* Reads SIZE bytes from INODE into BUFFER, starting at position OFFSET.
