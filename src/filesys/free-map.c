@@ -30,7 +30,7 @@ bool
 free_map_allocate (block_sector_t *sectorp)
 {
   lock_acquire (&free_map_lock);
-  block_sector_t sector = bitmap_scan_and_flip (free_map, 0, 1, false);
+  size_t sector = bitmap_scan_and_flip (free_map, 0, 1, false);
   lock_release (&free_map_lock);
   if (sector != BITMAP_ERROR) 
      *sectorp = sector;
