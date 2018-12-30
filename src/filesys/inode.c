@@ -220,7 +220,8 @@ void inode_deallocate (block_sector_t sector, int level) {
         c->sector=(block_sector_t)-1;
       }
       lock_release(&c->lock);
-      break;
+      free_map_release(sector);
+      return;
     }
     lock_release(&c->lock);
   }
