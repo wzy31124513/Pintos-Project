@@ -528,8 +528,8 @@ setup_stack (void **esp,char* file_name)
         palloc_free_page (kpage);
     }
 
-  char **argv = malloc (DEFAULT_ARGV_SIZE * sizeof(char *));
-  int argc = 0, argv_size = DEFAULT_ARGV_SIZE;
+  char **argv = malloc (2 * sizeof(char *));
+  int argc = 0, argv_size = 2;
 
   for (token = (char *)file_name; token != NULL;
        token = strtok_r (NULL, " ", save_ptr))
@@ -546,7 +546,7 @@ setup_stack (void **esp,char* file_name)
     memcpy (*esp, token, strlen (token) + 1); 
   }
 
-  size_t align = ((size_t) *esp) & (WORD_SIZE - 1);
+  size_t align = ((size_t) *esp) & (4 - 1);
   if (align) 
   {
    *esp -= align;
