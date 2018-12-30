@@ -477,10 +477,8 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   t->fd_num=2;
   list_init (&t->file_list);
   t->self=NULL;
-  list_init (&t->mappings);
   sema_init (&t->timer_sema, 0);
   t->pagedir=NULL;
-  t->pages=NULL;
   t->wd=NULL;
   list_push_back (&all_list, &t->allelem);
 }

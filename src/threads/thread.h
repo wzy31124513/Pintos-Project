@@ -99,13 +99,10 @@ struct thread
     struct list children;
     int fd_num;
     struct list file_list;
-    struct hash *pages;
     struct file *self;
-    struct list mappings;
     int64_t wakeup_time;
     struct list_elem timer_elem;
     struct semaphore timer_sema;
-    void *user_esp;
     struct dir *wd;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

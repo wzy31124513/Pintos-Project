@@ -149,13 +149,10 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* Allow the pager to try to handle it. */
-  if (user && not_present)
-    {
-      if (!load_fault (fault_addr))
-        exit1(-1);
-      return;
-    }
+  if ((!is_user_vaddr(fault_addr) && user)||not_present)
+  {
+    exit(-1);
+  }
 
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
