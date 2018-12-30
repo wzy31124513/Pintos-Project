@@ -59,7 +59,7 @@ void cache_flush (void) {
 struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
  try_again:
   lock_acquire (&search_lock);
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector != sector) 
@@ -89,7 +89,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock);
      return b;
   }
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[i];
     lock_acquire (&b->lock);
     if (b->sector == (block_sector_t)-1) {
@@ -107,7 +107,7 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
     lock_release (&b->lock); 
   }
 
-  for (i = 0; i < 64; i++){
+  for (int i = 0; i < 64; i++){
     struct cache_entry *b = &cache[m%64];
     m++;
     lock_acquire (&b->lock);
@@ -238,7 +238,7 @@ static void readahead (void *aux UNUSED)
     }
     r=list_entry(list_pop_front(&readahead_list),struct readahead_block,elem);
     lock_release (&readahead_lock);
-    struct cache_entry* c=cache_lock(ra_block->sector, 0);
+    struct cache_entry* c=cache_lock(r->sector, 0);
     cache_read(c);
     cache_unlock(c);
     free (r);
