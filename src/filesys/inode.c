@@ -199,7 +199,7 @@ void inode_deallocate (block_sector_t sector, int level) {
   {
     struct cache_entry* c=cache_lock(sector,1);
     block_sector_t* block=cache_read(c);
-    for (int i = 0; i < (off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)); ++i)
+    for (int i = 0; i < PTRS_PER_SECTOR; ++i)
     {
       if (block[i])
       {
@@ -208,24 +208,22 @@ void inode_deallocate (block_sector_t sector, int level) {
     }
     cache_unlock(c);
   }
-  lock_acquire(&search_lock);
-  for (int i = 0; i < 64; ++i)
-  {
-    struct cache_entry* c=&cache[i];
-    lock_acquire(&c->lock);
-    if (c->sector==sector)
-    {
-      if (c->readers==0 && c->read_waiters==0 && c->writers==0 && c->write_waiters==0)
-      {
-        c->sector=(block_sector_t)-1;
+  lock_acquire (&search_lock);
+  for (int i = 0; i < 64; i++){
+    struct cache_entry *b = &cache[i];
+    lock_acquire (&b->lock);
+    if (b->sector == sector) {
+      lock_release (&search_lock);
+      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
+        b->sector = (block_sector_t)-1; 
       }
-      lock_release(&c->lock);
-      free_map_release(sector);
+      lock_release (&b->lock);
+      free_map_release (sector);
       return;
     }
-    lock_release(&c->lock);
+    lock_release (&b->lock);
   }
-  lock_release(&search_lock);
+  lock_release (&search_lock);
   free_map_release(sector);
 }
 
@@ -515,10 +513,11 @@ void
 inode_deny_write (struct inode *inode) 
 {
   lock_acquire (&inode->deny_write);
-  while (inode->writer_cnt > 0)
+  while (inode->writer_cnt>0){
     cond_wait (&inode->no_writers, &inode->deny_write);
-  ASSERT (inode->deny_write_cnt < inode->open_cnt);
+  }
   inode->deny_write_cnt++;
+  ASSERT (inode->deny_write_cnt < inode->open_cnt);
   lock_release (&inode->deny_write);
 }
 
@@ -528,22 +527,21 @@ inode_deny_write (struct inode *inode)
 void
 inode_allow_write (struct inode *inode) 
 {
-  lock_acquire (&inode->deny_write);
+  lock_acquire(&inode->deny_write);
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
   inode->deny_write_cnt--;
-  lock_release (&inode->deny_write);
+  lock_release(&inode->deny_write);
 }
 
 /* Returns the length, in bytes, of INODE's data. */
 off_t
 inode_length (const struct inode *inode)
 {
-  struct cache_entry *inode_block = cache_lock (inode->sector, 0);
-  struct inode_disk *disk_inode = cache_read (inode_block);
-  off_t length = disk_inode->length;
+  struct cache_entry *inode_block=cache_lock(inode->sector, 0);
+  struct inode_disk *disk=cache_read(inode_block);
   cache_unlock (inode_block);
-  return length;
+  return disk->length;
 }
 
 /* Returns the number of openers. */
