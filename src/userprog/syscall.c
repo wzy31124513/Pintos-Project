@@ -40,96 +40,27 @@ static int sys_isdir (int handle);
 static int sys_inumber (int handle);
  
 static void syscall_handler (struct intr_frame *);
-static void copy_in (void *, const void *, size_t);
+static void argcpy(void* cp,const void* addr1,size_t size);
  
-void
-syscall_init (void) 
-{
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-}
+
  
-/* System call handler. */
-static void
-syscall_handler (struct intr_frame *f) 
-{
-  typedef int syscall_function (int, int, int);
-
-  /* A system call. */
-  struct syscall 
-    {
-      size_t arg_cnt;           /* Number of arguments. */
-      syscall_function *func;   /* Implementation. */
-    };
-
-  /* Table of system calls. */
-  static const struct syscall syscall_table[] =
-    {
-      {0, (syscall_function *) sys_halt},
-      {1, (syscall_function *) sys_exit},
-      {1, (syscall_function *) sys_exec},
-      {1, (syscall_function *) sys_wait},
-      {2, (syscall_function *) sys_create},
-      {1, (syscall_function *) sys_remove},
-      {1, (syscall_function *) sys_open},
-      {1, (syscall_function *) sys_filesize},
-      {3, (syscall_function *) sys_read},
-      {3, (syscall_function *) sys_write},
-      {2, (syscall_function *) sys_seek},
-      {1, (syscall_function *) sys_tell},
-      {1, (syscall_function *) sys_close},
-      {2, (syscall_function *) sys_mmap},
-      {1, (syscall_function *) sys_munmap},
-      {1, (syscall_function *) sys_chdir},
-      {1, (syscall_function *) sys_mkdir},
-      {2, (syscall_function *) sys_readdir},
-      {1, (syscall_function *) sys_isdir},
-      {1, (syscall_function *) sys_inumber},
-    };
-
-  const struct syscall *sc;
-  unsigned call_nr;
-  int args[3];
-
-  /* Get the system call. */
-  copy_in (&call_nr, f->esp, sizeof call_nr);
-  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
-    thread_exit ();
-  sc = syscall_table + call_nr;
-
-  /* Get the system call arguments. */
-  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
-  memset (args, 0, sizeof args);
-  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
-
-  /* Execute the system call,
-     and set the return value. */
-  f->eax = sc->func (args[0], args[1], args[2]);
-}
- 
-/* Copies SIZE bytes from user address USRC to kernel address
-   DST.
-   Call thread_exit() if any of the user accesses are invalid. */
-static void
-copy_in (void *dst_, const void *usrc_, size_t size) 
-{
-  uint8_t *dst = dst_;
-  const uint8_t *usrc = usrc_;
-
-  while (size > 0) 
-    {
-      size_t chunk_size = PGSIZE - pg_ofs (usrc);
-      if (chunk_size > size)
-        chunk_size = size;
-      
-      if (!page_lock (usrc, false))
-        thread_exit ();
-      memcpy (dst, usrc, chunk_size);
-      page_unlock (usrc);
-
-      dst += chunk_size;
-      usrc += chunk_size;
-      size -= chunk_size;
+static void argcpy(void* cp,const void* addr1,size_t size){
+  uint8_t *dst=cp;
+  const uint8_t *addr=addr1;
+  while(size>0){
+    size_t s=PGSIZE-pg_ofs(addr);
+    if(s>size){
+      s=size;
     }
+    if(!page_lock(addr,false)){
+      exit1(-1);
+    }
+    memcpy(dst,addr,s);
+    page_unlock(addr);
+    dst+=s;
+    addr+=s;
+    size-=s;
+  }
 }
  
 /* Copies SIZE bytes from kernel address SRC to user address
@@ -692,4 +623,103 @@ syscall_exit (void)
     }
 
   dir_close (cur->wd);
+}
+
+
+void
+syscall_init (void)
+{
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+static void
+syscall_handler (struct intr_frame *f)
+{
+  unsigned func;
+  int args[3];
+  argcpy(&func,f->esp,sizeof(func));
+
+  memset(args,0,sizeof(args));
+  if (func==SYS_HALT)
+  {
+    sys_halt();
+  }else if (func==SYS_EXIT)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    sys_exit(args[0]);
+  }else if (func==SYS_EXEC)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_exec((const char *)args[0]);
+  }else if (func==SYS_WAIT)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_wait(args[0]);
+  }else if (func==SYS_CREATE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_create((const char *)args[0],(unsigned)args[1]);
+  }else if (func==SYS_REMOVE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_remove((const char *)args[0]);
+  }else if (func==SYS_OPEN){
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_open((const char *)args[0]);
+  }
+  else if (func==SYS_FILESIZE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_filesize(args[0]);
+  }else if (func==SYS_READ)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=sys_read(args[0],(void*)args[1],args[2]);
+  }else if (func==SYS_WRITE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
+    f->eax=sys_write(args[0],(void*)args[1],args[2]);
+  }else if (func==SYS_SEEK)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_seek(args[0],args[1]);
+  }else if (func==SYS_TELL)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_tell(args[0]);
+  }else if (func==SYS_CLOSE)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_close(args[0]);
+  }else if (func==SYS_MMAP)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_mmap(args[0],(void*)args[1]);
+  }else if (func==SYS_MUNMAP)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_munmap(args[0]);
+  }else if (func==SYS_CHDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_chdir(args[0]);
+  }else if (func==SYS_MKDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_mkdir((const char *)args[0]);
+  }else if (func==SYS_READDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=sys_readdir(args[0],args[1]);
+  }else if (func==SYS_ISDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+   f->eax=sys_isdir(args[0]);
+  }else if (func==SYS_INUMBER)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=sys_inumber(args[0]);
+  }else{
+    thread_exit();
+  }
 }
