@@ -118,23 +118,23 @@ syscall_handler (struct intr_frame *f)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_munmap(args[0]);
-  }else if (*esp==SYS_CHDIR)
+  }else if (func==SYS_CHDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_chdir(args[0]);
-  }else if (*esp==SYS_MKDIR)
+  }else if (func==SYS_MKDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_mkdir((const char *)*(esp+1));
-  }else if (*esp==SYS_READDIR)
+  }else if (func==SYS_READDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=sys_readdir(args[0],args[1]);
-  }else if (*esp==SYS_ISDIR)
+  }else if (func==SYS_ISDIR)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
    f->eax= sys_isdir(args[0]);
-  }else if (*esp==SYS_INUMBER)
+  }else if (func==SYS_INUMBER)
   {
     copy_in(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=sys_inumber(args[0]);
