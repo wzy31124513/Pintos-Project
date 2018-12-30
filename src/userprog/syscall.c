@@ -41,6 +41,7 @@ static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
+static struct fds * getfile (int fd);
 static struct fds * lookup_file_fd (int fd);
 static struct fds * lookup_dir_fd (int fd);
 static struct mapping * getmap (int handle);
