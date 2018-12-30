@@ -93,21 +93,23 @@ bool remove(const char* file){
 
 
 int open(const char* file){
-  char *fn_copy = strcpy_to_kernel (file);
+  char *kfile = strcpy_to_kernel(file);
   struct fds *fd;
   int handle = -1;
-  fd = malloc(sizeof(struct fds));
+  fd = calloc (1, sizeof *fd);
   if (fd != NULL){
-    struct inode *inode = filesys_open (fn_copy);
+    struct inode *inode = filesys_open (kfile);
     if (inode != NULL){
       if (inode_get_type (inode) == FILE_INODE){
-        fd->file=file_open(inode);
-      }else{
-        fd->dir=dir_open(inode);
+        fd->file = file_open (inode);
       }
-      if(fd->file!=NULL||fd->dir!=NULL){
+      else{
+        fd->dir = dir_open (inode);
+      }
+      if (fd->file != NULL || fd->dir != NULL)
+      {
         struct thread *cur = thread_current ();
-        handle=fd->handle=cur->next_handle++;
+        handle = fd->handle = cur->next_handle++;
         list_push_front (&cur->fds, &fd->elem);
       }else {
         free (fd);
@@ -115,14 +117,13 @@ int open(const char* file){
       }
     }
   }
-  palloc_free_page (fn_copy);
+  palloc_free_page (kfile);
   return handle;
 }
 
 
 
-int filesize(int fd)
-{
+int filesize(int fd){
   struct fds* f=lookup_file_fd(fd);
   int ret;
   ret=file_length(f->file);
