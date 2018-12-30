@@ -393,7 +393,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Sector to write, starting byte offset within sector, sector data. */
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
       struct cache_entry *block;
-      uint8_t *sector_data;
 
       /* Bytes to max inode size, bytes left in sector, lesser of the two. */
       off_t inode_left = INODE_SPAN - offset;
