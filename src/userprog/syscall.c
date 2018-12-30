@@ -330,7 +330,7 @@ syscall_handler (struct intr_frame *f)
   }else if (*esp==SYS_EXIT)
   {
     is_valid_vaddr(esp+1);
-    exit(*(esp+1));
+    exit1(*(esp+1));
   }else if (*esp==SYS_EXEC)
   {
     is_valid_vaddr(esp+1);
