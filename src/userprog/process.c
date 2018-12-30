@@ -34,14 +34,21 @@ process_execute (const char *file_name)
   char* name=malloc(strlen(file_name)+1);
   char *p;
   tid_t tid;
+
   struct exec_table exec;
   exec.file_name = file_name;
+  sema_init (&exec.load,0);
 
   struct dir *wd = thread_current ()->wd;
-  exec.wd = wd != NULL ? dir_reopen (wd) : dir_open_root ();
-  if (exec.wd == NULL)
+  if (wd=NULL)
+  {
+    exec.wd=dir_reopen (wd);
+  }else{
+    exec.wd=dir_open_root ();
+  }
+  if (exec.wd == NULL){
     return TID_ERROR;
-  sema_init (&exec.load,0);
+  }
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name,file_name,strlen(file_name)+1);
