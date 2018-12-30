@@ -253,7 +253,7 @@ dir_remove (struct dir *dir, const char *name)
     while(inode_read_at(inode,&scan,sizeof(scan),scan_ofs)==sizeof(scan)){
       if (scan.in_use)
       {
-        in_ust_cnt++;
+        in_use_cnt++;
       }
       scan_ofs+=sizeof(scan);
     }
