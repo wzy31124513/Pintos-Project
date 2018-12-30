@@ -577,7 +577,7 @@ struct inode * file_create (block_sector_t sector, off_t length) {
 bool is_directory (const struct inode * inode){
   struct cache_entry *cache=cache_lock(inode->sector, 0);
   struct inode_disk *disk=cache_read(cache);
-  bool ret=disk_inode->directory;
-  cache_unlock(inode_block);
+  bool ret=disk->directory;
+  cache_unlock(cache);
   return ret;
 }
