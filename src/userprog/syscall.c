@@ -93,66 +93,32 @@ bool remove(const char* file){
 
 
 int open(const char* file){
-  char* fn_copy=strcpy_to_kernel(file);
-  struct fds* f=malloc(sizeof(struct fds));
-  int fd=-1;
-  if (f!=NULL)
-  {
-    struct inode *inode=filesys_open(fn_copy);
+  char *fn_copy = strcpy_to_kernel (file);
+  struct fds *fd;
+  int handle = -1;
+  fd = malloc(sizeof(struct fds));
+  if (fd != NULL){
+    struct inode *inode = filesys_open (fn_copy);
     if (inode != NULL){
-      if (inode_get_type(inode)== 0){
-        f->file=file_open(inode);
+      if (inode_get_type (inode) == FILE_INODE){
+        fd->file=file_open(inode);
       }else{
-        f->dir=dir_open(inode);
+        fd->dir=dir_open(inode);
       }
-      if (f->file!= NULL||f->dir!=NULL){
-        thread_current()->next_handle++;
-        fd=thread_current()->next_handle;
-        f->handle=fd;
-        list_push_front (&thread_current()->fds,&f->elem);
-      }else{
-        free (f);
+      if(fd->file!=NULL||fd->dir!=NULL){
+        struct thread *cur = thread_current ();
+        handle=fd->handle=cur->next_handle++;
+        list_push_front (&cur->fds, &fd->elem);
+      }else {
+        free (fd);
         inode_close (inode);
       }
     }
   }
   palloc_free_page (fn_copy);
-  return fd;
-}
-
-/*
-int open(const char* file){
-  char *kfile = strcpy_to_kernel (file);
-  struct fds *fd;
-  int handle = -1;
- 
-  fd = calloc (1, sizeof *fd);
-  if (fd != NULL)
-    {
-      struct inode *inode = filesys_open (kfile);
-      if (inode != NULL)
-        {
-          if (inode_get_type (inode) == FILE_INODE)
-            fd->file = file_open (inode);
-          else
-            fd->dir = dir_open (inode);
-          if (fd->file != NULL || fd->dir != NULL)
-            {
-              struct thread *cur = thread_current ();
-              handle = fd->handle = cur->next_handle++;
-              list_push_front (&cur->fds, &fd->elem);
-            }
-          else 
-            {
-              free (fd);
-              inode_close (inode);
-            }
-        }
-    }
-  palloc_free_page (kfile);
   return handle;
 }
-*/
+
 
 
 int filesize(int fd)
