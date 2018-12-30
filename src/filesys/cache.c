@@ -183,23 +183,6 @@ struct cache_entry * cache_lock (block_sector_t sector,bool exclusive){
   goto try_again;
 }
 
-
-
-
-void * cache_zero (struct cache_entry *b) {
-  memset (b->data, 0, BLOCK_SECTOR_SIZE);
-  b->correct = true;
-  b->dirty = true;
-  return b->data;
-}
-
-
-void cache_dirty (struct cache_entry *b) 
-{
-  b->dirty = true;
-}
-
-
 void cache_unlock (struct cache_entry *b){
   lock_acquire (&b->lock);
   if (b->readers) {
