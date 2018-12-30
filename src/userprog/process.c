@@ -21,7 +21,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
-
+static bool install_page (void *upage, void *kpage, bool writable);
 /* Data structure shared between process_execute() in the
    invoking thread and start_process() in the newly invoked
    thread. */
