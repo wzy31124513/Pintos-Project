@@ -517,7 +517,7 @@ setup_stack (void **esp,char* file_name)
   uint8_t *kpage;
   bool success = false;
   char *token;
-
+  char ** save_ptr;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
