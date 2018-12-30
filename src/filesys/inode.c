@@ -531,11 +531,11 @@ inode_deny_write (struct inode *inode)
 void
 inode_allow_write (struct inode *inode) 
 {
-  lock_acquire (&inode->deny_write_lock);
+  lock_acquire (&inode->deny_write);
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
   inode->deny_write_cnt--;
-  lock_release (&inode->deny_write_lock);
+  lock_release (&inode->deny_write);
 }
 
 /* Returns the length, in bytes, of INODE's data. */
@@ -581,11 +581,4 @@ struct inode * file_create(block_sector_t sector, off_t length) {
   return inode;
 }
 
-int inode_open_cnt (const struct inode * inode) 
-{
-  int open_cnt;
-  lock_acquire (&open_inodes_lock);
-  open_cnt = inode->open_cnt;
-  lock_release (&open_inodes_lock);
-  return open_cnt;
-}
+
