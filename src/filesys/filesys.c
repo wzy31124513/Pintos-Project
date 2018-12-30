@@ -13,7 +13,7 @@
 struct block *fs_device;
 
 static void do_format (void);
-static bool name2entry(const char *name,struct dir **dir, char* base_name);
+static bool name2entry(const char *name,struct dir **dir, char name[15]);
 static int get_next_part (char *name, const char **srcp);
 /* Initializes the file system module.
    If FORMAT is true, reformats the file system. */
@@ -105,7 +105,7 @@ filesys_open (const char *name)
   }
 }
 
-static bool name2entry (const char *name,struct dir **dirp, char base_name[15]) 
+static bool name2entry (const char *name,struct dir **dir, char base_name[15]) 
 {
   struct dir* d;
   struct inode* inode;
@@ -165,16 +165,6 @@ static bool name2entry (const char *name,struct dir **dirp, char base_name[15])
   return true;
 }
 
-
-
-
-
-
-/* Extracts a file name part from *SRCP into PART,
-   and updates *SRCP so that the next call will return the next
-   file name part.
-   Returns 1 if successful, 0 at end of string, -1 for a too-long
-   file name part. */
 static int get_next_part (char part[NAME_MAX], const char **srcp)
 {
   const char *src = *srcp;
@@ -225,21 +215,7 @@ filesys_remove (const char *name)
   
   return success;
 }
-/* Change current directory to NAME.
-   Return true if successful, false on failure. */
-bool
-filesys_chdir (const char *name) 
-{
-  struct dir *dir = dir_open (resolve_name_to_inode (name));
-  if (dir != NULL) 
-    {
-      dir_close (thread_current ()->wd);
-      thread_current ()->wd = dir;
-      return true;
-    }
-  else
-    return false;
-}
+
 
 /* Formats the file system. */
 static void
