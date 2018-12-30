@@ -170,7 +170,7 @@ resolve_name_to_inode (const char *name)
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size, enum inode_type type) 
+filesys_create (const char *name, off_t initial_size, bool directory) 
 {
   struct dir *dir;
   char base_name[NAME_MAX + 1];
@@ -181,7 +181,7 @@ filesys_create (const char *name, off_t initial_size, enum inode_type type)
   if (success) 
     {
       struct inode *inode;
-      if (type == FILE_INODE)
+      if (type == 0)
         inode = file_create (inode_sector, initial_size);
       else
         inode = dir_create (inode_sector,
