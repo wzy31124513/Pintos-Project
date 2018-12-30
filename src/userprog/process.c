@@ -36,13 +36,12 @@ process_execute (const char *file_name)
   tid_t tid;
   struct exec_table exec;
   exec.file_name = file_name;
-  sema_init (&exec.load,0);
 
   struct dir *wd = thread_current ()->wd;
   exec.wd = wd != NULL ? dir_reopen (wd) : dir_open_root ();
   if (exec.wd == NULL)
     return TID_ERROR;
-
+  sema_init (&exec.load,0);
 
   /* Create a new thread to execute FILE_NAME. */
   strlcpy (name,file_name,strlen(file_name)+1);
@@ -314,7 +313,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy (name,file_name,strlen(file_name)+1);
   strtok_r (name," ",&p);
   /* Open executable file. */
-  file=filesys_open(name);
+  file=file_open(filesys_open(name));
   t->self=file;
   free(name);
 
