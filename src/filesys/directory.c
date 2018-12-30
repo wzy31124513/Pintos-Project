@@ -30,7 +30,7 @@ struct dir_entry
 struct inode *
 dir_create (block_sector_t sector, block_sector_t parent_sector)
 {
-  struct inode *inode = DIR_INODE (sector, 1);
+  struct inode *inode = filesys_create (sector, 1);
   if (inode != NULL) 
     {
       struct dir_entry entries[2];
@@ -236,7 +236,7 @@ dir_remove (struct dir *dir, const char *name)
     goto done;
 
   /* Verify that it is not an in-use or non-empty directory. */  
-  if(inode_get_type(inode) == DIR_INODE)
+  if(is_directory(inode) == 1)
   {
     if(inode_open_cnt(inode) > 1)
       goto done;
