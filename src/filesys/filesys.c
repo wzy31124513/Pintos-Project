@@ -212,9 +212,10 @@ filesys_remove (const char *name)
 static void
 do_format (void)
 {
+  struct inode* inode;
   printf ("Formatting file system...");
   free_map_create ();
-  struct inode* inode = dir_create (ROOT_DIR_SECTOR, ROOT_DIR_SECTOR);
+  inode = dir_create (ROOT_DIR_SECTOR, ROOT_DIR_SECTOR);
   if (inode == NULL)
     PANIC ("root directory creation failed");
   inode_close (inode);  
