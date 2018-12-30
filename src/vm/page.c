@@ -49,7 +49,7 @@ static struct page * find_page(const void* addr){
     {
       return hash_entry(e,struct page,elem);
     }else if (PHYS_BASE-addr<=(1024*1024)){
-      if (addr>=thread_current()->esp-32)
+      if (addr>=thread_current()->user_esp-32)
       {
         return page_alloc((void*)addr,false);
       }
