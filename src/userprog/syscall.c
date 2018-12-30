@@ -516,10 +516,10 @@ sys_mmap (int handle, void *addr)
           unmap (m);
           return -1;
         }
-      p->private = false;
+      p->mmap = false;
       p->file = m->file;
-      p->file_offset = offset;
-      p->file_bytes = length >= PGSIZE ? PGSIZE : length;
+      p->offset = offset;
+      p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
       offset += p->file_bytes;
       length -= p->file_bytes;
       m->page_cnt++;
