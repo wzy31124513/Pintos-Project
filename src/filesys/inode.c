@@ -234,7 +234,7 @@ deallocate_recursive (block_sector_t sector, int level)
         b->sector = (block_sector_t)-1; 
       }
       lock_release (&b->lock);
-      break;
+      return;
     }
     lock_release (&b->lock);
   }
