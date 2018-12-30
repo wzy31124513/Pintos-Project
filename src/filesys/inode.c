@@ -43,22 +43,6 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
 
-/* In-memory inode. */
-struct inode 
-  {
-    struct list_elem elem;              /* Element in inode list. */
-    block_sector_t sector;              /* Sector number of disk location. */
-    int open_cnt;                       /* Number of openers. */
-    bool removed;                       /* True if deleted, false otherwise. */
-    struct lock lock;                   /* Protects the inode. */
-
-    /* Denying writes. */
-    struct lock deny_write_lock;        /* Protects members below. */
-    struct condition no_writers_cond;   /* Signaled when no writers. */ 
-    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    int writer_cnt;                     /* Number of writers. */
-  };
-
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
