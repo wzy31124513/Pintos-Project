@@ -416,85 +416,86 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  int *esp=f->esp;
+  unsigned func;
+  argcpy(&func,f->esp,sizeof(func));
   int args[3];
   memset(args,0,sizeof(args));
-  if (*esp==SYS_HALT)
+  if (func==SYS_HALT)
   {
     halt();
-  }else if (*esp==SYS_EXIT)
+  }else if (func==SYS_EXIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     exit1(args[0]);
-  }else if (*esp==SYS_EXEC)
+  }else if (func==SYS_EXEC)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=exec((const char *)args[0]);
-  }else if (*esp==SYS_WAIT)
+  }else if (func==SYS_WAIT)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=wait(args[0]);
-  }else if (*esp==SYS_CREATE)
+  }else if (func==SYS_CREATE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=create((const char *)args[0],(unsigned)args[1]);
-  }else if (*esp==SYS_REMOVE)
+  }else if (func==SYS_REMOVE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=remove((const char *)args[0]);
-  }else if (*esp==SYS_OPEN){
+  }else if (func==SYS_OPEN){
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=open((const char *)args[0]);
   }
-  else if (*esp==SYS_FILESIZE)
+  else if (func==SYS_FILESIZE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=filesize(args[0]);
-  }else if (*esp==SYS_READ)
+  }else if (func==SYS_READ)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=read(args[0],(void*)args[1],args[2]);
-  }else if (*esp==SYS_WRITE)
+  }else if (func==SYS_WRITE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*3);
     f->eax=write(args[0],(void*)args[1],args[2]);
-  }else if (*esp==SYS_SEEK)
+  }else if (func==SYS_SEEK)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     seek(args[0],args[1]);
-  }else if (*esp==SYS_TELL)
+  }else if (func==SYS_TELL)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=tell(args[0]);
-  }else if (*esp==SYS_CLOSE)
+  }else if (func==SYS_CLOSE)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     close(args[0]);
-  }else if (*esp==SYS_MMAP)
+  }else if (func==SYS_MMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=mmap(args[0],(void*)args[1]);
-  }else if (*esp==SYS_MUNMAP)
+  }else if (func==SYS_MUNMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     munmap(args[0]);
-  }else if (*esp==SYS_CHDIR)
+  }else if (func==SYS_CHDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=chdir((const char *)args[0]);
-  }else if (*esp==SYS_MKDIR)
+  }else if (func==SYS_MKDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=mkdir((const char *)args[0]);
-  }else if (*esp==SYS_READDIR)
+  }else if (func==SYS_READDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
     f->eax=readdir(args[0],(char*)args[1]);
-  }else if (*esp==SYS_ISDIR)
+  }else if (func==SYS_ISDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=isdir(args[0]);
-  }else if (*esp==SYS_INUMBER)
+  }else if (func==SYS_INUMBER)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     f->eax=inumber(args[0]);
