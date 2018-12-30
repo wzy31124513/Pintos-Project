@@ -123,7 +123,7 @@ int open(const char* file){
   if (fd != NULL){
     struct inode *inode = filesys_open (kfile);
     if (inode != NULL){
-      if (inode_get_type (inode) == FILE_INODE){
+      if (is_directory (inode)==0){
         fd->file = file_open (inode);
       }
       else{
