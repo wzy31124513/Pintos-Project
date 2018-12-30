@@ -4,9 +4,10 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
+#include <string.h>
 
-
-
+static void flushd (void *aux);
+static void readaheadd (void *aux);
 
 void cache_init (void) {
   lock_init(&search_lock);
@@ -207,7 +208,7 @@ void cache_free (block_sector_t sector) {
   lock_release (&search_lock);
 }
 
-void flushd (void *aux UNUSED) {
+static void flushd (void *aux UNUSED) {
   for (;;) 
     {
       timer_msleep (30 * 1000);
@@ -229,7 +230,7 @@ void cache_readahead (block_sector_t sector) {
   lock_release (&readahead_lock);
 }
 
-void readaheadd (void *aux UNUSED) 
+static void readaheadd (void *aux UNUSED) 
 {
   for (;;) 
   {

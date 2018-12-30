@@ -43,7 +43,6 @@ void cache_unlock (struct cache_entry *);
 void cache_free (block_sector_t);
 void cache_readahead (block_sector_t);
 
-void flushd (void *aux);
-void readaheadd (void *aux);
+
 
 #endif /* filesys/cache.h */
