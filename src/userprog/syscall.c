@@ -41,7 +41,10 @@ static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
 static void copy_out (void *udst_, const void *src_, size_t size);
- 
+static struct fds * lookup_file_fd (int fd);
+static struct fds * lookup_dir_fd (int fd);
+static struct mapping * getmap (int handle);
+
 struct fds
 {
   int handle;
@@ -112,37 +115,6 @@ int open(const char* file){
   return fd;
 }
 
-
-static struct fds *lookup_fd (int fd){
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-  for (e = list_begin (&cur->fds); e!=list_end(&cur->fds);e = list_next (e)){
-    struct fds *f=list_entry (e, struct fds, elem);
-    if (f->handle == fd){
-      return f;
-    }
-  }
-  thread_exit ();
-}
-
-static struct fds *lookup_file_fd (int handle) { 
-  struct fds *fd = lookup_fd (handle);
-  if (fd->file == NULL)
-    thread_exit ();
-  return fd;
-}
- 
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with an
-   open directory. */
-static struct fds *
-lookup_dir_fd (int handle) 
-{
-  struct fds *fd = lookup_fd (handle);
-  if (fd->dir == NULL)
-    thread_exit ();
-  return fd;
-}
 
 int filesize(int fd)
 {
@@ -278,7 +250,7 @@ unsigned tell (int handle)
 
 void close (int handle) 
 {
-  struct fds *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   file_close (fd->file);
   dir_close (fd->dir);
   list_remove (&fd->elem);
@@ -287,34 +259,13 @@ void close (int handle)
 
 struct mapping
   {
-    struct list_elem elem;      /* List element. */
-    int handle;                 /* Mapping id. */
-    struct file *file;          /* File. */
-    uint8_t *base;              /* Start of memory mapping. */
-    size_t page_cnt;            /* Number of pages mapped. */
+    struct list_elem elem;
+    int id;
+    struct file *file;
+    uint8_t *base;
+    size_t page_cnt;
   };
 
-/* Returns the file descriptor associated with the given handle.
-   Terminates the process if HANDLE is not associated with a
-   memory mapping. */
-static struct mapping *
-lookup_mapping (int handle) 
-{
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-   
-  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);
-       e = list_next (e))
-    {
-      struct mapping *m = list_entry (e, struct mapping, elem);
-      if (m->handle == handle)
-        return m;
-    }
- 
-  thread_exit ();
-}
-
- 
 
 int mmap (int handle, void *addr)
 {
@@ -344,7 +295,7 @@ int mmap (int handle, void *addr)
       struct page *p = page_alloc ((uint8_t *) addr + offset, false);
       if (p == NULL)
         {
-          munmap (m->base);
+          munmap (m->id);
           return -1;
         }
       p->mmap = false;
@@ -361,7 +312,7 @@ int mmap (int handle, void *addr)
 
 void munmap (int mapping) 
 {
-  struct mapping *m=lookup_mapping (mapping);
+  struct mapping *m=getmap (mapping);
   list_remove (&m->elem);
   for(int i=0;i<m->page_cnt;i++)
   {
@@ -410,7 +361,7 @@ bool readdir (int handle, char *uname)
 
 bool isdir (int handle)
 {
-  struct fds *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   return fd->dir != NULL;
 }
 
@@ -424,7 +375,7 @@ int inumber (int handle)
     return inode_get_inumber(inode);
   }
 
-  struct fds *fd = lookup_fd (handle);
+  struct fds *fd = getfile (handle);
   struct inode *inode = file_get_inode (fd->file);
   return inode_get_inumber (inode);
 }
@@ -449,7 +400,7 @@ syscall_exit (void)
     {
       struct mapping *m = list_entry (e, struct mapping, elem);
       next = list_next (e);
-      munmap (m->base);
+      munmap (m->id);
     }
 
   dir_close (cur->wd);
@@ -626,4 +577,44 @@ static char * strcpy_to_kernel (const char *str){
     }
     page_unlock (addr);
   }
+}
+
+static struct fds * getfile (int fd){
+  struct thread *cur=thread_current ();
+  struct list_elem *e;
+  for (e=list_begin(&cur->fds);e!=list_end(&cur->fds);e=list_next (e)){
+    struct fds *f=list_entry(e,struct fds, elem);
+    if (f->handle == fd){
+      return f;
+    }
+  }
+  thread_exit ();
+}
+
+static struct fds * lookup_file_fd (int fd) { 
+  struct fds *f = getfile (fd);
+  if (f->file == NULL){
+    thread_exit ();
+  }
+  return f;
+}
+
+static struct fds * lookup_dir_fd (int fd) {
+  struct fds *f = getfile (fd);
+  if (f->dir == NULL){
+    thread_exit ();
+  }
+  return f;
+}
+
+static struct mapping * getmap (int handle) {
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  for (e = list_begin (&cur->mappings); e != list_end (&cur->mappings);e=list_next(e)){
+      struct mapping *m =list_entry(e,struct mapping, elem);
+      if (m->id == handle){
+        return m;
+      }
+    }
+  thread_exit ();
 }
