@@ -31,7 +31,6 @@ struct lock search_lock;
 struct lock readahead_lock;
 struct condition readahead_list_nonempty;
 struct list readahead_list;
-size_t mark=0;
 
 void cache_init (void);
 void cache_flush (void);

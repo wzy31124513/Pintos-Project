@@ -8,7 +8,7 @@
 
 static void flushed (void *aux);
 static void readahead (void *aux);
-
+static size_t m=0;
 void cache_init (void) {
   lock_init(&search_lock);
   for (int i = 0; i < 64; ++i)
@@ -110,8 +110,8 @@ cache_lock (block_sector_t sector,bool exclusive)
   }
 
   for (i = 0; i < 64; i++){
-    struct cache_entry *b = &cache[mark%64];
-    mark++;
+    struct cache_entry *b = &cache[m%64];
+    m++;
     lock_acquire (&b->lock);
     if (b->readers || b->writers || b->read_waiters || b->write_waiters) {
       lock_release (&b->lock);
