@@ -18,8 +18,6 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "vm/page.h"
-#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
@@ -200,8 +198,7 @@ process_exit (void)
       release_child (cs);
     }
 
-  /* Destroy the page hash table. */
-  page_exit ();
+
   
   /* Close executable (and allow writes). */
   file_close (cur->bin_file);
@@ -331,11 +328,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  /* Create page hash table. */
-  t->pages = malloc (sizeof *t->pages);
-  if (t->pages == NULL)
-    goto done;
-  hash_init (t->pages, page_hash, page_less, NULL);
 
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
@@ -509,127 +501,102 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  while (read_bytes > 0 || zero_bytes > 0) 
+  while (read_bytes > 0 || zero_bytes > 0)
     {
+      /* Calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-      struct page *p = page_allocate (upage, !writable);
-      if (p == NULL)
+
+      /* Get a page of memory. */
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if (kpage == NULL)
         return false;
-      if (page_read_bytes > 0) 
+
+      /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          p->file = file;
-          p->file_offset = ofs;
-          p->file_bytes = page_read_bytes;
+          palloc_free_page (kpage);
+          return false;
         }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable))
+        {
+          palloc_free_page (kpage);
+          return false;
+        }
+
+      /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;
 }
 
-/* Reverse the order of the ARGC pointers to char in ARGV. */
-static void
-reverse (int argc, char **argv) 
-{
-  for (; argc > 1; argc -= 2, argv++) 
-    {
-      char *tmp = argv[0];
-      argv[0] = argv[argc - 1];
-      argv[argc - 1] = tmp;
-    }
-}
  
-/* Pushes the SIZE bytes in BUF onto the stack in KPAGE, whose
-   page-relative stack pointer is *OFS, and then adjusts *OFS
-   appropriately.  The bytes pushed are rounded to a 32-bit
-   boundary.
-
-   If successful, returns a pointer to the newly pushed object.
-   On failure, returns a null pointer. */
-static void *
-push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
-{
-  size_t padsize = ROUND_UP (size, sizeof (uint32_t));
-  if (*ofs < padsize)
-    return NULL;
-
-  *ofs -= padsize;
-  memcpy (kpage + *ofs + (padsize - size), buf, size);
-  return kpage + *ofs + (padsize - size);
-}
-
-/* Sets up command line arguments in KPAGE, which will be mapped
-   to UPAGE in user space.  The command line arguments are taken
-   from CMD_LINE, separated by spaces.  Sets *ESP to the initial
-   stack pointer for the process. */
-static bool
-init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
-               void **esp) 
-{
-  size_t ofs = PGSIZE;
-  char *const null = NULL;
-  char *cmd_line_copy;
-  char *karg, *saveptr;
-  int argc;
-  char **argv;
-
-  /* Push command line string. */
-  cmd_line_copy = push (kpage, &ofs, cmd_line, strlen (cmd_line) + 1);
-  if (cmd_line_copy == NULL)
-    return false;
-
-  if (push (kpage, &ofs, &null, sizeof null) == NULL)
-    return false;
-
-  /* Parse command line into arguments
-     and push them in reverse order. */
-  argc = 0;
-  for (karg = strtok_r (cmd_line_copy, " ", &saveptr); karg != NULL;
-       karg = strtok_r (NULL, " ", &saveptr))
-    {
-      void *uarg = upage + (karg - (char *) kpage);
-      if (push (kpage, &ofs, &uarg, sizeof uarg) == NULL)
-        return false;
-      argc++;
-    }
-
-  /* Reverse the order of the command line arguments. */
-  argv = (char **) (upage + ofs);
-  reverse (argc, (char **) (kpage + ofs));
-
-  /* Push argv, argc, "return address". */
-  if (push (kpage, &ofs, &argv, sizeof argv) == NULL
-      || push (kpage, &ofs, &argc, sizeof argc) == NULL
-      || push (kpage, &ofs, &null, sizeof null) == NULL)
-    return false;
-
-  /* Set initial stack pointer. */
-  *esp = upage + ofs;
-  return true;
-}
-
 /* Create a minimal stack for T by mapping a page at the
    top of user virtual memory.  Fills in the page using CMD_LINE
    and sets *ESP to the stack pointer. */
 static bool
-setup_stack (const char *cmd_line, void **esp) 
+setup_stack (const char *file_name, void **esp) 
 {
-  struct page *page = page_allocate (((uint8_t *) PHYS_BASE) - PGSIZE, false);
-  if (page != NULL) 
+  uint8_t *kpage;
+  bool success = false;
+
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL)
     {
-      page->frame = frame_alloc_and_lock (page);
-      if (page->frame != NULL)
-        {
-          bool ok;
-          page->read_only = false;
-          page->private = false;
-          ok = init_cmd_line (page->frame->base, page->addr, cmd_line, esp);
-          frame_unlock (page->frame);
-          return ok;
-        }
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else{
+        palloc_free_page (kpage);
+      }
     }
-  return false;
+   
+    char* p;
+    char* name;
+    int argc=0;
+    char* fn_copy=calloc(1,strlen(file_name)+1);
+    strlcpy(fn_copy,file_name,strlen(file_name)+1);
+    for (name = strtok_r(fn_copy," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    {
+      argc=argc+1;
+    }
+    int i=0;
+    int* argv=calloc(argc,sizeof(int));
+    for (name = strtok_r(file_name," ",&p); name!=NULL; name=strtok_r(NULL," ",&p))
+    {
+      *esp-=strlen(name)+1;
+      memcpy(*esp,name,strlen(name)+1);
+      argv[i]=(int)*esp;
+      i++;
+    }
+    while((int)*esp%4!=0){
+      char a=0;
+      *esp-=1;
+      memcpy(*esp,&a,1);
+    }
+    int null=0;
+    *esp-=sizeof(int);
+    memcpy(*esp,&null,sizeof(int));
+    for ( i = argc-1; i >= 0; i--)
+    {
+      *esp-=sizeof(int);
+      memcpy(*esp,&argv[i],sizeof(int));
+    }
+    int aa=(int)*esp;
+    *esp-=sizeof(int);
+    memcpy(*esp,&aa,sizeof(int));
+    *esp-=sizeof(int);
+    memcpy(*esp,&argc,sizeof(int));
+    *esp-=sizeof(int);
+    memcpy(*esp,&null,sizeof(int));
+    free(fn_copy);
+    free(argv);
+    return success;
 }
