@@ -297,7 +297,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int i;
   char* p;
   char* name=calloc(1,strlen(file_name)+1);
-  lock_acquire(&file_lock);
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
@@ -307,7 +306,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   strlcpy(name,file_name,strlen(file_name)+1);
   name=strtok_r(name," ",&p);
-  file = filesys_open (name);
+  file=file_open(filesys_open(name));
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -388,7 +387,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp,file_name))
+  if (!setup_stack (esp,(char*)file_name))
     goto done;
 
   /* Start address. */
@@ -399,7 +398,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   free(name);
-  lock_release(&file_lock);
   return success;
 }
 
