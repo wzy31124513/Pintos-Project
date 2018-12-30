@@ -69,15 +69,16 @@ start_process (void *exec_table)
 {
   struct intr_frame if_;
   bool success;
-
-  thread_current ()->wd = exec->wd;
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+  struct exec_table *exec = exec_table;
+  thread_current ()->wd = exec_table->wd;
   success = load (exec->file_name, &if_.eip, &if_.esp);
+
 
   if(success){
     exec->child_proc=malloc(sizeof(struct child_proc));
@@ -150,7 +151,7 @@ process_exit (void)
   printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
   if (cur->child_proc != NULL) {
     struct child_proc *c = cur->child_proc;
-    c->ret = cur->exitcode;
+    c->ret = cur->exit_code;
     sema_up (&c->exit);
     lock_acquire(&c->lock);
     int temp=--c->status;
@@ -277,7 +278,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (const char *cmd_line, void **esp);
+static bool setup_stack (void** esp,char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -294,6 +295,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
+  bool success = false;
   char* name=malloc(strlen(file_name)+1);
   char *p;
   int i;
@@ -503,7 +505,7 @@ static void reverse (int argc, char **argv);
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool setup_stack (void** esp,char* file_name)
+static bool setup_stack (void** esp,char* file_name);
 {
   struct page *page=page_alloc(((uint8_t *)PHYS_BASE)-PGSIZE,false);
   if (page!=NULL) 
