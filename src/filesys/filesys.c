@@ -165,27 +165,32 @@ static bool name2entry (const char *name,struct dir **dir, char base_name[15])
   return true;
 }
 
-static int get_next_part (char name[NAME_MAX], const char **srcp)
+static int get_next_part (char name[14], const char **srcp)
 {
-  const char* src=*srcp;
-  char* dst=name;
-  while(*src=='/'){
+  const char *src = *srcp;
+  char *dst = name;
+
+  /* Skip leading slashes.
+     If it's all slashes, we're done. */
+  while (*src == '/')
     src++;
-  }
-  if (*src=='\0')
-  {
+  if (*src == '\0')
     return 0;
-  }
-  while(*src!='/' && *src!='\0'){
-    if (dst<name+14)
+
+  /* Copy up to NAME_MAX character from SRC to DST.
+     Add null terminator. */
+  while (*src != '/' && *src != '\0') 
     {
-      *dst++=*src;
-    }else{
-      return -1;
+      if (dst < name + 14)
+        *dst++ = *src;
+      else
+        return -1;
+      src++; 
     }
-    src++;
-  }
-  *srcp=src;
+  *dst = '\0';
+
+  /* Advance source pointer. */
+  *srcp = src;
   return 1;
 }
 
