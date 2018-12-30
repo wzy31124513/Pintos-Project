@@ -76,7 +76,7 @@ start_process (void *exec_table)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   struct exec_table *exec = exec_table;
-  thread_current ()->wd = exec_table->wd;
+  thread_current ()->wd = exec->wd;
   success = load (exec->file_name, &if_.eip, &if_.esp);
 
 
@@ -505,7 +505,7 @@ static void reverse (int argc, char **argv);
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool setup_stack (void** esp,char* file_name);
+static bool setup_stack (void** esp,char* file_name)
 {
   struct page *page=page_alloc(((uint8_t *)PHYS_BASE)-PGSIZE,false);
   if (page!=NULL) 
