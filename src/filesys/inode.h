@@ -8,22 +8,19 @@
 #include <list.h>
 
 struct bitmap;
-
-/* In-memory inode. */
 struct inode 
   {
     struct list_elem elem;              /* Element in inode list. */
     block_sector_t sector;              /* Sector number of disk location. */
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
-    struct lock lock;                   /* Protects the inode. */
-
-    /* Denying writes. */
-    struct lock deny_write_lock;        /* Protects members below. */
-    struct condition no_writers_cond;   /* Signaled when no writers. */ 
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    int writer_cnt;                     /* Number of writers. */
+    int writer_cnt;
+    struct lock lock;
+    struct lock deny_write;
+    struct condition no_writers;
   };
+
 
 void inode_init (void);
 struct inode * inode_create (block_sector_t sector, bool directory);
