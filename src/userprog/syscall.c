@@ -54,8 +54,8 @@ struct fds{
 struct mapping{
   int id;
   struct file *file;
-  uint8_t *base;
-  size_t page_cnt;
+  uint8_t *addr;
+  size_t num;
   struct list_elem elem;
 };
 
@@ -293,8 +293,8 @@ int mmap (int fd, void *addr){
     free (m);
     return -1;
   }
-  m->base=addr;
-  m->page_cnt=0;
+  m->addr=addr;
+  m->num=0;
   list_push_front(&thread_current()->mappings, &m->elem);
   offset=0;
   length=file_length (m->file);
@@ -310,7 +310,7 @@ int mmap (int fd, void *addr){
     p->rw_bytes = length >= PGSIZE ? PGSIZE : length;
     offset += p->rw_bytes;
     length -= p->rw_bytes;
-    m->page_cnt++;
+    m->num++;
   }
   return m->id;
 }
@@ -318,16 +318,16 @@ int mmap (int fd, void *addr){
 void munmap (int mapping){
   struct mapping *m=getmap (mapping);
   list_remove (&m->elem);
-  for(int i=0;i<m->page_cnt;i++)
+  for(int i=0;i<m->num;i++)
   {
-    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->base+PGSIZE * i))))
+    if(pagedir_is_dirty(thread_current()->pagedir,((const void *)(m->addr+PGSIZE * i))))
     {
-      file_write_at(m->file,(const void *)(m->base+PGSIZE * i),PGSIZE*(m->page_cnt),PGSIZE*i);
+      file_write_at(m->file,(const void *)(m->addr+PGSIZE * i),PGSIZE*(m->num),PGSIZE*i);
     }
   }
-  for(int i=0;i<(int)m->page_cnt;i++)
+  for(int i=0;i<(int)m->num;i++)
   {
-    page_deallocate((void *)(m->base+PGSIZE * i));
+    page_deallocate((void *)(m->addr+PGSIZE * i));
   }
   free (m);
 }
