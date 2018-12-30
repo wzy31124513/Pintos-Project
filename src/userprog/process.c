@@ -516,64 +516,70 @@ setup_stack (void **esp,char* file_name)
 {
   uint8_t *kpage;
   bool success = false;
-  char *token;
-  char ** save_ptr;
+
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE; 
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
 
-  char **argv = malloc (2 * sizeof(char *));
-  int argc = 0, argv_size = 2;
+  char *token, *save_ptr;
+  int argc = 0,i;
 
-  for (token = (char *)file_name; token != NULL;
-       token = strtok_r (NULL, " ", save_ptr))
-  {
-    *esp -= strlen (token) + 1;
-    argv[argc] = *esp;
+  char * copy = malloc(strlen(file_name)+1);
+  strlcpy (copy, file_name, strlen(file_name)+1);
+
+
+  for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr))
     argc++;
-    
-    if (argc >= argv_size) 
+
+
+  int *argv = calloc(argc,sizeof(int));
+
+  for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr),i++)
     {
-      argv_size = argv_size * 2;
-      argv = realloc (argv, argv_size * sizeof (char *));
+      *esp -= strlen(token) + 1;
+      memcpy(*esp,token,strlen(token) + 1);
+
+      argv[i]=*esp;
     }
-    memcpy (*esp, token, strlen (token) + 1); 
-  }
 
-  size_t align = ((size_t) *esp) & (4 - 1);
-  if (align) 
+  while((int)*esp%4!=0)
   {
-   *esp -= align;
-   char *align_value = calloc (align, sizeof (char));
-   memcpy (*esp, align_value , align);
+    *esp-=sizeof(char);
+    char x = 0;
+    memcpy(*esp,&x,sizeof(char));
   }
 
-  argv[argc] = 0; 
+  int zero = 0;
 
-  int i = 0;
-  for (i = argc; i >= 0; i--)
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  for(i=argc-1;i>=0;i--)
   {
-   *esp -= sizeof (char *);
-   memcpy (*esp, &argv[i], sizeof (char *));
+    *esp-=sizeof(int);
+    memcpy(*esp,&argv[i],sizeof(int));
   }
-  
-  char *argv_addr = *esp;
-  *esp -= sizeof (char **);
-  memcpy (*esp, &argv_addr, sizeof (char **));
 
-  *esp -= sizeof (int);
-  memcpy (*esp, &argc, sizeof (int));
+  int pt = *esp;
+  *esp-=sizeof(int);
+  memcpy(*esp,&pt,sizeof(int));
 
-  *esp -= sizeof (void *);
-  memcpy (*esp, &argv[argc], sizeof (void *));
+  *esp-=sizeof(int);
+  memcpy(*esp,&argc,sizeof(int));
 
-  free (argv);
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  free(copy);
+  free(argv);
 
   return success;
 }
