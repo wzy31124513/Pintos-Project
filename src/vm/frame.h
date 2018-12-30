@@ -1,23 +1,20 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 
-#include <stdbool.h>
-#include "threads/synch.h"
+#include "vm/page.h"
 
-/* A physical frame. */
 struct frame 
   {
-    struct lock lock;           /* Prevent simultaneous access. */
-    void *base;                 /* Kernel virtual base address. */
-    struct page *page;          /* Mapped process page, if any. */
+	struct page* page;
+	void* addr;
+	struct list_elem elem;
+	struct lock lock;
   };
 
-void frame_init (void);
+void frame_init(void);
+struct frame *frame_alloc(struct page*);
+void frame_lock(struct page*);
+void frame_free(struct frame*);
+void frame_unlock(struct frame*);
 
-struct frame *frame_alloc_and_lock (struct page *);
-void frame_lock (struct page *);
-
-void frame_free (struct frame *);
-void frame_unlock (struct frame *);
-
-#endif /* vm/frame.h */
+#endif
