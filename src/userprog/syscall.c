@@ -134,9 +134,7 @@ int exec(const char* cmd_line)
 {
   int ret;
   char* fn_copy=strcpy_to_kernel(cmd_line);
-  lock_acquire(&file_lock);
   ret=process_execute(fn_copy);
-  lock_release(&file_lock);
   palloc_free_page (fn_copy);
   return ret;
 }
@@ -150,9 +148,7 @@ bool create(const char *file, unsigned initial_size)
 {
   bool ret;
   char* fn_copy=strcpy_to_kernel(file);
-  lock_acquire(&file_lock);
   ret=filesys_create(fn_copy,initial_size);
-  lock_release(&file_lock);
   palloc_free_page (fn_copy);
   return ret;
 }
@@ -161,9 +157,7 @@ bool remove(const char* file)
 {
   char* fn_copy=strcpy_to_kernel(file);
   bool ret;
-  lock_acquire(&file_lock);
   ret=filesys_remove(fn_copy);
-  lock_release(&file_lock);
   palloc_free_page (fn_copy);
   return ret;
 }
@@ -258,9 +252,7 @@ int filesize(int fd)
 {
   struct file_descriptor* f=lookup_file_fd(fd);
   int ret;
-  lock_acquire (&file_lock);
   ret=file_length(f->file);
-  lock_release (&file_lock);
   return ret;
 }
 
@@ -623,7 +615,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_SEEK)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
-    f->eax=seek(args[0],args[1]);
+    seek(args[0],args[1]);
   }else if (func==SYS_TELL)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
@@ -639,7 +631,7 @@ syscall_handler (struct intr_frame *f)
   }else if (func==SYS_MUNMAP)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
-    f->eax=munmap(args[0]);
+    munmap(args[0]);
   }else if (func==SYS_CHDIR)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
