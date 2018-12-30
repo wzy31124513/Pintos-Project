@@ -56,8 +56,8 @@ void cache_flush (void) {
 
 static void cache_writebehind (void *aux UNUSED) {
   while(1){
-    timer_msleep (30 * 1000);
-    cache_flush ();
+    timer_msleep(1000);
+    cache_flush();
   }
 }
 
@@ -173,8 +173,8 @@ struct cache_entry * cache_lock(block_sector_t sector){
       a=false;
       continue;
     }
-    lock_release (&search_lock);
-    timer_msleep (1000);
+    lock_release(&search_lock);
+    timer_msleep(1000);
   }
 }
 
@@ -253,8 +253,8 @@ struct cache_entry * cache_alloc(block_sector_t sector){
       a=false;
       continue;
     }
-    lock_release (&search_lock);
-    timer_msleep (1000);
+    lock_release(&search_lock);
+    timer_msleep(1000);
   }
 }
 
