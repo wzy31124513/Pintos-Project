@@ -107,6 +107,7 @@ struct thread
     struct hash* pages;
     struct list mapping;
     void* esp;
+    int ticks;
     unsigned magic;                     /* Detects stack overflow. */
   };
 

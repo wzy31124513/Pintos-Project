@@ -6,7 +6,6 @@
 #include "userprog/pagedir.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
-#include "filesys/directory.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/interrupt.h"
@@ -16,6 +15,8 @@
 #include "threads/vaddr.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "filesys/directory.h"
+
 struct fds
 {
     struct file *file;
@@ -46,6 +47,12 @@ unsigned tell (int fd);
 void close (int fd);
 int mmap (int fd, void *addr);
 void munmap (int mapping);
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char *name);
+bool isdir (int fd);
+int inumber (int fd);
+
 static void syscall_handler (struct intr_frame *);
 static void argcpy(void* cp,const void* addr1,size_t size);
 static char * strcpy_to_kernel (const char *us);
@@ -361,6 +368,52 @@ void munmap (int mapping)
   return;
 }
 
+bool chdir (const char *dir){
+  bool ok = false;
+  ok = filesys_chdir(udir);
+  return ok;
+}
+
+bool mkdir (const char *dir){
+  bool ok = filesys_create (udir, 0, DIR_INODE);
+  return ok;
+}
+
+bool readdir (int fd, char *name){
+  struct fds *fd = getfile (handle);
+  if (fds->dir==NULL)
+  {
+    exit1(-1);
+  }
+  bool ok = dir_readdir (fd->dir, uname);
+  return ok;
+}
+bool isdir (int fd){
+  struct fds *fd = getfile (handle);
+  return fd->dir != NULL;
+}
+int inumber (int fd){
+  struct fds* fds=getfile(fd);
+  if (isdir(fd))
+  {
+    if (fds->dir==NULL)
+    {
+      exit1(-1);
+    }
+    struct inode* inode=dir_get_inode(fds->dir);
+    return inode_get_inumber(inode);
+  }else{
+    if (fds->f==NULL)
+    {
+      exit1(-1);
+    }
+    struct inode* inode=file_get_inode(fds->f);
+    return inode_get_inumber(inode);
+  }
+}
+
+
+
 void
 syscall_init (void)
 {
@@ -373,9 +426,7 @@ syscall_handler (struct intr_frame *f)
   unsigned func;
   int args[3];
   argcpy(&func,f->esp,sizeof(func));
-  if(func>=15){
-    exit1(-1);
-  }
+
   memset(args,0,sizeof(args));
   if (func==SYS_HALT)
   {
@@ -436,6 +487,28 @@ syscall_handler (struct intr_frame *f)
   {
     argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
     munmap(args[0]);
+  }else if (func==SYS_CHDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=chdir(args[0]);
+  }else if (func==SYS_MKDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=mkdir((const char *)args[0]);
+  }else if (func==SYS_READDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args)*2);
+    f->eax=readdir(args[0],args[1]);
+  }else if (func==SYS_ISDIR)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+   f->eax= isdir(args[0]);
+  }else if (func==SYS_INUMBER)
+  {
+    argcpy(args,(uint32_t*)f->esp+1,sizeof(*args));
+    f->eax=inumber(args[0]);
+  }else{
+    exit(-1);
   }
 }
 
@@ -493,7 +566,7 @@ static char * strcpy_to_kernel (const char *str)
 }
 
 
-static struct fds* getfile(int fd){
+static struct fds * getfile(int fd){
   struct list_elem *e;
   struct fds* fds;
   for(e=list_begin(&thread_current()->file_list);e!=list_end(&thread_current()->file_list);e=list_next(e))
@@ -507,7 +580,7 @@ static struct fds* getfile(int fd){
   return NULL;
 }
 
-static struct mapping* getmap (int fd)
+static struct mapping * getmap (int fd)
 {
   struct list_elem *e;
   for (e = list_begin (&thread_current()->mapping); e != list_end (&thread_current()->mapping);e = list_next (e))
