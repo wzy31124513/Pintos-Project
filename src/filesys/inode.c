@@ -478,6 +478,19 @@ bool is_directory (const struct inode * inode){
   return ret;
 }
 
+/* Returns the number of openers. */
+int
+inode_open_cnt (const struct inode *inode) 
+{
+  int open_cnt;
+  
+  lock_acquire (&open_inodes_lock);
+  open_cnt = inode->open_cnt;
+  lock_release (&open_inodes_lock);
+
+  return open_cnt;
+}
+
 struct inode * file_create (block_sector_t sector, off_t length) {
   struct inode *inode = inode_create(sector, 0);
   if (inode != NULL && length>0 && inode_write_at(inode,"",1,length-1)!=1)
