@@ -38,7 +38,6 @@ void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
 struct inode * file_create (block_sector_t sector, off_t length);
-int inode_open_cnt (const struct inode *);
 bool is_directory (const struct inode *);
 void inode_deallocate (block_sector_t sector, int level);
 #endif /* filesys/inode.h */
