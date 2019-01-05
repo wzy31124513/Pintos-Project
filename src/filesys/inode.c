@@ -188,7 +188,7 @@ void inode_deallocate (block_sector_t sector, int level) {
   {
     struct cache_entry* c=cache_lock(sector);
     block_sector_t* block=cache_read(c);
-    for (int i = 0; i < ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))); ++i)
+    for (int i = 0; i < ((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t))); ++i)
     {
       if (block[i])
       {
@@ -198,21 +198,21 @@ void inode_deallocate (block_sector_t sector, int level) {
     cache_unlock(c);
   }
   lock_acquire (&search_lock);
-  for (int i = 0; i < 64; i++){
-    struct cache_entry *b = &cache[i];
-    lock_acquire (&b->lock);
-    if (b->sector == sector) {
-      lock_release (&search_lock);
-      if (b->readers == 0 && b->read_waiters == 0 && b->writers == 0 && b->write_waiters == 0){
+  for (int i = 0; i < 64; ++i){
+    struct cache_entry *b=&cache[i];
+    lock_acquire(&b->lock);
+    if (b->sector==sector) {
+      lock_release(&search_lock);
+      if (b->readers==0 && b->read_waiters==0 && b->writers==0 && b->write_waiters==0){
         b->sector = (block_sector_t)-1; 
       }
-      lock_release (&b->lock);
-      free_map_release (sector);
+      lock_release(&b->lock);
+      free_map_release(sector);
       return;
     }
-    lock_release (&b->lock);
+    lock_release(&b->lock);
   }
-  lock_release (&search_lock);
+  lock_release(&search_lock);
   free_map_release(sector);
 }
 
@@ -238,18 +238,18 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
     offset_cnt=1;
   }else{
     sector_idx-=123;
-    if (sector_idx<((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))
+    if (sector_idx<((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t))))
     {
-      offsets[0]=123 + sector_idx / ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
-      offsets[1]=sector_idx % ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
+      offsets[0]=123+sector_idx/((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)));
+      offsets[1]=sector_idx%((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)));
       offset_cnt=2;
     }else{
-      sector_idx-=((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
-      if (sector_idx < 1 * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))) * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))
+      sector_idx-=((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)));
+      if (sector_idx<((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)))*((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t))))
       {
-        offsets[0]=(124+ sector_idx / (((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))) * ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)))));
-        offsets[1]=sector_idx / ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
-        offsets[2]=sector_idx % ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t)));
+        offsets[0]=(124+sector_idx/(((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)))*((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)))));
+        offsets[1]=sector_idx/((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)));
+        offsets[2]=sector_idx%((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t)));
         offset_cnt=3;
       }
     }
@@ -270,23 +270,23 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
         if ((level==0 && offsets[level]+1<123) || (level>0 && offsets[level]+1 < ((off_t) (BLOCK_SECTOR_SIZE / sizeof (block_sector_t))))) 
         {
           uint32_t next_sector=data[offsets[level]+1];
-          if (next_sector && next_sector < block_size(fs_device)){
-            struct readahead_block *block = malloc (sizeof(struct readahead_block));
-            block->sector = next_sector;
+          if (next_sector && next_sector<block_size(fs_device)){
+            struct readahead_block *block=malloc (sizeof(struct readahead_block));
+            block->sector=next_sector;
             lock_acquire (&readahead_lock);
             list_push_back (&readahead_list,&block->elem);
             cond_signal (&readahead_list_nonempty, &readahead_lock);
             lock_release (&readahead_lock);
           }
         }
-        cache_unlock (c);
+        cache_unlock(c);
         *data_block=cache_alloc(sector);
         return true;
       }
-      cache_unlock (c);
+      cache_unlock(c);
       continue;
     }
-    cache_unlock (c);
+    cache_unlock(c);
     if (!allocate) 
     {
       *data_block = NULL;
@@ -313,10 +313,10 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
     cache_unlock (c);
     if (level == offset_cnt - 1) 
     {
-      *data_block = next_cache;
+      *data_block=next_cache;
       return true;
     }
-    cache_unlock (next_cache);
+    cache_unlock(next_cache);
   }
 }
 
