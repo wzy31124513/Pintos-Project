@@ -57,6 +57,8 @@ inode_create (block_sector_t sector, bool directory)
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
+
+
   memset(cache->data,0,BLOCK_SECTOR_SIZE);
   cache->correct=true;
   disk_inode=(struct inode_disk*)cache->data;
@@ -109,6 +111,7 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+
   lock_init(&inode->lock);
   lock_init(&inode->deny_write);
   cond_init(&inode->no_writers);
@@ -190,7 +193,7 @@ void inode_deallocate (block_sector_t sector, int level) {
     block_sector_t* block=cache_read(c);
     for (int i = 0; i < ((off_t)(BLOCK_SECTOR_SIZE/sizeof(block_sector_t))); ++i)
     {
-      if (block[i])
+      if(block[i])
       {
         inode_deallocate(sector,level-1);
       }
@@ -226,9 +229,7 @@ inode_remove (struct inode *inode)
 }
 
 static bool
-get_data_block (struct inode *inode, off_t offset, bool allocate,
-                struct cache_entry **data_block) 
-{
+get_data_block (struct inode *inode, off_t offset, bool allocate,struct cache_entry **data_block) {
   size_t offsets[3];
   size_t offset_cnt=0;
   off_t sector_idx=offset/BLOCK_SECTOR_SIZE;
@@ -289,7 +290,7 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
     cache_unlock(c);
     if (!allocate) 
     {
-      *data_block = NULL;
+      *data_block=NULL;
       return true;
     }
     c=cache_lock(sector);
@@ -342,16 +343,17 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
       /* Number of bytes to actually copy out of this sector. */
       int chunk_size = size < min_left ? size : min_left;
-      if (chunk_size <= 0 || !get_data_block(inode,offset,false,&c))
+
+      bool ok=get_data_block(inode,offset,false,&c);
+      if (chunk_size <= 0 || !ok)
         break;
 
-      if (c == NULL) 
+      if (c == NULL){
         memset (buffer + bytes_read, 0, chunk_size);
-      else 
-        {
-          const uint8_t* data=cache_read(c);
-          memcpy (buffer + bytes_read, data + sector_ofs, chunk_size);
-          cache_unlock(c);
+      }else {
+        const uint8_t* data=cache_read(c);
+        memcpy(buffer+bytes_read,data+sector_ofs,chunk_size);
+        cache_unlock(c);
         }
       
       /* Advance. */
@@ -396,7 +398,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < min_left ? size : min_left;
 
-      if (chunk_size <= 0 || !get_data_block(inode,offset,true,&block))
+      bool ok=get_data_block(inode,offset,true,&block);
+      if (chunk_size <= 0 || !ok)
         break;
 
       uint8_t* data=cache_read(block);
