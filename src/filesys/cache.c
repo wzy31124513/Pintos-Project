@@ -77,6 +77,15 @@ static void readahead (void *aux UNUSED){
   }
 }
 
+void cache_readahead (block_sector_t sector) {
+  struct readahead_block *block = malloc (sizeof(struct readahead_block));
+  block->sector = sector;
+  lock_acquire (&readahead_lock);
+  list_push_back (&readahead_list,&block->elem);
+  cond_signal (&readahead_list_nonempty, &readahead_lock);
+  lock_release (&readahead_lock);
+}
+
 void* cache_read(struct cache_entry* c){
   lock_acquire(&c->data_lock);
   if (!c->correct)
