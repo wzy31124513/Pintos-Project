@@ -271,7 +271,12 @@ get_data_block (struct inode *inode, off_t offset, bool allocate,
         {
           uint32_t next_sector=data[offsets[level]+1];
           if (next_sector && next_sector < block_size(fs_device)){
-            cache_readahead (next_sector); 
+            struct readahead_block *block = malloc (sizeof(struct readahead_block));
+            block->sector = next_sector;
+            lock_acquire (&readahead_lock);
+            list_push_back (&readahead_list,&block->elem);
+            cond_signal (&readahead_list_nonempty, &readahead_lock);
+            lock_release (&readahead_lock);
           }
         }
         cache_unlock (c);
