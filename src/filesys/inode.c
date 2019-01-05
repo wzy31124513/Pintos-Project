@@ -344,8 +344,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       /* Number of bytes to actually copy out of this sector. */
       int chunk_size = size < min_left ? size : min_left;
 
-      bool ok=get_data_block(inode,offset,false,&c);
-      if (chunk_size <= 0 || !ok)
+      if (chunk_size <= 0 || !get_data_block(inode,offset,false,&c))
         break;
 
       if (c == NULL){
@@ -398,8 +397,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < min_left ? size : min_left;
 
-      bool ok=get_data_block(inode,offset,true,&block);
-      if (chunk_size <= 0 || !ok)
+      if (chunk_size <= 0 || !get_data_block(inode,offset,true,&block))
         break;
 
       uint8_t* data=cache_read(block);
