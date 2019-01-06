@@ -100,7 +100,6 @@ struct thread
     int fd_num;
     struct list file_list;
     struct file *self;
-    int64_t wakeup_time;
     int ticks;
     struct dir *wd;
     /* Owned by thread.c. */

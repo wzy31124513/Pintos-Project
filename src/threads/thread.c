@@ -134,6 +134,7 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+  
    struct list_elem* a=list_begin(&all_list);          
    for(a=list_begin(&all_list);a!=list_end(&all_list);a=list_next(a)){
      struct thread* t=list_entry(a,struct thread,allelem);
