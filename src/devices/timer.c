@@ -87,13 +87,6 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-static bool cmp (const struct list_elem *a_,const struct list_elem *b_,void *aux UNUSED){
-  const struct thread *a = list_entry (a_, struct thread, timer_elem);
-  const struct thread *b = list_entry (b_, struct thread, timer_elem);
-  return a->wakeup_time < b->wakeup_time;
-}
-
-
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
