@@ -99,13 +99,16 @@ static bool cmp (const struct list_elem *a_,const struct list_elem *b_,void *aux
 void
 timer_sleep (int64_t ticks) 
 {
-  struct thread *t = thread_current ();
-  t->wakeup_time=timer_ticks()+ticks;
+  if(ticks<=0){
+      return;
+  }
+  int64_t start = timer_ticks ();
   ASSERT (intr_get_level () == INTR_ON);
-  enum intr_level old_level = intr_disable ();
-  list_insert_ordered(&wait_list,&t->timer_elem,cmp,NULL);
+  enum intr_level old_level=intr_disable();
+  thread_current()->ticks=ticks;
+  thread_block();
+  
   intr_set_level(old_level);
-  sema_down (&t->timer_sema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -184,15 +187,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-
-  while (!list_empty (&wait_list)){
-    struct thread *t = list_entry(list_front(&wait_list),struct thread,timer_elem);
-    if (ticks<t->wakeup_time){
-      break;
-    }
-    sema_up(&t->timer_sema);
-    list_pop_front(&wait_list);
-  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

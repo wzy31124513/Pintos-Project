@@ -101,8 +101,7 @@ struct thread
     struct list file_list;
     struct file *self;
     int64_t wakeup_time;
-    struct list_elem timer_elem;
-    struct semaphore timer_sema;
+    int ticks;
     struct dir *wd;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

@@ -134,7 +134,16 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
+   struct list_elem* a=list_begin(&all_list);          
+   for(a=list_begin(&all_list);a!=list_end(&all_list);a=list_next(a)){
+     struct thread* t=list_entry(a,struct thread,allelem);
+      if(t->ticks>0){
+      t->ticks=t->ticks-1;
+      if(t->ticks==0){
+        thread_unblock(t);
+      }
+    }
+   }
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -477,9 +486,9 @@ init_thread (struct thread *t, const char *name, int priority, tid_t tid)
   t->fd_num=2;
   list_init (&t->file_list);
   t->self=NULL;
-  sema_init (&t->timer_sema, 0);
   t->pagedir=NULL;
   t->wd=NULL;
+  t->ticks=0;
   list_push_back (&all_list, &t->allelem);
 }
 
