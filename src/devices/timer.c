@@ -185,15 +185,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  while (!list_empty (&wait_list))
-    {
-      struct thread *t = list_entry (list_front (&wait_list),
-                                     struct thread, timer_elem);
-      if (ticks < t->wakeup_time) 
-        break;
-      sema_up (&t->timer_sema);
-      list_pop_front (&wait_list);
+  while (!list_empty (&wait_list)){
+    struct thread *t = list_entry(list_front(&wait_list),struct thread,timer_elem);
+    if (ticks<t->wakeup_time){
+      break;
     }
+    sema_up(&t->timer_sema);
+    list_pop_front(&wait_list);
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
